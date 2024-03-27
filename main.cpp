@@ -17,19 +17,18 @@ class AudioToolWindow : public Widget
     std::vector<float> m_sound_data;
     std::vector<float> m_sound_data_x;
     fftw_plan m_fftplan;
-    double *m_fftin = NULL;
-    fftw_complex *m_fftout = NULL;
-    float *m_fftdraw = NULL;
-    float *m_fftfreqs = NULL;
+    double *m_fftin = nullptr;
+    fftw_complex *m_fftout = nullptr;
+    float *m_fftdraw = nullptr;
+    float *m_fftfreqs = nullptr;
     int m_capture_size = 0;
     float m_audio_gain = 1.0f;
     int m_combo_in = 0;
     int m_combo_out = 0;
-
     int m_in_sample_rate = 0;
     int m_out_sample_rate = 0;
-
     float m_latency = 0.2f;
+    
 public:
     AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager)
     {
@@ -47,19 +46,40 @@ public:
         m_combo_out = m_audiomanager.get_output_device_reverse_map(m_audio_out_idx);
 
         m_sine_generator.init(m_audiomanager, m_audio_out_idx, -1);
+
         reinit_recorder();
-        init_capture(4096);
         m_fftplan = fftw_plan_dft_r2c_1d(m_capture_size, m_fftin, m_fftout, FFTW_ESTIMATE);
     }
 
     virtual ~AudioToolWindow(){
         m_sine_generator.destroy();
         fftw_destroy_plan(m_fftplan);
+        destroy_capture();
+    }
 
+    void destroy_capture()
+    {
         delete[] m_fftin;
         delete[] m_fftout;
         delete[] m_fftdraw;
         delete[] m_fftfreqs;
+
+        m_fftin = nullptr;
+        m_fftout = nullptr;
+        m_fftdraw = nullptr;
+        m_fftfreqs = nullptr;
+    }
+
+    void init_capture()
+    {
+        int capture_size = m_audiorecorder.get_buffer_capacity(m_latency);
+        printf("Capture %i\n",capture_size);
+        destroy_capture();
+        m_fftin = new double[capture_size];
+        m_fftout = new fftw_complex[capture_size];
+        m_fftdraw = new float[capture_size/2];
+        m_fftfreqs = new float[capture_size/2];   
+        m_capture_size = capture_size;     
     }
 
     void reinit_recorder()
@@ -67,15 +87,7 @@ public:
         if (m_audiorecorder.init(m_latency, m_audio_in_idx, m_audiomanager.get_input_sample_rates()[m_in_sample_rate])){
             m_audiorecorder.start();
         }
-    }
-
-    void init_capture(int capture_size)
-    {
-        m_fftin = new double[capture_size];
-        m_fftout = new fftw_complex[capture_size];
-        m_fftdraw = new float[capture_size/2];
-        m_fftfreqs = new float[capture_size/2];   
-        m_capture_size = capture_size;     
+        init_capture();
     }
 
     void reset_sine_generator(){
@@ -103,6 +115,7 @@ public:
 
         const std::vector<std::string>& out_devices = m_audiomanager.get_output_devices();
         if (ImGui::Combo("Ouput devs", &m_combo_out, vector_getter, (void*)&out_devices, out_devices.size())){
+            m_audio_out_idx = m_audiomanager.get_output_device_map(m_combo_out);
             reset_sine_generator();
         }
 

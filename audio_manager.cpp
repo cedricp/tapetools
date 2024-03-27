@@ -319,3 +319,8 @@ const std::vector<int> audioManager::get_output_sample_rates()
     }
     return sample_rates;
 }
+
+SoundIoRingBuffer* audioManager::get_new_ringbuffer(int capacity)
+{
+    return soundio_ring_buffer_create(m_soundio, capacity);
+}

@@ -54,7 +54,8 @@ bool audioRecorder::init(float buffer_capacity, int device_idx, int samplerate)
     }
 
     int capacity = buffer_capacity * m_instream->sample_rate * m_instream->bytes_per_frame;
-    m_ring_buffer = soundio_ring_buffer_create(m_manager.get_soundio(), capacity);
+    printf("Capacity2 %i\n", capacity);
+    m_ring_buffer = m_manager.get_new_ringbuffer(capacity);
 
     return true;
 }
@@ -182,5 +183,5 @@ int audioRecorder::get_current_samplerate()
 
 int audioRecorder::get_buffer_capacity(float time)
 {
-    return time * float(m_instream->sample_rate * m_instream->bytes_per_frame);
+    return time * float(m_instream->sample_rate);
 }

@@ -50,6 +50,7 @@ public:
     bool valid(){return m_valid;}
     SoundIo* get_soundio(){return m_soundio;}
 
+    SoundIoRingBuffer* get_new_ringbuffer(int capacity);
 };
 
 
