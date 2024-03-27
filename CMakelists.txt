@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.5.0)
+project(tapetools C CXX)
+
+set(CMAKE_MODULE_PATH ${tapetools_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+
+find_package(OpenGL REQUIRED)
+find_package(GLEW REQUIRED)
+find_package(SDL2 REQUIRED)
+find_package(FFTW3 REQUIRED)
+
+add_subdirectory(libsoundio)
+add_subdirectory(libimgui)
+
+add_executable(tapetools audio_manager.cpp audio_sine_gen.cpp audio_record.cpp main.cpp)
+add_compile_definitions(tapetools "SOUNDIO_STATIC_LIBRARY")
+target_include_directories(tapetools PRIVATE "libimgui/include" "libsoundio/include")
+target_link_libraries(tapetools fftw3 libsoundio_static imgui_static)
