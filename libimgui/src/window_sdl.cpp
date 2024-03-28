@@ -346,6 +346,7 @@ void Widget::draw_widget()
 			_sizex = w;
 			_sizey = h;
 			flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
+			flags |= ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoBringToFrontOnFocus;
 		}
 
 		if(ImGui::Begin(_name.c_str(), &_is_open, flags)){
@@ -612,6 +613,7 @@ void App_SDL::run()
         		}
         	}
         }
+		//ImPlot::SetCurrentContext(_implotcontext);
 		for(auto window: _impl->_windows){
 			window->draw(false);
 		}

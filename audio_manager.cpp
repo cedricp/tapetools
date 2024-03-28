@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <math.h>
 
-static int g_samplerates[] = {96000, 48000, 44100, 24000, 12000, 12355, 8000, 4000, 2000};
+static int g_samplerates[] = {96000, 48000, 44100, 24000, 12000, 8000, 4000, 2000};
 
 audioManager::audioManager(SoundIoBackend backend)
 {

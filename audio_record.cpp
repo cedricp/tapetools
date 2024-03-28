@@ -54,7 +54,6 @@ bool audioRecorder::init(float buffer_capacity, int device_idx, int samplerate)
     }
 
     int capacity = buffer_capacity * m_instream->sample_rate * m_instream->bytes_per_frame;
-    printf("Capacity2 %i\n", capacity);
     m_ring_buffer = m_manager.get_new_ringbuffer(capacity);
 
     return true;
@@ -157,7 +156,7 @@ void audioRecorder::get_data(std::vector<float>& data, size_t size)
 
     data.resize(size);
 
-    constexpr float inv16 = 1.0 / INT16_MAX;
+    constexpr float inv16 = 1.0f / INT16_MAX;
 
     for (int i = 0; i < size; ++i){
         data[i] = float(read_buf[i]) * inv16;
@@ -183,5 +182,8 @@ int audioRecorder::get_current_samplerate()
 
 int audioRecorder::get_buffer_capacity(float time)
 {
+    if (m_instream == nullptr){
+        return 0;
+    }
     return time * float(m_instream->sample_rate);
 }
