@@ -74,7 +74,7 @@ class AudioToolWindow : public Widget
     int m_combo_out = 0;
     int m_in_sample_rate = 0;
     int m_out_sample_rate = 0;
-    float m_latency = 0.1f;
+    float m_latency = 0.2f;
 
     bool m_sound_setup_open = false;
     bool m_tone_generator_open = false;
@@ -128,13 +128,13 @@ public:
         if (capture_size == 0){
             return;
         }
-        destroy_capture();
+        destroy_capture(); 
         m_fftin = new double[capture_size];
         m_fftout = new fftw_complex[capture_size];
         m_fftdraw = new float[capture_size/2];
         m_fftfreqs = new float[capture_size/2];   
         m_capture_size = capture_size;
-        m_fftplan = fftw_plan_dft_r2c_1d(m_capture_size, m_fftin, m_fftout, FFTW_ESTIMATE);
+        m_fftplan = fftw_plan_dft_r2c_1d(m_capture_size, m_fftin, m_fftout, FFTW_MEASURE);
     }
 
     void reinit_recorder()
@@ -156,18 +156,26 @@ public:
     void draw() override {
         m_audiomanager.flush();
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
-        int fft_capture_size = m_capture_size / 2;
+        const int fft_capture_size = m_capture_size / 2;
+        const float inv_capture_size = 1.0f / float(fft_capture_size);
 
         // Check that the buffer contains enough data
-        int needed_bytes = m_capture_size * sizeof(short);
+        int channelcount = m_audiorecorder.get_channel_count();
+        int needed_bytes = m_capture_size * sizeof(short) * channelcount;
+
         if (m_audiorecorder.get_available_bytes() > needed_bytes){
-            m_audiorecorder.get_data(m_sound_data, m_capture_size);
+            std::vector<float> raw_buffer;
+            m_sound_data.resize(m_capture_size);
+            m_audiorecorder.get_data(raw_buffer, m_capture_size * channelcount);
             m_sound_data_x.resize(m_capture_size);
 
             // Fill audio waveform
-            for (int i = 0; i < m_capture_size; ++i){
+            for (int i = 0; i < m_capture_size; i++){
                 if (m_audio_gain != 1.0f){
-                    m_sound_data[i] *= m_audio_gain;
+                    m_sound_data[i] = raw_buffer[i*channelcount] * m_audio_gain;
+                } else {
+                    //m_sound_data[i] = sin(1000.0*i*2.0*3.14/44100.);//raw_buffer[i*channelcount];
+                    m_sound_data[i] = raw_buffer[i*channelcount];
                 }
                 m_fftin[i] = m_sound_data[i] * m_window_fn(i, m_capture_size);
                 m_sound_data_x[i] = float(i) / (current_sample_rate * 0.001f);
@@ -177,11 +185,9 @@ public:
             fftw_execute(m_fftplan);
             for (int i = 0; i < fft_capture_size; ++i){
                 m_fftfreqs[i] = current_sample_rate / 2. / float(fft_capture_size) * float(i); 
-                m_fftout[i][0] *= 2./float(m_capture_size);
-                m_fftout[i][1] *= 2./float(m_capture_size);
-                m_fftdraw[i] = m_fftout[i][0] * m_fftout[i][0] + m_fftout[i][1] * m_fftout[i][1];
-                m_fftdraw[i] = 10. * log10(m_fftdraw[i]);
-                m_fftdraw[i] = std::max(m_fftdraw[i], -110.f);
+                float fftout = sqrtf(m_fftout[i][0] * m_fftout[i][0] + m_fftout[i][1] * m_fftout[i][1]) * inv_capture_size;
+                fftout = 20.f * log10(fftout);
+                m_fftdraw[i] = std::max(fftout, -130.f);
             }
         }
         
@@ -213,7 +219,7 @@ public:
         if (ImPlot::BeginPlot("Audio", ImVec2(-1, plotheight))){
             float xmax = current_sample_rate > 0 ? float(m_capture_size) * (1.f/(current_sample_rate*0.001f)) : INFINITY;
             ImPlot::SetupAxes("Time (ms)", "Amplitude", 0, ImPlotAxisFlags_Lock);
-            ImPlot::SetupAxesLimits(0, xmax, -1.0f, 1.0f);
+            ImPlot::SetupAxesLimits(0, xmax, -1.f, 1.f);
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xmax);
             ImPlot::PlotLine("Audio samples", m_sound_data_x.data(), m_sound_data.data(), m_sound_data_x.size());
             ImPlot::EndPlot();
@@ -222,7 +228,7 @@ public:
         if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, plotheight))){
             float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
             ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock);
-            ImPlot::SetupAxesLimits(0, xfftmax, -110, 0.0);
+            ImPlot::SetupAxesLimits(0, xfftmax, -100, 0.0);
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xfftmax);
             ImPlot::PlotLine("Audio FFT", m_fftfreqs, m_fftdraw, m_sound_data_x.size()/2);
             ImPlot::EndPlot();
