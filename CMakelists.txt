@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.5.0)
 project(tapetools_project C CXX)
 
 set(CMAKE_MODULE_PATH ${tapetools_project_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+set(CMAKE_INSTALL_PREFIX ${tapetools_project_SOURCE_DIR}/INSTALL_${CMAKE_BUILD_TYPE})
 
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
@@ -23,26 +24,34 @@ set_target_properties(tapetools PROPERTIES LINK_FLAGS "-static-libgcc -static-li
 install (TARGETS tapetools RUNTIME DESTINATION bin)
 
 if(WIN32)
-file(GENERATE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/install_deps_${CMAKE_BUILD_TYPE}.cmake CONTENT [[
-set(TARGET_APP $<TARGET_FILE:tapetools>)
-message("path to executable: ${TARGET_APP}")
-message(STATUS "Looking for deps in '${CMAKE_SYSTEM_LIBRARY_PATH};${CMAKE_MINGW_SYSTEM_LIBRARY_PATH}'")
-file(GET_RUNTIME_DEPENDENCIES
-    RESOLVED_DEPENDENCIES_VAR deps_resolved
-    UNRESOLVED_DEPENDENCIES_VAR deps_unresolved
-    LIBRARIES ${TARGET_APP}
-    DIRECTORIES ${CMAKE_SYSTEM_LIBRARY_PATH} ${CMAKE_MINGW_SYSTEM_LIBRARY_PATH} C:/msys64/mingw64/bin
-    PRE_EXCLUDE_REGEXES "api-ms-*" "ext-ms-*"
-    POST_EXCLUDE_REGEXES ".*system32/.*\\.dll"
-    )
-message(STATUS "Resolving runtime dependencies for ${TARGET_APP}-")
-foreach(dep ${deps_resolved})
-    file(INSTALL ${dep} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
-endforeach()
-foreach(dep ${deps_unresolved})
-    message(WARNING "Runtime dependency ${dep} could not be resolved.")
-endforeach()
-]])
+set(CONFIG_FILE ${CMAKE_CURRENT_BINARY_DIR}/install_deps_${CMAKE_BUILD_TYPE}.cmake)
 
-install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/install_deps_${CMAKE_BUILD_TYPE}.cmake)
+#
+# Find and install needed DLLs
+#
+file(GENERATE OUTPUT
+    "${CONFIG_FILE}" CONTENT [[
+    set(TARGET_APP $<TARGET_FILE:tapetools>)
+    message(STATUS "path to executable: ${TARGET_APP}")
+    message(STATUS "paths to cmake library paths ${CMAKELIBPATH}")
+    message(STATUS "Looking for deps in '${TARGET_APP}'")
+    file(GET_RUNTIME_DEPENDENCIES
+        RESOLVED_DEPENDENCIES_VAR deps_resolved
+        UNRESOLVED_DEPENDENCIES_VAR deps_unresolved
+        LIBRARIES ${TARGET_APP}
+        DIRECTORIES ${CMAKELIBPATH}
+        PRE_EXCLUDE_REGEXES "api-ms-*" "ext-ms-*"
+        POST_EXCLUDE_REGEXES ".*system32/.*\\.dll"
+        )
+    message(STATUS "Resolving runtime dependencies for ${TARGET_APP}")
+    foreach(dep ${deps_resolved})
+    file(INSTALL ${dep} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+    message(STATUS "Installing ${dep}")
+    endforeach()
+    foreach(dep ${deps_unresolved})
+    message(WARNING "Runtime dependency ${dep} could not be resolved.")
+    endforeach()
+]])
+install(CODE "set(CMAKELIBPATH \"${CMAKE_SYSTEM_LIBRARY_PATH} ${CMAKE_MINGW_SYSTEM_LIBRARY_PATH}\")")
+install(SCRIPT ${CONFIG_FILE})
 endif()

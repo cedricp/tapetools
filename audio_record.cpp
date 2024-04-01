@@ -53,7 +53,7 @@ bool audioRecorder::init(float buffer_capacity, int device_idx, int samplerate)
         return false;
     }
 
-    int capacity = buffer_capacity * m_instream->sample_rate * m_instream->bytes_per_frame;
+    int capacity = get_buffer_capacity(buffer_capacity) * sizeof(short)*2;
     m_ring_buffer = m_manager.get_new_ringbuffer(capacity);
     return true;
 }
@@ -150,9 +150,6 @@ void audioRecorder::get_data(std::vector<float>& data, size_t size)
 
     size_t fill_bytes = soundio_ring_buffer_fill_count(m_ring_buffer);
     int16_t *read_buf = (int16_t*)soundio_ring_buffer_read_ptr(m_ring_buffer);
-
-    //size = std::min(size, fill_bytes/2);
-
     data.resize(size);
 
     constexpr float inv16 = 1.0f / float(INT16_MAX);
@@ -168,11 +165,20 @@ int audioRecorder::get_available_bytes()
     if (!m_ring_buffer){
         return 0;
     }
+    return soundio_ring_buffer_fill_count(m_ring_buffer)/ m_instream->bytes_per_sample;
+}
+
+int audioRecorder::get_available_samples()
+{
+    if (!m_ring_buffer){
+        return 0;
+    }
     return soundio_ring_buffer_fill_count(m_ring_buffer);
 }
 
 int audioRecorder::get_channel_count()
 {
+    if(m_instream==nullptr) return 0;
     return m_instream->layout.channel_count;
 }
 
@@ -190,5 +196,5 @@ int audioRecorder::get_buffer_capacity(float time)
     if (m_instream == nullptr){
         return 0;
     }
-    return time * float(m_instream->sample_rate);
+    return time * float(m_instream->sample_rate) * float(get_channel_count());
 }
