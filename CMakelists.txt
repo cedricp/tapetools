@@ -14,7 +14,7 @@ find_package(FFTW3 REQUIRED)
 add_subdirectory(libsoundio)
 add_subdirectory(libimgui)
 
-add_executable(tapetools audio_manager.cpp audio_sine_gen.cpp audio_record.cpp main.cpp)
+add_executable(tapetools audio_manager.cpp audio_sine_gen.cpp audio_record.cpp sg_smooth.cpp main.cpp)
 add_compile_definitions(tapetools "SOUNDIO_STATIC_LIBRARY")
 target_include_directories(tapetools PRIVATE "libimgui/include" "libsoundio/include")
 target_link_libraries(tapetools fftw3 libsoundio_static imgui_static)

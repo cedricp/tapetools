@@ -53,7 +53,7 @@ bool audioRecorder::init(float buffer_capacity, int device_idx, int samplerate)
         return false;
     }
 
-    int capacity = get_buffer_capacity(buffer_capacity) * sizeof(short)*2;
+    int capacity = get_buffer_size(buffer_capacity) * sizeof(short);
     m_ring_buffer = m_manager.get_new_ringbuffer(capacity);
     return true;
 }
@@ -165,7 +165,7 @@ int audioRecorder::get_available_bytes()
     if (!m_ring_buffer){
         return 0;
     }
-    return soundio_ring_buffer_fill_count(m_ring_buffer)/ m_instream->bytes_per_sample;
+    return soundio_ring_buffer_fill_count(m_ring_buffer);
 }
 
 int audioRecorder::get_available_samples()
@@ -173,7 +173,7 @@ int audioRecorder::get_available_samples()
     if (!m_ring_buffer){
         return 0;
     }
-    return soundio_ring_buffer_fill_count(m_ring_buffer);
+    return soundio_ring_buffer_fill_count(m_ring_buffer) / m_instream->bytes_per_sample;
 }
 
 int audioRecorder::get_channel_count()
@@ -191,10 +191,10 @@ int audioRecorder::get_current_samplerate()
     return m_instream->sample_rate;
 }
 
-int audioRecorder::get_buffer_capacity(float time)
+int audioRecorder::get_buffer_size(float time, bool channels_mult)
 {
     if (m_instream == nullptr){
         return 0;
     }
-    return time * float(m_instream->sample_rate) * float(get_channel_count());
+    return time * float(m_instream->sample_rate) * float(channels_mult ? get_channel_count() : 1);
 }

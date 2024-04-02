@@ -24,5 +24,5 @@ public:
     int  get_current_samplerate();
     int  get_channel_count();
 
-    int get_buffer_capacity(float time);
+    int get_buffer_size(float time, bool channels_mult = true);
 };
