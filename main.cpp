@@ -224,7 +224,7 @@ public:
         const float inv_fft_capture_size = 1.0f / float(fft_capture_size);
 
 
-        if (m_audiorecorder.get_available_samples() >= m_capture_size){
+        if (m_audiorecorder.get_available_samples() >= m_capture_size * channelcount){
             memset(m_fft_highest_pos, sizeof(m_fft_highest_pos), 0);
             m_fft_highest_val = -100;
             std::vector<float> raw_buffer;
@@ -234,8 +234,11 @@ public:
             m_sound_data_x.resize(m_capture_size);
 
             // Fill audio waveform
-            for (int i = 0; i < m_capture_size * channelcount; i++){
+            for (int i = 0; i < m_capture_size; i++){
                 m_sound_data1[i] = raw_buffer[i*channelcount] * m_audio_gain;
+                m_sound_data1[i] += 0.5f*sin(1000.*float(i) *2.f*3.14159*1./44100.);
+                m_sound_data1[i] += 0.1f*sin(2000.*float(i) *2.f*3.14159*1./44100.);
+                m_sound_data1[i] += 0.05f*sin(4000.*float(i) *2.f*3.14159*1./44100.);
                 if(channelcount>1) m_sound_data2[i] = raw_buffer[i*channelcount+1] * m_audio_gain;
                 if (m_fft_channel == 0){
                     m_fftin[i] = m_sound_data1[i] * m_window_fn(i, m_capture_size);
@@ -266,7 +269,8 @@ public:
             stddev = sqrtf(stddev / (fft_capture_size - 1));
             m_noise_foor = mean + stddev;
 
-            sg_smooth(m_fftdraw, m_fftfiltered, fft_capture_size, 10, 1);
+            //sg_smooth(m_fftdraw, m_fftfiltered, fft_capture_size, 10, 1);
+            smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, 50, 3, 1);
             int found = 0;
             for (int i = 1; i < fft_capture_size-1; ++i){
                 if (m_fftfiltered[i] > m_noise_foor){
