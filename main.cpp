@@ -38,10 +38,11 @@ class AudioToolWindow : public Widget
     int m_fft_channel = 0;
 
     float m_noise_foor = -100;
-    float m_fft_highest_pos[10];
-    int m_fft_highest_idx[10];
+    float m_fft_highest_pos[200];
+    int m_fft_highest_idx[200];
     float m_fft_highest_val;
-    int   m_fft_found_peaks = 0;    
+    int   m_fft_found_peaks = 0;
+    float m_thd = 0; 
 public:
     AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager)
     {
@@ -98,7 +99,7 @@ public:
         m_fftdraw = new float[capture_size/2];
         m_fftfreqs = new float[capture_size/2];   
         m_fftfiltered = new float[capture_size/2];   
-        m_fftplan = fftw_plan_dft_r2c_1d(capture_size, m_fftin, m_fftout, FFTW_MEASURE);
+        m_fftplan = fftw_plan_dft_r2c_1d(capture_size, m_fftin, m_fftout, FFTW_MEASURE | FFTW_PRESERVE_INPUT );
         m_capture_size = capture_size;
         m_fft_channel = 0;
     }
@@ -164,6 +165,8 @@ public:
         ImGui::EndTabBar();
 
         draw_tools_windows();
+
+        //ImPlot::ShowDemoWindow();
     }
 
     void draw_rt_analysis(){
@@ -190,8 +193,10 @@ public:
                 ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock);
                 ImPlot::SetupAxesLimits(0, xfftmax, -130, 0.0);
                 ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xfftmax);
+                char thdtext[16];
+                snprintf(thdtext, 16, "THD : %.2f %%", m_thd);
+                ImPlot::PlotText(thdtext, current_sample_rate/4.0, -20.0f);
                 if (channelcount>0) ImPlot::PlotLine("Audio FFT", m_fftfreqs, m_fftdraw, m_sound_data_x.size()/2);
-                if (channelcount>0) ImPlot::PlotLine("Audio Smoothed FFT", m_fftfreqs, m_fftfiltered, m_sound_data_x.size()/2);
                 for (int i = 0; i < m_fft_found_peaks; ++i){
                     float fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 0., -130.};
                     ImPlot::PlotLine("Peaks", fund, fund+2, 2);
@@ -226,9 +231,10 @@ public:
             // Fill audio waveform
             for (int i = 0; i < m_capture_size; i++){
                 m_sound_data1[i] = raw_buffer[i*channelcount] * m_audio_gain;
-                m_sound_data1[i] += 1.0f*sin(1000.*float(i) *2.f*3.14159*1./44100.);
-                m_sound_data1[i] += 0.1*sin(2000.*float(i) *2.f*3.14159*1./44100.);
-                m_sound_data1[i] += 0.001f*sin(4000.*float(i) *2.f*3.14159*1./44100.);
+                m_sound_data1[i] += 0.7f*sin(1000.*float(i) *2.f*3.14159*1./44100.);
+                // THD test for non linear signal by applying "gamma"
+                // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.1f);
+                // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.1f);
                 if(channelcount>1) m_sound_data2[i] = raw_buffer[i*channelcount+1] * m_audio_gain;
                 if (m_fft_channel == 0){
                     m_fftin[i] = m_sound_data1[i] * m_window_fn(i, m_capture_size);
@@ -245,7 +251,7 @@ public:
                 m_fftfreqs[i] = current_sample_rate * 0.5f * inv_fft_capture_size * float(i); 
                 float fftout = sqrtf(m_fftout[i][0] * m_fftout[i][0] + m_fftout[i][1] * m_fftout[i][1]) * inv_fft_capture_size;
                 fftout = std::max(20.f * log10(fftout), -130.f);
-                m_fftdraw[i] = isnan(fftout) ? -100 : fftout;
+                m_fftdraw[i] = isnan(fftout) ? -130.f : fftout;
                 sum += fftout;
             }
 
@@ -254,14 +260,13 @@ public:
             float stddev = 0;
             for (int i = 0; i < fft_capture_size; ++i){
                 float a = (m_fftdraw[i] - mean);
-                a *= a;
-                stddev += a;
+                stddev += a * a;
             }
             stddev = sqrtf(stddev / (fft_capture_size - 1));
             m_noise_foor = mean + stddev;
 
             // Find peaks
-            smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, 100, 4, 0.5);
+            smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, 50, 4, 0.f);
             int one_count = 0;
             int found = 0;
             for(int i = 200; i < fft_capture_size; ++i){
@@ -287,12 +292,13 @@ public:
                     }
                     m_fft_highest_idx[found] = freq_idx;
                     m_fft_highest_pos[found++] = m_fftfreqs[freq_idx];
-                    if (found > 9) break;
+                    if (found >= 200) break;
                     one_count = 0;
                 }
             }
             m_fft_found_peaks = found;
             
+            // Find max values of filtered signal
             int fundamental_idx = 0;
             float max = -200.;
             for(int i = 0; i < m_fft_found_peaks; ++i){
@@ -302,19 +308,18 @@ public:
                 }
             }
 
-            float thd = 0;
+            // Compute Total Harmonic Distortion
+            // Source http://www.r-type.org/addtext/add183.htm
+            m_thd = 0;
             float fundamental_db = m_fftdraw[m_fft_highest_idx[fundamental_idx]];
             float fundamental = powf(10.f, fundamental_db/20.f);
             for (int i = fundamental_idx + 1; i < m_fft_found_peaks; ++i){
                 float dbc = m_fftdraw[m_fft_highest_idx[i]] - fundamental_db;
                 float v = powf(10.f, dbc/20.f);
-                thd += (v * v) / (fundamental * fundamental); 
+                m_thd += (v * v) ; 
             }
-            thd = sqrtf(thd) * 100.f;
-
-            printf("THD %f\n", thd);
+            m_thd = sqrtf(m_thd) / fundamental * 100.f;
         }
-
     }
 
     void draw_tools_windows(){

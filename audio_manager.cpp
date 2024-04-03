@@ -274,7 +274,7 @@ const std::vector<std::string> audioManager::get_input_sample_rates_str()
 const std::vector<std::string> audioManager::get_output_sample_rates_str()
 {
     std::vector<std::string> sample_rates;
-    if (m_in_device == nullptr){
+    if (m_out_device == nullptr){
         return sample_rates;
     }
     for (int i = 0; i < sizeof(g_samplerates)/sizeof(int); ++i){
