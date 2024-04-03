@@ -2,57 +2,9 @@
 #include "window_sdl.h"
 #include "audio_sine_gen.h"
 #include "audio_record.h"
-#include "sg_smooth.h"
+#include "utils.h"
 #include <fftw3.h>
 
-
-double rectangle(int i, int length)
-{
-	return 1.0;
-}
-
-double hamming(int i, int length)
-{
-	double a, b, w, N1;
-	a = 25.0/46.0;
-	b = 21.0/46.0;
-	N1 = (double)(length-1);
-	w = a - b*cos(2*i*M_PI/N1);
-	return w;
-}
-
-double hann_poisson(int i, int length)
-{
-	double a, N1, w;
-	a = 2.0;
-	N1 = (double)(length-1);
-	w = 0.5 * (1 - cos(2*M_PI*i/N1)) * \
-	    pow(M_E, (-a*(double)abs((int)(N1-1-2*i)))/N1);
-	return w;
-}
-
-double blackman(int i, int length)
-{
-	double a0, a1, a2, w, N1;
-	a0 = 7938.0/18608.0;
-	a1 = 9240.0/18608.0;
-	a2 = 1430.0/18608.0;
-	N1 = (double)(length-1);
-	w = a0 - a1*cos(2*i*M_PI/N1) + a2*cos(4*i*M_PI/N1);
-	return w;
-}
-
-double blackman_harris(int i, int length)
-{
-	double a0, a1, a2, a3, w, N1;
-	a0 = 0.35875;
-	a1 = 0.48829;
-	a2 = 0.14128;
-	a3 = 0.01168;
-	N1 = (double)(length-1);
-	w = a0 - a1*cos(2*i*M_PI/N1) + a2*cos(4*i*M_PI/N1) - a3*cos(6*i*M_PI/N1);
-	return w;
-}
 
 class AudioToolWindow : public Widget
 {
@@ -81,13 +33,13 @@ class AudioToolWindow : public Widget
 
     bool m_sound_setup_open = false;
     bool m_tone_generator_open = false;
-    double (*m_window_fn)(int, int);
-    int m_fft_window_fn = 1;
+    float (*m_window_fn)(int, int);
+    int m_fft_window_fn = 5;
     int m_fft_channel = 0;
 
     float m_noise_foor = -100;
     float m_fft_highest_pos[10];
-    float m_fft_highest_idx[10];
+    int m_fft_highest_idx[10];
     float m_fft_highest_val;
     int   m_fft_found_peaks = 0;    
 public:
@@ -98,7 +50,7 @@ public:
         set_resizable(false);
         set_titlebar(false);
 
-        m_window_fn = hamming;
+        m_window_fn = hann_fft_window;
 
         m_audiomanager.flush();
 
@@ -182,11 +134,12 @@ public:
             }
             if (ImGui::BeginMenu("FFT")){
                 if (ImGui::BeginMenu("Window")){
-                    if (ImGui::MenuItem("Rectangle",       NULL, m_fft_window_fn == 0)){ m_fft_window_fn = 0;m_window_fn = rectangle; }
-                    if (ImGui::MenuItem("Hamming",         NULL, m_fft_window_fn == 1)){ m_fft_window_fn = 1;m_window_fn = hamming; }
-                    if (ImGui::MenuItem("Hann-Poisson",    NULL, m_fft_window_fn == 2)){ m_fft_window_fn = 2;m_window_fn = hann_poisson; }
-                    if (ImGui::MenuItem("Blackman",        NULL, m_fft_window_fn == 3)){ m_fft_window_fn = 3;m_window_fn = blackman; }
-                    if (ImGui::MenuItem("Blackman-Harris", NULL, m_fft_window_fn == 4)){ m_fft_window_fn = 4;m_window_fn = blackman_harris; }
+                    if (ImGui::MenuItem("Rectangle",       NULL, m_fft_window_fn == 0)){ m_fft_window_fn = 0;m_window_fn = rectangle_fft_window; }
+                    if (ImGui::MenuItem("Hamming",         NULL, m_fft_window_fn == 1)){ m_fft_window_fn = 1;m_window_fn = hamming_fft_window; }
+                    if (ImGui::MenuItem("Hann-Poisson",    NULL, m_fft_window_fn == 2)){ m_fft_window_fn = 2;m_window_fn = hann_poisson_fft_window; }
+                    if (ImGui::MenuItem("Blackman",        NULL, m_fft_window_fn == 3)){ m_fft_window_fn = 3;m_window_fn = blackman_fft_window; }
+                    if (ImGui::MenuItem("Blackman-Harris", NULL, m_fft_window_fn == 4)){ m_fft_window_fn = 4;m_window_fn = blackman_harris_fft_window; }
+                    if (ImGui::MenuItem("Hann",            NULL, m_fft_window_fn == 5)){ m_fft_window_fn = 5;m_window_fn = hann_fft_window; }
                     ImGui::EndMenu();
                 }
                 if(ImGui::BeginMenu("Channel")){
@@ -214,78 +167,11 @@ public:
     }
 
     void draw_rt_analysis(){
+
+        int channelcount = m_audiorecorder.get_channel_count(); 
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
-        float inv_current_sample_rage = 1.0f / current_sample_rate;
 
-        // Check that the buffer contains enough data
-        int channelcount = m_audiorecorder.get_channel_count();
-        
-        const int fft_capture_size = m_capture_size / 2;
-        const float inv_fft_capture_size = 1.0f / float(fft_capture_size);
-
-
-        if (m_audiorecorder.get_available_samples() >= m_capture_size * channelcount){
-            memset(m_fft_highest_pos, sizeof(m_fft_highest_pos), 0);
-            m_fft_highest_val = -100;
-            std::vector<float> raw_buffer;
-            m_sound_data1.resize(m_capture_size);
-            m_sound_data2.resize(m_capture_size);
-            m_audiorecorder.get_data(raw_buffer, m_capture_size * channelcount);
-            m_sound_data_x.resize(m_capture_size);
-
-            // Fill audio waveform
-            for (int i = 0; i < m_capture_size; i++){
-                m_sound_data1[i] = raw_buffer[i*channelcount] * m_audio_gain;
-                m_sound_data1[i] += 0.5f*sin(1000.*float(i) *2.f*3.14159*1./44100.);
-                m_sound_data1[i] += 0.1f*sin(2000.*float(i) *2.f*3.14159*1./44100.);
-                m_sound_data1[i] += 0.05f*sin(4000.*float(i) *2.f*3.14159*1./44100.);
-                if(channelcount>1) m_sound_data2[i] = raw_buffer[i*channelcount+1] * m_audio_gain;
-                if (m_fft_channel == 0){
-                    m_fftin[i] = m_sound_data1[i] * m_window_fn(i, m_capture_size);
-                } else {
-                    m_fftin[i] = m_sound_data2[i] * m_window_fn(i, m_capture_size);
-                }
-                m_sound_data_x[i] = float(i) * inv_current_sample_rage * 1000.f;
-            }
-            
-            // Compute and fill audio FFT
-            fftw_execute(m_fftplan);
-            float sum = 0;
-            for (int i = 0; i < fft_capture_size; ++i){
-                m_fftfreqs[i] = current_sample_rate * 0.5f * inv_fft_capture_size * float(i); 
-                float fftout = sqrtf(m_fftout[i][0] * m_fftout[i][0] + m_fftout[i][1] * m_fftout[i][1]) * inv_fft_capture_size;
-                fftout = std::max(20.f * log10(fftout), -100.f);
-                m_fftdraw[i] = isnan(fftout) ? -100 : fftout;
-                sum += fftout;
-            }
-
-            float mean = sum / fft_capture_size;
-            float stddev = 0;
-            for (int i = 0; i < fft_capture_size; ++i){
-                float a = (m_fftdraw[i] - mean);
-                a *= a;
-                stddev += a;
-            }
-            stddev = sqrtf(stddev / (fft_capture_size - 1));
-            m_noise_foor = mean + stddev;
-
-            //sg_smooth(m_fftdraw, m_fftfiltered, fft_capture_size, 10, 1);
-            smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, 50, 3, 1);
-            int found = 0;
-            for (int i = 1; i < fft_capture_size-1; ++i){
-                if (m_fftfiltered[i] > m_noise_foor){
-                    if (m_fftfiltered[i] > m_fftfiltered[i-1] && m_fftfiltered[i] > m_fftfiltered[i+1]){
-                        for (int k = 0; k < found; ++k) if (m_fft_highest_idx[k] == i) continue;
-                        m_fft_highest_pos[found] = m_fftfreqs[i];
-                        m_fft_highest_idx[found++] = i;
-                    }
-                    if (found >= 10) break;
-                }
-            }
-            m_fft_found_peaks = found;
-        }
-
-
+        compute();
         
         ImGui::BeginChild("ScopesChild", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
             int plotheight = height() / 2 - 5;
@@ -302,13 +188,13 @@ public:
             if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, plotheight))){
                 float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
                 ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock);
-                ImPlot::SetupAxesLimits(0, xfftmax, -100, 0.0);
+                ImPlot::SetupAxesLimits(0, xfftmax, -130, 0.0);
                 ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xfftmax);
                 if (channelcount>0) ImPlot::PlotLine("Audio FFT", m_fftfreqs, m_fftdraw, m_sound_data_x.size()/2);
                 if (channelcount>0) ImPlot::PlotLine("Audio Smoothed FFT", m_fftfreqs, m_fftfiltered, m_sound_data_x.size()/2);
                 for (int i = 0; i < m_fft_found_peaks; ++i){
-                    float fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 0., -100.};
-                    ImPlot::PlotLine("Fundamental", fund, fund+2, 2);
+                    float fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 0., -130.};
+                    ImPlot::PlotLine("Peaks", fund, fund+2, 2);
                 }
                 float nf[4] = {0., (current_sample_rate)/2.f, m_noise_foor, m_noise_foor};
                 ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
@@ -320,6 +206,115 @@ public:
                 ImGui::SliderFloat("Gain", &m_audio_gain, 1.f, 100.f);
                 ImGui::Separator();
             }
+    }
+
+    void compute(){
+        int channelcount = m_audiorecorder.get_channel_count();
+
+        if (channelcount && m_audiorecorder.get_available_samples() >= m_capture_size * channelcount){
+            float current_sample_rate = m_audiorecorder.get_current_samplerate();
+            float inv_current_sample_rage = 1.0f / current_sample_rate;
+            const int fft_capture_size = m_capture_size / 2;
+            const float inv_fft_capture_size = 1.0f / float(fft_capture_size);
+            m_fft_highest_val = -100;
+            std::vector<float> raw_buffer;
+            m_sound_data1.resize(m_capture_size);
+            m_sound_data2.resize(m_capture_size);
+            m_audiorecorder.get_data(raw_buffer, m_capture_size * channelcount);
+            m_sound_data_x.resize(m_capture_size);
+
+            // Fill audio waveform
+            for (int i = 0; i < m_capture_size; i++){
+                m_sound_data1[i] = raw_buffer[i*channelcount] * m_audio_gain;
+                m_sound_data1[i] += 1.0f*sin(1000.*float(i) *2.f*3.14159*1./44100.);
+                m_sound_data1[i] += 0.1*sin(2000.*float(i) *2.f*3.14159*1./44100.);
+                m_sound_data1[i] += 0.001f*sin(4000.*float(i) *2.f*3.14159*1./44100.);
+                if(channelcount>1) m_sound_data2[i] = raw_buffer[i*channelcount+1] * m_audio_gain;
+                if (m_fft_channel == 0){
+                    m_fftin[i] = m_sound_data1[i] * m_window_fn(i, m_capture_size);
+                } else {
+                    m_fftin[i] = m_sound_data2[i] * m_window_fn(i, m_capture_size);
+                }
+                m_sound_data_x[i] = float(i) * inv_current_sample_rage * 1000.f;
+            }
+            
+            // Compute and fill audio FFT
+            fftw_execute(m_fftplan);
+            float sum = 0;
+            for (int i = 0; i < fft_capture_size; ++i){
+                m_fftfreqs[i] = current_sample_rate * 0.5f * inv_fft_capture_size * float(i); 
+                float fftout = sqrtf(m_fftout[i][0] * m_fftout[i][0] + m_fftout[i][1] * m_fftout[i][1]) * inv_fft_capture_size;
+                fftout = std::max(20.f * log10(fftout), -130.f);
+                m_fftdraw[i] = isnan(fftout) ? -100 : fftout;
+                sum += fftout;
+            }
+
+            // Compute noise floor
+            float mean = sum / fft_capture_size;
+            float stddev = 0;
+            for (int i = 0; i < fft_capture_size; ++i){
+                float a = (m_fftdraw[i] - mean);
+                a *= a;
+                stddev += a;
+            }
+            stddev = sqrtf(stddev / (fft_capture_size - 1));
+            m_noise_foor = mean + stddev;
+
+            // Find peaks
+            smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, 100, 4, 0.5);
+            int one_count = 0;
+            int found = 0;
+            for(int i = 200; i < fft_capture_size; ++i){
+                float current_sample = m_fftfiltered[i];
+                if (one_count == 0 && current_sample > 0){
+                    one_count++;
+                    continue;
+                }
+                if (one_count && current_sample > 0){
+                    one_count++;
+                    continue;
+                }
+                if(one_count && current_sample < 1.f){
+                    int freq_start = i - one_count;
+                    float max = -130;
+                    int freq_idx = freq_start;
+                    // Find max value in range
+                    for (int j = freq_start; j < i; ++j){
+                        if (m_fftdraw[j] > max){
+                            freq_idx = j;
+                            max = m_fftdraw[j];
+                        }
+                    }
+                    m_fft_highest_idx[found] = freq_idx;
+                    m_fft_highest_pos[found++] = m_fftfreqs[freq_idx];
+                    if (found > 9) break;
+                    one_count = 0;
+                }
+            }
+            m_fft_found_peaks = found;
+            
+            int fundamental_idx = 0;
+            float max = -200.;
+            for(int i = 0; i < m_fft_found_peaks; ++i){
+                if (m_fftdraw[m_fft_highest_idx[i]] > max){
+                    max = m_fftdraw[m_fft_highest_idx[i]];
+                    fundamental_idx = i; 
+                }
+            }
+
+            float thd = 0;
+            float fundamental_db = m_fftdraw[m_fft_highest_idx[fundamental_idx]];
+            float fundamental = powf(10.f, fundamental_db/20.f);
+            for (int i = fundamental_idx + 1; i < m_fft_found_peaks; ++i){
+                float dbc = m_fftdraw[m_fft_highest_idx[i]] - fundamental_db;
+                float v = powf(10.f, dbc/20.f);
+                thd += (v * v) / (fundamental * fundamental); 
+            }
+            thd = sqrtf(thd) * 100.f;
+
+            printf("THD %f\n", thd);
+        }
+
     }
 
     void draw_tools_windows(){
@@ -364,35 +359,6 @@ public:
             ImGui::End();
         }
     }
-
-    // void find_peaks(std::vector<float>& x, int num_peaks, int wlen){
-    //     std::vector<int> peaks;
-    //     peaks.resize(num_peaks, 0.);
-    //     std::vector<float> prominences[num_peaks];
-    //     std::vector<int> left_bases[num_peaks];
-    //     std::vector<int> right_bases[num_peaks];
-    //     for (int peak_nr = 0; peak_nr < peak_nr;++peak_nr){
-    //         int& peak = peaks[peak_nr];
-    //         int imin = 0;
-    //         int imax = peaks.size() - 1;
-    //         if (2 <= wlen){
-    //             imin = std::max(peaks[peak_nr] - wlen / 2, imin);
-    //             imax = std::min(peaks[peak_nr] + wlen / 2, imax);
-    //         }
-    //         int i = left_bases[peak_nr] = peak;
-    //         int left_min = x[peak];
-    //         while(imin <= i && x[i] <= x[peak]){
-    //             if (x[i] < left_min){
-    //                 left_min = x[i];
-    //                 left_bases[peak_nr] = i;
-    //             }
-    //             --i;
-    //         }
-
-    //         i = right_bases[peak_nr] = peak;
-
-    //     }
-    // }
 };
 
 class MainWindow : public Window_SDL
