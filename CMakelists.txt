@@ -18,7 +18,7 @@ add_executable(tapetools audio_manager.cpp audio_sine_gen.cpp audio_record.cpp u
 add_compile_definitions(tapetools "SOUNDIO_STATIC_LIBRARY")
 target_include_directories(tapetools PRIVATE "libimgui/include" "libsoundio/include")
 target_link_libraries(tapetools fftw3 libsoundio_static imgui_static)
-set_target_properties(tapetools PROPERTIES LINK_FLAGS "-static-libgcc -static-libstdc++")
+set_target_properties(tapetools PROPERTIES LINK_FLAGS "-static-libgcc -static-libstdc++ -mwindows")
 
 
 install (TARGETS tapetools RUNTIME DESTINATION bin)

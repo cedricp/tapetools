@@ -1,5 +1,8 @@
 #pragma once
 
+
+//#undef WIN32
+
 #ifdef WIN32
 #include <windows.h>
 #else
@@ -61,6 +64,7 @@ protected:
     HANDLE m_thread_handle = NULL;
     static DWORD WINAPI run_win32(LPVOID userdata);
 #else
+    pthread_t m_thread_id;
     void* run_posix();
 #endif
     volatile bool m_running;

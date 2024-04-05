@@ -3,6 +3,9 @@
 #include <unistd.h>
 #include <stdio.h>
 
+	
+typedef void * (*THREADFUNCPTR)(void *);
+
 IMPLEMENT_STATIC_CALLBACK_METHOD(on_exit_event, Thread)
 
 #ifdef WIN32
@@ -48,6 +51,7 @@ void *Thread::run_posix()
     m_running = false;
     m_thread_exit_event.push();
     pthread_exit(NULL);
+    return NULL;
 }
 #endif
 
