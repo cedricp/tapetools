@@ -23,26 +23,26 @@ set_target_properties(tapetools PROPERTIES LINK_FLAGS "-static-libgcc -static-li
 
 install (TARGETS tapetools RUNTIME DESTINATION bin)
 
-if(WIN32)
-set(CONFIG_FILE ${CMAKE_CURRENT_BINARY_DIR}/install_deps_${CMAKE_BUILD_TYPE}.cmake)
+if(MINGW)
+    set(CONFIG_FILE ${CMAKE_CURRENT_BINARY_DIR}/install_deps_${CMAKE_BUILD_TYPE}.cmake)
 
-#
-# Find and install needed DLLs
-#
-file(GENERATE OUTPUT
+    #
+    # Find and install needed DLLs
+    #
+    file(GENERATE OUTPUT
     "${CONFIG_FILE}" CONTENT [[
     set(TARGET_APP $<TARGET_FILE:tapetools>)
     message(STATUS "path to executable: ${TARGET_APP}")
     message(STATUS "paths to cmake library paths ${CMAKELIBPATH}")
     message(STATUS "Looking for deps in '${TARGET_APP}'")
     file(GET_RUNTIME_DEPENDENCIES
-        RESOLVED_DEPENDENCIES_VAR deps_resolved
-        UNRESOLVED_DEPENDENCIES_VAR deps_unresolved
-        LIBRARIES ${TARGET_APP}
-        DIRECTORIES ${CMAKELIBPATH}
-        PRE_EXCLUDE_REGEXES "api-ms-*" "ext-ms-*"
-        POST_EXCLUDE_REGEXES ".*system32/.*\\.dll"
-        )
+    RESOLVED_DEPENDENCIES_VAR deps_resolved
+    UNRESOLVED_DEPENDENCIES_VAR deps_unresolved
+    LIBRARIES ${TARGET_APP}
+    DIRECTORIES ${CMAKELIBPATH}
+    PRE_EXCLUDE_REGEXES "api-ms-*" "ext-ms-*"
+    POST_EXCLUDE_REGEXES ".*system32/.*\\.dll"
+    )
     message(STATUS "Resolving runtime dependencies for ${TARGET_APP}")
     foreach(dep ${deps_resolved})
     file(INSTALL ${dep} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
@@ -51,7 +51,10 @@ file(GENERATE OUTPUT
     foreach(dep ${deps_unresolved})
     message(WARNING "Runtime dependency ${dep} could not be resolved.")
     endforeach()
-]])
-install(CODE "set(CMAKELIBPATH \"${CMAKE_SYSTEM_LIBRARY_PATH} ${CMAKE_MINGW_SYSTEM_LIBRARY_PATH}\")")
-install(SCRIPT ${CONFIG_FILE})
-endif()
+    ]])
+
+    get_filename_component(MIGGWCC  ${CMAKE_C_COMPILER} PATH)
+	set(MINGWLIBPATH "${MIGGWCC}/")
+    install(CODE "set(CMAKELIBPATH \"${CMAKE_SYSTEM_LIBRARY_PATH};${CMAKE_MINGW_SYSTEM_LIBRARY_PATH};${MINGWLIBPATH}\")")
+    install(SCRIPT ${CONFIG_FILE})
+endif(MINGW)
