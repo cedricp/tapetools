@@ -15,7 +15,7 @@ public:
     ~audioSineGenerator();
 
     void destroy();
-    bool init(audioManager& manager, int device_idx, int samplerate);
+    bool init(audioManager& manager, int device_idx, int samplerate, float latency);
     bool start();
     bool pause(bool pause = true);
 

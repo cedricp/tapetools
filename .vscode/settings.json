@@ -1,6 +1,4 @@
 {
-    "cmake.cmakePath": "D:/Development/tools/msys2/mingw64/bin/cmake",
-    "C_Cpp.default.compilerPath": "d:/development/tools/msys2/mingw64/bin/gcc.exe",
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
     "files.associations": {
         "*.cpp": "cpp",
@@ -54,6 +52,9 @@
         "streambuf": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp",
-        "*.f": "cpp"
-    }
+        "*.f": "cpp",
+        "ios": "cpp",
+        "locale": "cpp"
+    },
+    "cmake.sourceDirectory": "/storage1/sources/GIT/tapetools"
 }
