@@ -63,7 +63,7 @@ public:
         m_combo_in = m_audiomanager.get_input_device_reverse_map(m_audio_in_idx);
         m_combo_out = m_audiomanager.get_output_device_reverse_map(m_audio_out_idx);
 
-        m_sine_generator.init(m_audiomanager, m_audio_out_idx, -1);
+        m_sine_generator.init(m_audiomanager, m_audio_out_idx, -1, 0.2f);
 
         reinit_recorder();
     }
@@ -117,7 +117,7 @@ public:
     void reset_sine_generator(){
         int current_sine_samplerate = m_audiomanager.get_output_sample_rates()[m_out_sample_rate];
         m_sine_generator.destroy();
-        m_sine_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate);
+        m_sine_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, 0.1f);
         m_sine_generator.start();
         m_sine_generator.pause(!m_sine_generator_switch);
     }

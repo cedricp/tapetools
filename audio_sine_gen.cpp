@@ -77,7 +77,7 @@ audioSineGenerator::~audioSineGenerator(){
     destroy();
 }
 
-bool audioSineGenerator::init(audioManager& manager, int device_idx, int samplerate){
+bool audioSineGenerator::init(audioManager& manager, int device_idx, int samplerate, float latency){
     if (!manager.valid()){
         fprintf(stderr, "audioSine::init : AudioManager not valid\n");
     }
@@ -89,7 +89,7 @@ bool audioSineGenerator::init(audioManager& manager, int device_idx, int sampler
         m_outstream = nullptr;
     }
 
-    m_outstream = manager.get_out_stream("SineGenerator", 0.0, samplerate, SoundIoFormatS16NE, device_idx);
+    m_outstream = manager.get_out_stream("SineGenerator", latency, samplerate, SoundIoFormatS16NE, device_idx);
 
     if (m_outstream == nullptr){
         fprintf(stderr, "unable to open device index: %i\n", device_idx);
@@ -99,6 +99,7 @@ bool audioSineGenerator::init(audioManager& manager, int device_idx, int sampler
     m_outstream->userdata = (void*)this; 
     m_outstream->write_callback = this->write_callback;
     m_outstream->underflow_callback = this->underflow_callback;
+    m_outstream->software_latency = latency;
 
     if (m_outstream->layout_error){
         fprintf(stderr, "unable to set channel layout: %s\n", soundio_strerror(m_outstream->layout_error));

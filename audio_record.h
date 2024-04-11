@@ -14,7 +14,7 @@ public:
     audioRecorder(audioManager& audioManager);
     ~audioRecorder();
 
-    bool init(float buffer_capacity, int device_idx, int samplerate);
+    bool init(float latency, int device_idx, int samplerate);
     int get_available_bytes();
     int get_available_samples();
     bool start();

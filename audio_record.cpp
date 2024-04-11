@@ -29,7 +29,7 @@ void audioRecorder::destroy()
     m_ring_buffer = nullptr;
 }
 
-bool audioRecorder::init(float buffer_capacity, int device_idx, int samplerate)
+bool audioRecorder::init(float latency, int device_idx, int samplerate)
 {
     destroy();
 
@@ -38,7 +38,7 @@ bool audioRecorder::init(float buffer_capacity, int device_idx, int samplerate)
         return false;
     }
 
-    m_instream = m_manager.get_in_stream("audioRecorder", 0.0, samplerate, SoundIoFormatS16NE, device_idx);
+    m_instream = m_manager.get_in_stream("audioRecorder", latency, samplerate, SoundIoFormatS16NE, device_idx);
 
     if (m_instream == nullptr){
         return false;
@@ -47,13 +47,13 @@ bool audioRecorder::init(float buffer_capacity, int device_idx, int samplerate)
     m_instream->userdata = (void*)this; 
     m_instream->read_callback = this->read_callback;
     m_instream->overflow_callback = this->overflow_callback;
-    m_instream->software_latency = buffer_capacity;
+    m_instream->software_latency = latency;
 
     if (m_instream->layout_error){
         return false;
     }
 
-    int capacity = get_buffer_size(buffer_capacity) * sizeof(short);
+    int capacity = get_buffer_size(latency) * sizeof(short);
     m_ring_buffer = m_manager.get_new_ringbuffer(capacity);
     return true;
 }

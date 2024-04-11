@@ -9,7 +9,11 @@ set(CMAKE_INSTALL_PREFIX ${tapetools_project_SOURCE_DIR}/INSTALL_${CMAKE_BUILD_T
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(SDL2 REQUIRED)
+if(MINGW)
 find_package(FFTW3 REQUIRED)
+else()
+find_package(FFTW REQUIRED)
+endif(MINGW)
 
 add_subdirectory(libsoundio)
 add_subdirectory(libimgui)
@@ -18,8 +22,9 @@ add_executable(tapetools audio_manager.cpp audio_sine_gen.cpp audio_record.cpp u
 add_compile_definitions(tapetools "SOUNDIO_STATIC_LIBRARY")
 target_include_directories(tapetools PRIVATE "libimgui/include" "libsoundio/include")
 target_link_libraries(tapetools fftw3 libsoundio_static imgui_static)
+if(MINGW)
 set_target_properties(tapetools PROPERTIES LINK_FLAGS "-static-libgcc -static-libstdc++ -mwindows")
-
+endif(MINGW)
 
 install (TARGETS tapetools RUNTIME DESTINATION bin)
 
