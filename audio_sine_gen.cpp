@@ -99,7 +99,6 @@ bool audioSineGenerator::init(audioManager& manager, int device_idx, int sampler
     m_outstream->userdata = (void*)this; 
     m_outstream->write_callback = this->write_callback;
     m_outstream->underflow_callback = this->underflow_callback;
-    m_outstream->software_latency = latency;
 
     if (m_outstream->layout_error){
         fprintf(stderr, "unable to set channel layout: %s\n", soundio_strerror(m_outstream->layout_error));

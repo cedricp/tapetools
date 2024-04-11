@@ -38,7 +38,7 @@ bool audioRecorder::init(float latency, int device_idx, int samplerate)
         return false;
     }
 
-    m_instream = m_manager.get_in_stream("audioRecorder", latency, samplerate, SoundIoFormatS16NE, device_idx);
+    m_instream = m_manager.get_in_stream("TapeTools_audioRecorder", latency, samplerate, SoundIoFormatS16NE, device_idx);
 
     if (m_instream == nullptr){
         return false;
@@ -47,7 +47,6 @@ bool audioRecorder::init(float latency, int device_idx, int samplerate)
     m_instream->userdata = (void*)this; 
     m_instream->read_callback = this->read_callback;
     m_instream->overflow_callback = this->overflow_callback;
-    m_instream->software_latency = latency;
 
     if (m_instream->layout_error){
         return false;
@@ -196,5 +195,5 @@ int audioRecorder::get_buffer_size(float time, bool channels_mult)
     if (m_instream == nullptr){
         return 0;
     }
-    return time * float(m_instream->sample_rate) * float(channels_mult ? get_channel_count() : 1);
+    return time * float(m_instream->sample_rate) * float(channels_mult ? get_channel_count() : 1.0f);
 }

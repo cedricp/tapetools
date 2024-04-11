@@ -10,6 +10,7 @@ static int g_samplerates[] = {96000, 48000, 44100, 22050, 16000, 11025, 8000, 40
 
 audioManager::audioManager(SoundIoBackend backend)
 {
+    m_backend = backend;
     m_out_device = nullptr;
     m_soundio = soundio_create();
     if (!m_soundio) {
