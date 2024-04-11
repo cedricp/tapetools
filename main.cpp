@@ -19,9 +19,9 @@ class AudioToolWindow : public Widget
     
     std::vector<float> m_sound_data1, m_sound_data2;
     std::vector<float> m_sound_data_x;
-    fftw_plan m_fftplan = NULL;
-    double *m_fftin = nullptr;
-    fftw_complex *m_fftout = nullptr;
+    fftwf_plan m_fftplan = NULL;
+    float *m_fftin = nullptr;
+    fftwf_complex *m_fftout = nullptr;
     float *m_fftdraw = nullptr;
     float *m_fftfreqs = nullptr;
     float *m_fftfiltered = nullptr;
@@ -81,7 +81,7 @@ public:
         delete[] m_fftfreqs;
         delete[] m_fftfiltered;
 
-        if (m_fftplan) fftw_destroy_plan(m_fftplan);
+        if (m_fftplan) fftwf_destroy_plan(m_fftplan);
         m_fftin = nullptr;
         m_fftout = nullptr;
         m_fftdraw = nullptr;
@@ -96,12 +96,12 @@ public:
             return;
         }
         destroy_capture(); 
-        m_fftin = new double[capture_size];
-        m_fftout = new fftw_complex[capture_size];
+        m_fftin = new float[capture_size];
+        m_fftout = new fftwf_complex[capture_size];
         m_fftdraw = new float[capture_size/2];
         m_fftfreqs = new float[capture_size/2];   
         m_fftfiltered = new float[capture_size/2];   
-        m_fftplan = fftw_plan_dft_r2c_1d(capture_size, m_fftin, m_fftout, FFTW_MEASURE | FFTW_PRESERVE_INPUT );
+        m_fftplan = fftwf_plan_dft_r2c_1d(capture_size, m_fftin, m_fftout, FFTW_MEASURE | FFTW_PRESERVE_INPUT );
         m_capture_size = capture_size;
         m_fft_channel = 0;
     }
@@ -245,7 +245,7 @@ public:
         
         if (compute_fft){
             // Compute and fill audio FFT
-            fftw_execute(m_fftplan);
+            fftwf_execute(m_fftplan);
             float sum = 0;
             for (int i = 0; i < fft_capture_size; ++i){
                 m_fftfreqs[i] = current_sample_rate * 0.5f * inv_fft_capture_size * float(i); 
