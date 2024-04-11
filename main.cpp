@@ -5,16 +5,18 @@
 #include "utils.h"
 #include <fftw3.h>
 
-
 class AudioToolWindow : public Widget
 {
     audioManager m_audiomanager;
     audioSineGenerator m_sine_generator;
     audioRecorder m_audiorecorder;
+    
     bool m_sine_generator_switch = false;
     float m_pitch = 440;
+    
     int m_audio_out_idx = -1;
     int m_audio_in_idx = -1;
+    
     std::vector<float> m_sound_data1, m_sound_data2;
     std::vector<float> m_sound_data_x;
     fftw_plan m_fftplan = NULL;
@@ -33,16 +35,16 @@ class AudioToolWindow : public Widget
 
     bool m_sound_setup_open = false;
     bool m_tone_generator_open = false;
-    float (*m_window_fn)(int, int);
-    int m_fft_window_fn = 5;
-    int m_fft_channel = 0;
-
-    float m_noise_foor = -100;
-    float m_fft_highest_pos[200];
-    int m_fft_highest_idx[200];
-    float m_fft_highest_val;
-    int   m_fft_found_peaks = 0;
-    float m_thd = 0; 
+    
+    float   (*m_window_fn)(int, int);
+    int     m_fft_window_fn = 5;
+    int     m_fft_channel = 0;
+    float   m_noise_foor = -100;
+    float   m_fft_highest_pos[200];
+    int     m_fft_highest_idx[200];
+    float   m_fft_highest_val;
+    int     m_fft_found_peaks = 0;
+    float   m_thd = 0; 
 public:
     AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager)
     {
@@ -165,16 +167,14 @@ public:
         ImGui::EndTabBar();
 
         draw_tools_windows();
-
-        //ImPlot::ShowDemoWindow();
     }
 
     void draw_rt_analysis(){
-
         int channelcount = m_audiorecorder.get_channel_count(); 
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
 
         compute();
+        compute_thd();
         
         ImGui::BeginChild("ScopesChild", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
             int plotheight = height() / 2 - 5;
@@ -193,9 +193,10 @@ public:
                 ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock);
                 ImPlot::SetupAxesLimits(0, xfftmax, -130, 0.0);
                 ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xfftmax);
+                ImPlotRect selection = ImPlot::GetPlotLimits(IMPLOT_AUTO);
                 char thdtext[16];
                 snprintf(thdtext, 16, "THD : %.2f %%", m_thd);
-                ImPlot::PlotText(thdtext, current_sample_rate/4.0, -20.0f);
+                ImPlot::PlotText(thdtext, selection.Min().x + (selection.Max().x - selection.Min().x)/2.0, -10.0f);
                 if (channelcount>0) ImPlot::PlotLine("Audio FFT", m_fftfreqs, m_fftdraw, m_sound_data_x.size()/2);
                 for (int i = 0; i < m_fft_found_peaks; ++i){
                     float fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 0., -130.};
@@ -206,120 +207,128 @@ public:
                 ImPlot::EndPlot();
             }
             ImGui::EndChild();
-
-            if (ImGui::CollapsingHeader("Input setup")){
-                ImGui::SliderFloat("Gain", &m_audio_gain, 1.f, 100.f);
-                ImGui::Separator();
-            }
     }
 
-    void compute(){
+    void compute(bool compute_fft = true, bool compute_noise_floor = true){
         int channelcount = m_audiorecorder.get_channel_count();
 
-        if (channelcount && m_audiorecorder.get_available_samples() >= m_capture_size * channelcount){
-            float current_sample_rate = m_audiorecorder.get_current_samplerate();
-            float inv_current_sample_rage = 1.0f / current_sample_rate;
-            const int fft_capture_size = m_capture_size / 2;
-            const float inv_fft_capture_size = 1.0f / float(fft_capture_size);
-            m_fft_highest_val = -100;
-            std::vector<float> raw_buffer;
-            m_sound_data1.resize(m_capture_size);
-            m_sound_data2.resize(m_capture_size);
-            m_audiorecorder.get_data(raw_buffer, m_capture_size * channelcount);
-            m_sound_data_x.resize(m_capture_size);
+        if (channelcount == 0 || m_audiorecorder.get_available_samples() < m_capture_size * channelcount){
+            return;
+        }
 
-            // Fill audio waveform
-            for (int i = 0; i < m_capture_size; i++){
-                m_sound_data1[i] = raw_buffer[i*channelcount] * m_audio_gain;
-                m_sound_data1[i] += 0.7f*sin(1000.*float(i) *2.f*3.14159*1./44100.);
-                // THD test for non linear signal by applying "gamma"
-                // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.1f);
-                // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.1f);
-                if(channelcount>1) m_sound_data2[i] = raw_buffer[i*channelcount+1] * m_audio_gain;
-                if (m_fft_channel == 0){
-                    m_fftin[i] = m_sound_data1[i] * m_window_fn(i, m_capture_size);
-                } else {
-                    m_fftin[i] = m_sound_data2[i] * m_window_fn(i, m_capture_size);
-                }
-                m_sound_data_x[i] = float(i) * inv_current_sample_rage * 1000.f;
+        float current_sample_rate = m_audiorecorder.get_current_samplerate();
+        float inv_current_sample_rage = 1.0f / current_sample_rate;
+        const int fft_capture_size = m_capture_size / 2;
+        const float inv_fft_capture_size = 1.0f / float(fft_capture_size);
+        m_fft_highest_val = -100;
+        std::vector<float> raw_buffer;
+        m_sound_data1.resize(m_capture_size);
+        m_sound_data2.resize(m_capture_size);
+        m_audiorecorder.get_data(raw_buffer, m_capture_size * channelcount);
+        m_sound_data_x.resize(m_capture_size);
+
+        // Fill audio waveform
+        for (int i = 0; i < m_capture_size; i++){
+            m_sound_data1[i] = raw_buffer[i*channelcount] * m_audio_gain;
+            // THD test for non linear signal by applying little distortion
+            m_sound_data1[i] += 0.7f*sin(1000.*float(i) *2.f*3.14159*1./current_sample_rate);
+            if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.1f);
+            if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.1f);
+            if(channelcount>1) m_sound_data2[i] = raw_buffer[i*channelcount+1] * m_audio_gain;
+            if (m_fft_channel == 0){
+                m_fftin[i] = m_sound_data1[i] * m_window_fn(i, m_capture_size);
+            } else {
+                m_fftin[i] = m_sound_data2[i] * m_window_fn(i, m_capture_size);
             }
-            
+            m_sound_data_x[i] = float(i) * inv_current_sample_rage * 1000.f;
+        }
+        
+        if (compute_fft){
             // Compute and fill audio FFT
             fftw_execute(m_fftplan);
             float sum = 0;
             for (int i = 0; i < fft_capture_size; ++i){
                 m_fftfreqs[i] = current_sample_rate * 0.5f * inv_fft_capture_size * float(i); 
                 float fftout = sqrtf(m_fftout[i][0] * m_fftout[i][0] + m_fftout[i][1] * m_fftout[i][1]) * inv_fft_capture_size;
-                fftout = std::max(20.f * log10(fftout), -130.f);
-                m_fftdraw[i] = isnan(fftout) ? -130.f : fftout;
+                fftout = std::max(20.f * log10(fftout), -200.f);
+                m_fftdraw[i] = isnan(fftout) ? -200.f : fftout;
                 sum += fftout;
             }
 
-            // Compute noise floor
-            float mean = sum / fft_capture_size;
-            float stddev = 0;
-            for (int i = 0; i < fft_capture_size; ++i){
-                float a = (m_fftdraw[i] - mean);
-                stddev += a * a;
-            }
-            stddev = sqrtf(stddev / (fft_capture_size - 1));
-            m_noise_foor = mean + stddev;
 
-            // Find peaks
-            smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, 50, 4, 0.f);
-            int one_count = 0;
-            int found = 0;
-            for(int i = 200; i < fft_capture_size; ++i){
-                float current_sample = m_fftfiltered[i];
-                if (one_count == 0 && current_sample > 0){
-                    one_count++;
-                    continue;
+            if (compute_noise_floor){
+                // Compute noise floor
+                float mean = sum / fft_capture_size;
+                float stddev = 0;
+                for (int i = 0; i < fft_capture_size; ++i){
+                    float a = (m_fftdraw[i] - mean);
+                    stddev += a * a;
                 }
-                if (one_count && current_sample > 0){
-                    one_count++;
-                    continue;
-                }
-                if(one_count && current_sample < 1.f){
-                    int freq_start = i - one_count;
-                    float max = -130;
-                    int freq_idx = freq_start;
-                    // Find max value in range
-                    for (int j = freq_start; j < i; ++j){
-                        if (m_fftdraw[j] > max){
-                            freq_idx = j;
-                            max = m_fftdraw[j];
-                        }
+                stddev = sqrtf(stddev / (fft_capture_size - 1));
+                m_noise_foor = mean + stddev;
+            } // compute_noise_floor
+        } // compute_fft
+    }
+
+    void compute_thd(){
+        // Find peaks
+        // Source : https://stackoverflow.com/questions/22583391/peak-signal-detection-in-realtime-timeseries-data
+        const int fft_capture_size = m_capture_size / 2;
+
+        smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, 50, 4, 0.f);
+        int one_count = 0;
+        int found = 0;
+
+        for(int i = 200; i < fft_capture_size; ++i){
+            float current_sample = m_fftfiltered[i];
+            if (one_count == 0 && current_sample > 0){
+                one_count++;
+                continue;
+            }
+            if (one_count && current_sample > 0){
+                one_count++;
+                continue;
+            }
+            if(one_count && current_sample < 1.f){
+                int freq_start = i - one_count;
+                float max = -130;
+                int freq_idx = freq_start;
+                // Find max value in range
+                for (int j = freq_start; j < i; ++j){
+                    if (m_fftdraw[j] > max){
+                        freq_idx = j;
+                        max = m_fftdraw[j];
                     }
-                    m_fft_highest_idx[found] = freq_idx;
-                    m_fft_highest_pos[found++] = m_fftfreqs[freq_idx];
-                    if (found >= 200) break;
-                    one_count = 0;
                 }
+                m_fft_highest_idx[found] = freq_idx;
+                m_fft_highest_pos[found++] = m_fftfreqs[freq_idx];
+                if (found >= 200) break;
+                one_count = 0;
             }
-            m_fft_found_peaks = found;
-            
-            // Find max values of filtered signal
-            int fundamental_idx = 0;
-            float max = -200.;
-            for(int i = 0; i < m_fft_found_peaks; ++i){
-                if (m_fftdraw[m_fft_highest_idx[i]] > max){
-                    max = m_fftdraw[m_fft_highest_idx[i]];
-                    fundamental_idx = i; 
-                }
-            }
-
-            // Compute Total Harmonic Distortion
-            // Source http://www.r-type.org/addtext/add183.htm
-            m_thd = 0;
-            float fundamental_db = m_fftdraw[m_fft_highest_idx[fundamental_idx]];
-            float fundamental = powf(10.f, fundamental_db/20.f);
-            for (int i = fundamental_idx + 1; i < m_fft_found_peaks; ++i){
-                float dbc = m_fftdraw[m_fft_highest_idx[i]] - fundamental_db;
-                float v = powf(10.f, dbc/20.f);
-                m_thd += (v * v) ; 
-            }
-            m_thd = sqrtf(m_thd) / fundamental * 100.f;
         }
+        m_fft_found_peaks = found;
+
+        // Find max values of filtered signal
+        int fundamental_idx = 0;
+        float max = -200.;
+        for(int i = 0; i < m_fft_found_peaks; ++i){
+            if (m_fftdraw[m_fft_highest_idx[i]] > max){
+                max = m_fftdraw[m_fft_highest_idx[i]];
+                fundamental_idx = i; 
+            }
+        }
+
+        // Compute Total Harmonic Distortion
+        // Source http://www.r-type.org/addtext/add183.htm
+        m_thd = 0;
+        float fundamental_db = m_fftdraw[m_fft_highest_idx[fundamental_idx]];
+        float fundamental = powf(10.f, fundamental_db/20.f);
+        for (int i = fundamental_idx + 1; i < m_fft_found_peaks; ++i){
+            float dbc = m_fftdraw[m_fft_highest_idx[i]] - fundamental_db;
+            float v = powf(10.f, dbc/20.f);
+            m_thd += (v * v) ; 
+        }
+        m_thd = sqrtf(m_thd) / fundamental * 100.f;
     }
 
     void draw_tools_windows(){
