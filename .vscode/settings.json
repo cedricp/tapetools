@@ -1,9 +1,5 @@
 {
-    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
     "files.associations": {
-        "*.cpp": "cpp",
-        "vector": "cpp",
-        "iosfwd": "cpp",
         "array": "cpp",
         "atomic": "cpp",
         "bit": "cpp",
@@ -25,6 +21,7 @@
         "map": "cpp",
         "string": "cpp",
         "unordered_map": "cpp",
+        "vector": "cpp",
         "exception": "cpp",
         "algorithm": "cpp",
         "functional": "cpp",
@@ -39,8 +36,8 @@
         "tuple": "cpp",
         "type_traits": "cpp",
         "utility": "cpp",
-        "fstream": "cpp",
         "initializer_list": "cpp",
+        "iosfwd": "cpp",
         "iostream": "cpp",
         "istream": "cpp",
         "limits": "cpp",
@@ -51,10 +48,6 @@
         "stdexcept": "cpp",
         "streambuf": "cpp",
         "cinttypes": "cpp",
-        "typeinfo": "cpp",
-        "*.f": "cpp",
-        "ios": "cpp",
-        "locale": "cpp"
-    },
-    "cmake.sourceDirectory": "/storage1/sources/GIT/tapetools"
+        "typeinfo": "cpp"
+    }
 }

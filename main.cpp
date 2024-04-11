@@ -19,6 +19,7 @@ class AudioToolWindow : public Widget
     
     std::vector<float> m_sound_data1, m_sound_data2;
     std::vector<float> m_sound_data_x;
+    std::vector<float> m_raw_buffer;
     fftwf_plan m_fftplan = NULL;
     float *m_fftin = nullptr;
     fftwf_complex *m_fftout = nullptr;
@@ -75,18 +76,20 @@ public:
 
     void destroy_capture()
     {
+        if (m_fftplan) fftwf_destroy_plan(m_fftplan);
+
         delete[] m_fftin;
         delete[] m_fftout;
         delete[] m_fftdraw;
         delete[] m_fftfreqs;
         delete[] m_fftfiltered;
 
-        if (m_fftplan) fftwf_destroy_plan(m_fftplan);
         m_fftin = nullptr;
         m_fftout = nullptr;
         m_fftdraw = nullptr;
         m_fftfreqs = nullptr;
         m_fftfiltered = nullptr;
+        m_fftplan = nullptr;
     }
 
     void init_capture()
@@ -217,30 +220,30 @@ public:
         }
 
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
-        float inv_current_sample_rage = 1.0f / current_sample_rate;
+        float inv_current_sample_rate = 1.0f / current_sample_rate;
         const int fft_capture_size = m_capture_size / 2;
         const float inv_fft_capture_size = 1.0f / float(fft_capture_size);
         m_fft_highest_val = -100;
-        std::vector<float> raw_buffer;
+        
         m_sound_data1.resize(m_capture_size);
         m_sound_data2.resize(m_capture_size);
-        m_audiorecorder.get_data(raw_buffer, m_capture_size * channelcount);
+        m_audiorecorder.get_data(m_raw_buffer, m_capture_size * channelcount);
         m_sound_data_x.resize(m_capture_size);
 
         // Fill audio waveform
         for (int i = 0; i < m_capture_size; i++){
-            m_sound_data1[i] = raw_buffer[i*channelcount] * m_audio_gain;
+            m_sound_data1[i] = m_raw_buffer[i*channelcount] * m_audio_gain;
             // THD test for non linear signal by applying little distortion
             m_sound_data1[i] += 0.7f*sin(1000.*float(i) *2.f*3.14159*1./current_sample_rate);
             if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.1f);
             if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.1f);
-            if(channelcount>1) m_sound_data2[i] = raw_buffer[i*channelcount+1] * m_audio_gain;
+            if(channelcount>1) m_sound_data2[i] = m_raw_buffer[i*channelcount+1] * m_audio_gain;
             if (m_fft_channel == 0){
                 m_fftin[i] = m_sound_data1[i] * m_window_fn(i, m_capture_size);
             } else {
                 m_fftin[i] = m_sound_data2[i] * m_window_fn(i, m_capture_size);
             }
-            m_sound_data_x[i] = float(i) * inv_current_sample_rage * 1000.f;
+            m_sound_data_x[i] = float(i) * inv_current_sample_rate * 1000.f;
         }
         
         if (compute_fft){
@@ -264,7 +267,7 @@ public:
                     float a = (m_fftdraw[i] - mean);
                     stddev += a * a;
                 }
-                stddev = sqrtf(stddev / (fft_capture_size - 1));
+                stddev = sqrtf(stddev / float(fft_capture_size - 1));
                 m_noise_foor = mean + stddev;
             } // compute_noise_floor
         } // compute_fft

@@ -65,7 +65,7 @@ void audioManager::flush()
     for (int i = 0; i < output_count; ++i){
         struct SoundIoDevice *device = soundio_get_output_device(m_soundio, i);
         std::string device_name = device->name;
-        if (device->is_raw) continue;//device_name = device_name + " [RAW]";
+        if (device->is_raw) continue;
         m_output_devices.push_back(device_name);
         m_output_map.push_back(i);
         soundio_device_unref(device);
@@ -77,7 +77,7 @@ void audioManager::flush()
     for (int i = 0; i < input_count; ++i){
         struct SoundIoDevice *device = soundio_get_input_device(m_soundio, i);
         std::string device_name = device->name;
-        if (device->is_raw) continue; //device_name = device_name + " [RAW]";
+        if (device->is_raw) continue;
         m_input_devices.push_back(device_name);
         m_input_map.push_back(i);
         soundio_device_unref(device);

@@ -141,18 +141,16 @@ bool audioRecorder::pause(bool p)
 
 void audioRecorder::get_data(std::vector<float>& data, size_t size)
 {
-    data.clear();
-
     if (!m_ring_buffer){
+        data.clear();
         return;
     }
 
     size_t fill_bytes = soundio_ring_buffer_fill_count(m_ring_buffer);
     int16_t *read_buf = (int16_t*)soundio_ring_buffer_read_ptr(m_ring_buffer);
-    data.resize(size);
+    if (data.size() != size) data.resize(size);
 
     constexpr float inv16 = 1.0f / float(INT16_MAX);
-
     for (int i = 0; i < size; ++i){
         data[i] = float(read_buf[i]) * inv16;
     }
