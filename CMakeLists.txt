@@ -6,6 +6,8 @@ project(tapetools_project C CXX)
 set(CMAKE_MODULE_PATH ${tapetools_project_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 set(CMAKE_INSTALL_PREFIX ${tapetools_project_SOURCE_DIR}/INSTALL_${CMAKE_BUILD_TYPE})
 
+set(OpenGL_GL_PREFERENCE "GLVND")
+
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(SDL2 REQUIRED)
@@ -19,7 +21,7 @@ add_subdirectory(libimgui)
 
 add_executable(tapetools audio_manager.cpp audio_sine_gen.cpp audio_record.cpp utils.cpp main.cpp)
 add_compile_definitions(tapetools "SOUNDIO_STATIC_LIBRARY")
-target_include_directories(tapetools PRIVATE "libimgui/include" "libsoundio/include")
+target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libsoundio/include")
 target_link_libraries(tapetools ${FFTW_FLOAT_LIB} libsoundio_static imgui_static)
 if(MINGW)
 set_target_properties(tapetools PROPERTIES LINK_FLAGS "-static-libgcc -static-libstdc++ -mwindows")
