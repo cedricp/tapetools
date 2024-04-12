@@ -6,7 +6,22 @@
 #include <stdint.h>
 #include <math.h>
 
-static int g_samplerates[] = {96000, 48000, 44100, 22050, 16000, 11025, 8000, 4000, 2000};
+static int g_samplerates[] = {
+    96000,
+    88200,
+    50400,
+    50000,
+    48000,
+    47250,
+    44100,
+    44056,
+    37800,
+    32000,
+    22050,
+    16000,
+    11025,
+    8000
+};
 
 audioManager::audioManager(SoundIoBackend backend)
 {
@@ -123,7 +138,7 @@ SoundIoOutStream* audioManager::get_out_stream(std::string stream_name, double l
     }
 
     if (sample_rate < 0){
-        std::vector<int> sr = get_output_sample_rates();
+        std::vector<int> sr = get_output_sample_rates(device_id);
         if (sr.empty()){
             return nullptr;
         }
@@ -193,7 +208,7 @@ SoundIoInStream* audioManager::get_in_stream(std::string stream_name, double lat
     }
 
     if (sample_rate < 0){
-        std::vector<int> sr = get_input_sample_rates();
+        std::vector<int> sr = get_input_sample_rates(device_id);
         if (sr.empty()){
             return nullptr;
         }
@@ -258,31 +273,37 @@ int audioManager::get_output_device_reverse_map(int mapid)
     return -1;
 }
 
-const std::vector<std::string> audioManager::get_input_sample_rates_str()
+const std::vector<std::string> audioManager::get_input_sample_rates_str(int devidx)
 {
+    SoundIoDevice* sndiodev = soundio_get_input_device(m_soundio, devidx);
     std::vector<std::string> sample_rates;
-    if (m_in_device == nullptr){
+    if (sndiodev == nullptr){
         return sample_rates;
     }
     for (int i = 0; i < sizeof(g_samplerates)/sizeof(int); ++i){
-        if (soundio_device_supports_sample_rate(m_in_device, g_samplerates[i])){
+        if (soundio_device_supports_sample_rate(sndiodev, g_samplerates[i]))
+        {
             sample_rates.push_back(std::to_string(g_samplerates[i]));
         }
     }
+    soundio_device_unref(sndiodev);
     return sample_rates;
 }
 
-const std::vector<std::string> audioManager::get_output_sample_rates_str()
+const std::vector<std::string> audioManager::get_output_sample_rates_str(int devidx)
 {
+    SoundIoDevice* sndiodev = soundio_get_output_device(m_soundio, devidx);
     std::vector<std::string> sample_rates;
-    if (m_out_device == nullptr){
+    if (sndiodev == nullptr)
+    {
         return sample_rates;
     }
     for (int i = 0; i < sizeof(g_samplerates)/sizeof(int); ++i){
-        if (soundio_device_supports_sample_rate(m_out_device, g_samplerates[i])){
+        if (soundio_device_supports_sample_rate(sndiodev, g_samplerates[i])){
             sample_rates.push_back(std::to_string(g_samplerates[i]));
         }
     }
+    soundio_device_unref(sndiodev);
     return sample_rates;
 }
 
@@ -291,33 +312,41 @@ int audioManager::get_sample_rate_by_index(int idx)
     return g_samplerates[idx];
 }
 
-const std::vector<int> audioManager::get_input_sample_rates()
+const std::vector<int> audioManager::get_input_sample_rates(int devidx)
 {
+    SoundIoDevice *sndiodev = soundio_get_input_device(m_soundio, devidx);
     std::vector<int> sample_rates;
-    if (m_in_device == nullptr){
+    if (sndiodev == nullptr)
+    {
         sample_rates.push_back(-1);
         return sample_rates;
     }
     for (int i = 0; i < sizeof(g_samplerates)/sizeof(int); ++i){
-        if (soundio_device_supports_sample_rate(m_in_device, g_samplerates[i])){
+        if (soundio_device_supports_sample_rate(sndiodev, g_samplerates[i]))
+        {
             sample_rates.push_back(g_samplerates[i]);
         }
     }
+    soundio_device_unref(sndiodev);
     return sample_rates;
 }
 
-const std::vector<int> audioManager::get_output_sample_rates()
+const std::vector<int> audioManager::get_output_sample_rates(int devidx)
 {
+    SoundIoDevice *sndiodev = soundio_get_output_device(m_soundio, devidx);
     std::vector<int> sample_rates;
-    if (m_out_device == nullptr){
+    if (sndiodev == nullptr)
+    {
         sample_rates.push_back(-1);
         return sample_rates;
     }
     for (int i = 0; i < sizeof(g_samplerates)/sizeof(int); ++i){
-        if (soundio_device_supports_sample_rate(m_out_device, g_samplerates[i])){
+        if (soundio_device_supports_sample_rate(sndiodev, g_samplerates[i]))
+        {
             sample_rates.push_back(g_samplerates[i]);
         }
     }
+    soundio_device_unref(sndiodev);
     return sample_rates;
 }
 

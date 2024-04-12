@@ -28,11 +28,11 @@ public:
     const std::vector<std::string>& get_input_devices(){return m_input_devices;}
     const std::vector<std::string>& get_output_devices(){return m_output_devices;}
 
-    const std::vector<std::string> get_input_sample_rates_str();
-    const std::vector<std::string> get_output_sample_rates_str();
+    const std::vector<std::string> get_input_sample_rates_str(int devidx);
+    const std::vector<std::string> get_output_sample_rates_str(int devidx);
 
-    const std::vector<int> get_input_sample_rates();
-    const std::vector<int> get_output_sample_rates();
+    const std::vector<int> get_input_sample_rates(int devidx);
+    const std::vector<int> get_output_sample_rates(int devidx);
 
     int get_sample_rate_by_index(int idx);
 

@@ -111,14 +111,15 @@ public:
 
     void reinit_recorder()
     {
-        if (m_audiorecorder.init(m_latency, m_audio_in_idx, m_audiomanager.get_input_sample_rates()[m_in_sample_rate])){
+        if (m_audiorecorder.init(m_latency, m_audio_in_idx, m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate]))
+        {
             m_audiorecorder.start();
         }
         init_capture();
     }
 
     void reset_sine_generator(){
-        int current_sine_samplerate = m_audiomanager.get_output_sample_rates()[m_out_sample_rate];
+        int current_sine_samplerate = m_audiomanager.get_output_sample_rates(m_audio_out_idx)[m_out_sample_rate];
         m_sine_generator.destroy();
         m_sine_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, 0.1f);
         m_sine_generator.start();
@@ -176,8 +177,9 @@ public:
         int channelcount = m_audiorecorder.get_channel_count(); 
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
 
-        compute();
-        compute_thd();
+        if(compute()){
+            compute_thd();
+        }
         
         ImGui::BeginChild("ScopesChild", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
             int plotheight = height() / 2 - 5;
@@ -212,11 +214,11 @@ public:
             ImGui::EndChild();
     }
 
-    void compute(bool compute_fft = true, bool compute_noise_floor = true){
+    bool compute(bool compute_fft = true, bool compute_noise_floor = true){
         int channelcount = m_audiorecorder.get_channel_count();
 
         if (channelcount == 0 || m_audiorecorder.get_available_samples() < m_capture_size * channelcount){
-            return;
+            return false;
         }
 
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
@@ -271,6 +273,7 @@ public:
                 m_noise_foor = mean + stddev;
             } // compute_noise_floor
         } // compute_fft
+        return true;
     }
 
     void compute_thd(){
@@ -335,45 +338,49 @@ public:
     }
 
     void draw_tools_windows(){
-        if (m_sound_setup_open && ImGui::Begin("Sound card setup", &m_sound_setup_open)){
-            ImVec2 winsize = ImGui::GetWindowSize();
-            ImGui::PushItemWidth(winsize.x / 3);
-            const std::vector<std::string>& out_devices = m_audiomanager.get_output_devices();
-            ImGui::SeparatorText("Output device");
-            if (ImGui::Combo("Ouput", &m_combo_out, vector_getter, (void*)&out_devices, out_devices.size())){
-                m_audio_out_idx = m_audiomanager.get_output_device_map(m_combo_out);
-                reset_sine_generator();
+        if (m_sound_setup_open){
+            if(ImGui::Begin("Sound card setup", &m_sound_setup_open)){
+                ImVec2 winsize = ImGui::GetWindowSize();
+                ImGui::PushItemWidth(winsize.x / 3);
+                const std::vector<std::string>& out_devices = m_audiomanager.get_output_devices();
+                ImGui::SeparatorText("Output device");
+                if (ImGui::Combo("Ouput", &m_combo_out, vector_getter, (void*)&out_devices, out_devices.size())){
+                    m_audio_out_idx = m_audiomanager.get_output_device_map(m_combo_out);
+                    reset_sine_generator();
+                }
+                ImGui::SameLine();
+                const std::vector<std::string> out_samplerate = m_audiomanager.get_output_sample_rates_str(m_audio_out_idx);
+                if (ImGui::Combo("Samplerate##1", &m_out_sample_rate, vector_getter, (void*)&out_samplerate, out_samplerate.size())){
+                    reset_sine_generator();
+                }
+                
+                ImGui::SeparatorText("Input device");
+                const std::vector<std::string>& in_devices = m_audiomanager.get_input_devices();
+                if (ImGui::Combo("Input", &m_combo_in, vector_getter, (void*)&in_devices, in_devices.size())){
+                    m_audio_in_idx = m_audiomanager.get_input_device_map(m_combo_in);
+                    reinit_recorder();
+                }
+                ImGui::SameLine();
+                const std::vector<std::string> in_samplerate = m_audiomanager.get_input_sample_rates_str(m_audio_in_idx);
+                if (ImGui::Combo("Samplerate##2", &m_in_sample_rate, vector_getter, (void*)&in_samplerate, in_samplerate.size())){
+                    reinit_recorder();
+                }
+                ImGui::PopItemWidth();
             }
-            ImGui::SameLine();
-            const std::vector<std::string> out_samplerate = m_audiomanager.get_output_sample_rates_str();
-            if (ImGui::Combo("Samplerate##1", &m_out_sample_rate, vector_getter, (void*)&out_samplerate, out_samplerate.size())){
-                reset_sine_generator();
-            }
-            
-            ImGui::SeparatorText("Input device");
-            const std::vector<std::string>& in_devices = m_audiomanager.get_input_devices();
-            if (ImGui::Combo("Input", &m_combo_in, vector_getter, (void*)&in_devices, in_devices.size())){
-                m_audio_in_idx = m_audiomanager.get_input_device_map(m_combo_in);
-                reinit_recorder();
-            }
-            ImGui::SameLine();
-            const std::vector<std::string> in_samplerate = m_audiomanager.get_input_sample_rates_str();
-            if (ImGui::Combo("Samplerate##2", &m_in_sample_rate, vector_getter, (void*)&in_samplerate, in_samplerate.size())){
-                reinit_recorder();
-            }
-            ImGui::PopItemWidth();
             ImGui::End();
         }
 
-        if (m_tone_generator_open && ImGui::Begin("Tone Generator", &m_tone_generator_open)){
-            if (ImGui::ToggleButton("Sine", &m_sine_generator_switch)){
-                reset_sine_generator();
+        if (m_tone_generator_open){
+            if(ImGui::Begin("Tone Generator", &m_tone_generator_open)){
+                if (ImGui::ToggleButton("Sine", &m_sine_generator_switch)){
+                    reset_sine_generator();
+                }
+                ImGui::SameLine();
+                if(ImGui::SliderFloat("Pitch", &m_pitch, 100, 20000)){
+                    m_sine_generator.setPitch(m_pitch);
+                }
+                ImGui::End();
             }
-            ImGui::SameLine();
-            if(ImGui::SliderFloat("Pitch", &m_pitch, 100, 20000)){
-                m_sine_generator.setPitch(m_pitch);
-            }
-            ImGui::End();
         }
     }
 };
