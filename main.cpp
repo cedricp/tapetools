@@ -36,8 +36,9 @@ class AudioToolWindow : public Widget
 
     bool m_sound_setup_open = false;
     bool m_tone_generator_open = false;
-    
-    float   (*m_window_fn)(int, int);
+    bool m_compute_thd = false;
+
+    float (*m_window_fn)(int, int) = hann_fft_window;
     int     m_fft_window_fn = 5;
     int     m_fft_channel = 0;
     float   m_noise_foor = -100;
@@ -53,8 +54,6 @@ public:
         set_movable(false);
         set_resizable(false);
         set_titlebar(false);
-
-        m_window_fn = hann_fft_window;
 
         m_audiomanager.flush();
 
@@ -177,28 +176,60 @@ public:
         int channelcount = m_audiorecorder.get_channel_count(); 
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
 
-        if(compute()){
+        if (compute() && m_compute_thd)
+        {
             compute_thd();
         }
-        
-        ImGui::BeginChild("ScopesChild", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
-            int plotheight = height() / 2 - 5;
-            if (ImPlot::BeginPlot("Audio", ImVec2(-1, plotheight))){
-                float xmax = current_sample_rate > 0 ? float(m_capture_size) * (1.f/(current_sample_rate*0.001f)) : INFINITY;
-                ImPlot::SetupAxes("Time (ms)", "Amplitude", 0, ImPlotAxisFlags_Lock);
-                ImPlot::SetupAxesLimits(0, xmax, -1.f, 1.f);
-                ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xmax);
-                if (channelcount>0) ImPlot::PlotLine("Channel 1", m_sound_data_x.data(), m_sound_data1.data(), m_sound_data_x.size());
-                if (channelcount>1) ImPlot::PlotLine("Channel 2", m_sound_data_x.data(), m_sound_data2.data(), m_sound_data_x.size());
-                ImPlot::EndPlot();
-            }
 
-            if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, plotheight))){
-                float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
-                ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock);
-                ImPlot::SetupAxesLimits(0, xfftmax, -130, 0.0);
-                ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xfftmax);
-                ImPlotRect selection = ImPlot::GetPlotLimits(IMPLOT_AUTO);
+        float frameh = ImGui::GetFrameHeightWithSpacing();
+        float padh = 3.0f * ImGui::GetStyle().FramePadding.y + ImGui::GetStyle().ItemSpacing.y;
+
+        ImGui::BeginChild("ScopesChild", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
+        float plotheight = height() / 2.0f - 5.f;
+
+        ImGui::BeginChild("ScopesChild1", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
+        if (ImPlot::BeginPlot("Audio", ImVec2(-1, -1)))
+        {
+            float xmax = current_sample_rate > 0 ? float(m_capture_size) * (1.f / (current_sample_rate * 0.001f)) : INFINITY;
+            ImPlot::SetupAxes("Time (ms)", "Amplitude", 0, ImPlotAxisFlags_Lock);
+            ImPlot::SetupAxesLimits(0, xmax, -1.f, 1.f);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xmax);
+            if (channelcount > 0)
+                ImPlot::PlotLine("Channel 1", m_sound_data_x.data(), m_sound_data1.data(), m_sound_data_x.size());
+            if (channelcount > 1)
+                ImPlot::PlotLine("Channel 2", m_sound_data_x.data(), m_sound_data2.data(), m_sound_data_x.size());
+            ImPlot::EndPlot();
+        }
+        ImGui::EndChild();
+
+        ImGui::BeginChild("ScopesChild2", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
+        ImGui::BeginChild("ScopesChild3", ImVec2(0, frameh + padh), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
+        ImGui::ToggleButton("CTHD", &m_compute_thd);
+        ImGui::SameLine();ImGui::Separator();
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Compute THD");
+        std::vector<std::string> wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann"};
+        ImGui::SameLine();ImGui::Spacing();ImGui::SameLine();
+        ImGui::SetNextItemWidth(150);
+        if (ImGui::Combo("Window mode", &m_fft_window_fn, vector_getter, (void *)&wmodes, wmodes.size()))
+        {
+            if (m_fft_window_fn == 0) m_window_fn = rectangle_fft_window;
+            if (m_fft_window_fn == 1) m_window_fn = hamming_fft_window;
+            if (m_fft_window_fn == 2) m_window_fn = hann_poisson_fft_window;
+            if (m_fft_window_fn == 3) m_window_fn = blackman_fft_window;
+            if (m_fft_window_fn == 4) m_window_fn = blackman_harris_fft_window;
+            if (m_fft_window_fn == 5) m_window_fn = hann_fft_window;
+        }
+
+        ImGui::EndChild();
+
+        if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1))){
+            float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
+            ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock);
+            ImPlot::SetupAxesLimits(0, xfftmax, -130, 0.0);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xfftmax);
+            ImPlotRect selection = ImPlot::GetPlotLimits(IMPLOT_AUTO);
+            if (m_compute_thd){
                 char thdtext[16];
                 snprintf(thdtext, 16, "THD : %.2f %%", m_thd);
                 ImPlot::PlotText(thdtext, selection.Min().x + (selection.Max().x - selection.Min().x)/2.0, -10.0f);
@@ -207,11 +238,14 @@ public:
                     float fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 0., -130.};
                     ImPlot::PlotLine("Peaks", fund, fund+2, 2);
                 }
-                float nf[4] = {0., (current_sample_rate)/2.f, m_noise_foor, m_noise_foor};
-                ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
-                ImPlot::EndPlot();
             }
-            ImGui::EndChild();
+            float nf[4] = {0., (current_sample_rate)/2.f, m_noise_foor, m_noise_foor};
+            ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
+            ImPlot::EndPlot();
+        }
+        ImGui::EndChild();
+
+        ImGui::EndChild();
     }
 
     bool compute(bool compute_fft = true, bool compute_noise_floor = true){
