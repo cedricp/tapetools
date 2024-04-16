@@ -20,13 +20,14 @@ void audioRecorder::destroy()
 {
     if (m_instream){
         m_manager.release_input_stream(m_instream);
+        m_instream = nullptr;
+        fprintf(stderr, "audioRecorder::destroy stream %x\n", m_instream);
     }
-    m_instream = nullptr;
 
     if (m_ring_buffer){
         soundio_ring_buffer_destroy(m_ring_buffer);
+        m_ring_buffer = nullptr;
     }
-    m_ring_buffer = nullptr;
 }
 
 bool audioRecorder::init(float latency, int device_idx, int samplerate)
@@ -34,12 +35,12 @@ bool audioRecorder::init(float latency, int device_idx, int samplerate)
     destroy();
 
     if (!m_manager.valid()){
-        fprintf(stderr, "audioSine::init : AudioManager not valid\n");
+        fprintf(stderr, "audioRecorder::init : AudioManager not valid\n");
         return false;
     }
 
     m_instream = m_manager.get_in_stream("TapeTools_audioRecorder", latency, samplerate, SoundIoFormatS16NE, device_idx);
-
+    fprintf(stderr, "audioRecorder::init : new stream %d\n", samplerate);
     if (m_instream == nullptr){
         return false;
     }
@@ -47,6 +48,7 @@ bool audioRecorder::init(float latency, int device_idx, int samplerate)
     m_instream->userdata = (void*)this; 
     m_instream->read_callback = this->read_callback;
     m_instream->overflow_callback = this->overflow_callback;
+    m_instream->error_callback = this->error_callback;
 
     if (m_instream->layout_error){
         return false;
@@ -61,6 +63,15 @@ void audioRecorder::overflow_callback(struct SoundIoInStream *instream)
 {
     static int count = 0;
     fprintf(stderr, "overflow %d\n", ++count);
+}
+
+void audioRecorder::error_callback(struct SoundIoInStream *instream, int err)
+{
+    audioRecorder *ar = (audioRecorder*)instream->userdata;
+    fprintf(stderr, "audioRecorder::error_callback %s\n", soundio_strerror(err));
+    ar->m_instream = nullptr;
+    soundio_ring_buffer_destroy(ar->m_ring_buffer);
+    ar->m_ring_buffer = nullptr;
 }
 
 void audioRecorder::read_callback(SoundIoInStream *instream, int frame_count_min, int frame_count_max) {

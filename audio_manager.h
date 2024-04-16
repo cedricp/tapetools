@@ -17,6 +17,9 @@ class audioManager
     std::vector<std::string> m_output_devices;
     std::vector<int> m_input_map;
     std::vector<int> m_output_map;
+    static void on_backend_disconnect(struct SoundIo *soundio, int err);
+    static void on_device_change(struct SoundIo *soundio);
+    void scan_devices();
 public:
     audioManager(SoundIoBackend backend = SoundIoBackendNone);
     ~audioManager();

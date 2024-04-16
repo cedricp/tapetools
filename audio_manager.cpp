@@ -33,6 +33,10 @@ audioManager::audioManager(SoundIoBackend backend)
         return;
     }
 
+    m_soundio->userdata = this;
+    m_soundio->on_backend_disconnect = this->on_backend_disconnect;
+    m_soundio->on_devices_change = this->on_device_change;
+
     int err = (m_backend == SoundIoBackendNone) ? soundio_connect(m_soundio) : soundio_connect_backend(m_soundio, m_backend);
 
     if (err) {
@@ -42,7 +46,7 @@ audioManager::audioManager(SoundIoBackend backend)
 
     fprintf(stderr, "Backend: %s\n", soundio_backend_name(m_soundio->current_backend));
 
-    soundio_flush_events(m_soundio);
+    flush();
 
     m_valid = true;
 }
@@ -60,6 +64,20 @@ audioManager::~audioManager()
     }
 }
 
+void audioManager::on_backend_disconnect(struct SoundIo *soundio, int err)
+{
+    audioManager* am = (audioManager*)soundio->userdata;
+    fprintf(stderr, "OK backend disconnected with '%s'.\n", soundio_strerror(err));
+    am->m_valid = false;
+}
+
+void audioManager::on_device_change(struct SoundIo *soundio)
+{
+    audioManager* am = (audioManager*)soundio->userdata;
+    fprintf(stderr, "OK backend device change.\n");
+    am->scan_devices();
+}
+
 void audioManager::release_output_stream(SoundIoOutStream* ostream)
 {
     soundio_outstream_destroy(ostream);
@@ -73,7 +91,10 @@ void audioManager::release_input_stream(SoundIoInStream* istream)
 void audioManager::flush()
 {
     soundio_flush_events(m_soundio);
+}
 
+void audioManager::scan_devices()
+{
     m_output_devices.clear();
     m_output_map.clear();
     int output_count = soundio_output_device_count(m_soundio);
@@ -275,8 +296,12 @@ int audioManager::get_output_device_reverse_map(int mapid)
 
 const std::vector<std::string> audioManager::get_input_sample_rates_str(int devidx)
 {
-    SoundIoDevice* sndiodev = soundio_get_input_device(m_soundio, devidx);
     std::vector<std::string> sample_rates;
+    flush();
+    if (devidx >= soundio_input_device_count(m_soundio)){
+        return sample_rates;
+    }
+    SoundIoDevice* sndiodev = soundio_get_input_device(m_soundio, devidx);
     if (sndiodev == nullptr){
         return sample_rates;
     }
@@ -292,8 +317,12 @@ const std::vector<std::string> audioManager::get_input_sample_rates_str(int devi
 
 const std::vector<std::string> audioManager::get_output_sample_rates_str(int devidx)
 {
-    SoundIoDevice* sndiodev = soundio_get_output_device(m_soundio, devidx);
     std::vector<std::string> sample_rates;
+    flush();
+    if (devidx >= soundio_output_device_count(m_soundio)){
+        return sample_rates;
+    }
+    SoundIoDevice* sndiodev = soundio_get_output_device(m_soundio, devidx);
     if (sndiodev == nullptr)
     {
         return sample_rates;
@@ -314,8 +343,11 @@ int audioManager::get_sample_rate_by_index(int idx)
 
 const std::vector<int> audioManager::get_input_sample_rates(int devidx)
 {
-    SoundIoDevice *sndiodev = soundio_get_input_device(m_soundio, devidx);
     std::vector<int> sample_rates;
+    if(devidx >= soundio_input_device_count(m_soundio)){
+        return sample_rates;
+    }
+    SoundIoDevice *sndiodev = soundio_get_input_device(m_soundio, devidx);
     if (sndiodev == nullptr)
     {
         sample_rates.push_back(-1);
@@ -333,8 +365,11 @@ const std::vector<int> audioManager::get_input_sample_rates(int devidx)
 
 const std::vector<int> audioManager::get_output_sample_rates(int devidx)
 {
-    SoundIoDevice *sndiodev = soundio_get_output_device(m_soundio, devidx);
     std::vector<int> sample_rates;
+    if(devidx >= soundio_output_device_count(m_soundio)){
+        return sample_rates;
+    }
+    SoundIoDevice *sndiodev = soundio_get_output_device(m_soundio, devidx);
     if (sndiodev == nullptr)
     {
         sample_rates.push_back(-1);

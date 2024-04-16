@@ -8,6 +8,7 @@ class audioRecorder
     SoundIoRingBuffer *m_ring_buffer = nullptr;
     static void read_callback(SoundIoInStream *instream, int frame_count_min, int frame_count_max);
     static void overflow_callback(SoundIoInStream *instream);
+    static void error_callback(SoundIoInStream *instream, int err);
     audioManager& m_manager;
     void destroy();
 public:

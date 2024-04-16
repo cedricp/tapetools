@@ -37,6 +37,7 @@ class AudioToolWindow : public Widget
     bool m_sound_setup_open = false;
     bool m_tone_generator_open = false;
     bool m_compute_thd = false;
+    bool m_logscale_frequency = false;
 
     float (*m_window_fn)(int, int) = hann_fft_window;
     int     m_fft_window_fn = 5;
@@ -138,23 +139,6 @@ public:
                 ImGui::MenuItem("Tone generator", nullptr, &m_tone_generator_open);
                 ImGui::EndMenu();
             }
-            if (ImGui::BeginMenu("FFT")){
-                if (ImGui::BeginMenu("Window")){
-                    if (ImGui::MenuItem("Rectangle",       NULL, m_fft_window_fn == 0)){ m_fft_window_fn = 0;m_window_fn = rectangle_fft_window; }
-                    if (ImGui::MenuItem("Hamming",         NULL, m_fft_window_fn == 1)){ m_fft_window_fn = 1;m_window_fn = hamming_fft_window; }
-                    if (ImGui::MenuItem("Hann-Poisson",    NULL, m_fft_window_fn == 2)){ m_fft_window_fn = 2;m_window_fn = hann_poisson_fft_window; }
-                    if (ImGui::MenuItem("Blackman",        NULL, m_fft_window_fn == 3)){ m_fft_window_fn = 3;m_window_fn = blackman_fft_window; }
-                    if (ImGui::MenuItem("Blackman-Harris", NULL, m_fft_window_fn == 4)){ m_fft_window_fn = 4;m_window_fn = blackman_harris_fft_window; }
-                    if (ImGui::MenuItem("Hann",            NULL, m_fft_window_fn == 5)){ m_fft_window_fn = 5;m_window_fn = hann_fft_window; }
-                    ImGui::EndMenu();
-                }
-                if(ImGui::BeginMenu("Channel")){
-                    if (ImGui::MenuItem("Left", NULL, m_fft_channel == 0)){ m_fft_channel = 0;}
-                    if (channelcount>1 && ImGui::MenuItem("Right", NULL, m_fft_channel == 1)){ m_fft_channel = 1;}
-                    ImGui::EndMenu();
-                }
-                ImGui::EndMenu();
-            }
             ImGui::EndMainMenuBar();
         }
 
@@ -202,38 +186,52 @@ public:
         }
         ImGui::EndChild();
 
+        std::vector<std::string> wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann"};
+        std::vector<std::string> fftchannels = {"Left", "Right"};
+
         ImGui::BeginChild("ScopesChild2", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
         ImGui::BeginChild("ScopesChild3", ImVec2(0, frameh + padh), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
+        ImGui::ToggleButton("LogFreq", &m_logscale_frequency);
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Log scale frequency");
+        ImGui::SameLine();
         ImGui::ToggleButton("CTHD", &m_compute_thd);
-        ImGui::SameLine();ImGui::Separator();
+        ImGui::SameLine();
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Compute THD");
-        std::vector<std::string> wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann"};
         ImGui::SameLine();ImGui::Spacing();ImGui::SameLine();
         ImGui::SetNextItemWidth(150);
         if (ImGui::Combo("Window mode", &m_fft_window_fn, vector_getter, (void *)&wmodes, wmodes.size()))
         {
             if (m_fft_window_fn == 0) m_window_fn = rectangle_fft_window;
-            if (m_fft_window_fn == 1) m_window_fn = hamming_fft_window;
-            if (m_fft_window_fn == 2) m_window_fn = hann_poisson_fft_window;
-            if (m_fft_window_fn == 3) m_window_fn = blackman_fft_window;
-            if (m_fft_window_fn == 4) m_window_fn = blackman_harris_fft_window;
-            if (m_fft_window_fn == 5) m_window_fn = hann_fft_window;
+            else if (m_fft_window_fn == 1) m_window_fn = hamming_fft_window;
+            else if (m_fft_window_fn == 2) m_window_fn = hann_poisson_fft_window;
+            else if (m_fft_window_fn == 3) m_window_fn = blackman_fft_window;
+            else if (m_fft_window_fn == 4) m_window_fn = blackman_harris_fft_window;
+            else if (m_fft_window_fn == 5) m_window_fn = hann_fft_window;
         }
+
+        ImGui::SameLine();ImGui::Spacing();ImGui::SameLine();
+        ImGui::SetNextItemWidth(150);
+        ImGui::Combo("Channel", &m_fft_channel, vector_getter, (void *)&fftchannels, fftchannels.size());
 
         ImGui::EndChild();
 
         if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1))){
             float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
             ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock);
-            ImPlot::SetupAxesLimits(0, xfftmax, -130, 0.0);
-            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xfftmax);
+            if (m_logscale_frequency){
+                ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+            }
+            ImPlot::SetupAxesLimits(0.1f, xfftmax, -130, 0.0);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0.1f, xfftmax);
             ImPlotRect selection = ImPlot::GetPlotLimits(IMPLOT_AUTO);
+            if (channelcount>0 && m_fftfreqs) ImPlot::PlotLine("Audio FFT", m_fftfreqs, m_fftdraw, m_sound_data_x.size()/2);
             if (m_compute_thd){
                 char thdtext[16];
                 snprintf(thdtext, 16, "THD : %.2f %%", m_thd);
                 ImPlot::PlotText(thdtext, selection.Min().x + (selection.Max().x - selection.Min().x)/2.0, -10.0f);
-                if (channelcount>0) ImPlot::PlotLine("Audio FFT", m_fftfreqs, m_fftdraw, m_sound_data_x.size()/2);
                 for (int i = 0; i < m_fft_found_peaks; ++i){
                     float fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 0., -130.};
                     ImPlot::PlotLine("Peaks", fund, fund+2, 2);

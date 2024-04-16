@@ -63,6 +63,12 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
     }
 }
 
+void audioSineGenerator::error_callback(SoundIoOutStream *outstream, int err)
+{
+    audioSineGenerator *ar = (audioSineGenerator*)outstream->userdata;
+    fprintf(stderr, "audioSineGenerator::error_callback %s\n", soundio_strerror(err));
+}
+
 void audioSineGenerator::underflow_callback(SoundIoOutStream *outstream) {
     static int count = 0;
     fprintf(stderr, "underflow %d\n", count++);
@@ -99,6 +105,7 @@ bool audioSineGenerator::init(audioManager& manager, int device_idx, int sampler
     m_outstream->userdata = (void*)this; 
     m_outstream->write_callback = this->write_callback;
     m_outstream->underflow_callback = this->underflow_callback;
+    m_outstream->error_callback = this->error_callback;
 
     if (m_outstream->layout_error){
         fprintf(stderr, "unable to set channel layout: %s\n", soundio_strerror(m_outstream->layout_error));

@@ -9,7 +9,7 @@ class audioSineGenerator{
 
     static void write_callback(SoundIoOutStream *outstream, int frame_count_min, int frame_count_max);
     static void underflow_callback(SoundIoOutStream *outstream);
-
+    static void error_callback(SoundIoOutStream *outstream, int err);
 public:
     audioSineGenerator();
     ~audioSineGenerator();
