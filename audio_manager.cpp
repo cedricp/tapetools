@@ -111,7 +111,7 @@ void audioManager::scan_devices()
     m_input_map.clear();
     int input_count = soundio_input_device_count(m_soundio);
     for (int i = 0; i < input_count; ++i){
-        struct SoundIoDevice *device = soundio_get_input_device(m_soundio, i);
+        SoundIoDevice *device = soundio_get_input_device(m_soundio, i);
         std::string device_name = device->name;
         if (device->is_raw) continue;
         m_input_devices.push_back(device_name);
@@ -120,7 +120,7 @@ void audioManager::scan_devices()
     }
 }
 
-SoundIoOutStream* audioManager::get_out_stream(std::string stream_name, double latency, int sample_rate, SoundIoFormat format, int device_id)
+SoundIoOutStream* audioManager::get_out_stream(double latency, int sample_rate, SoundIoFormat format, int device_id)
 {
     int err;
 
@@ -166,7 +166,7 @@ SoundIoOutStream* audioManager::get_out_stream(std::string stream_name, double l
         sample_rate = sr[0];
     }
 
-    ostream->name = stream_name.c_str();
+    ostream->name = m_stream_name.c_str();
     ostream->software_latency = latency;
     ostream->sample_rate = sample_rate;
     ostream->format = format;
@@ -190,7 +190,7 @@ SoundIoOutStream* audioManager::get_out_stream(std::string stream_name, double l
     return ostream;
 }
 
-SoundIoInStream* audioManager::get_in_stream(std::string stream_name, double latency, int sample_rate, SoundIoFormat format, int device_id)
+SoundIoInStream* audioManager::get_in_stream(double latency, int sample_rate, SoundIoFormat format, int device_id)
 {
     int err;
 
@@ -236,7 +236,7 @@ SoundIoInStream* audioManager::get_in_stream(std::string stream_name, double lat
         sample_rate = sr[0];
     }
 
-    istream->name = stream_name.c_str();
+    istream->name = m_stream_name.c_str();
     istream->software_latency = latency;
     istream->sample_rate = sample_rate;
     istream->format = format;
