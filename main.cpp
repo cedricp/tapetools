@@ -37,7 +37,7 @@ class AudioToolWindow : public Widget
     bool m_sound_setup_open = false;
     bool m_tone_generator_open = false;
     bool m_compute_thd = false;
-    bool m_logscale_frequency = false;
+    bool m_logscale_frequency = true;
 
     float (*m_window_fn)(int, int) = hann_fft_window;
     int     m_fft_window_fn = 5;
@@ -186,7 +186,7 @@ public:
         }
         ImGui::EndChild();
 
-        std::vector<std::string> wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann"};
+        std::vector<std::string> wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann", "Keiser 5"};
         std::vector<std::string> fftchannels = {"Left", "Right"};
 
         ImGui::BeginChild("ScopesChild2", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
@@ -210,10 +210,11 @@ public:
             else if (m_fft_window_fn == 3) m_window_fn = blackman_fft_window;
             else if (m_fft_window_fn == 4) m_window_fn = blackman_harris_fft_window;
             else if (m_fft_window_fn == 5) m_window_fn = hann_fft_window;
+            else if (m_fft_window_fn == 6) m_window_fn = keiser5_fft_window;
         }
 
         ImGui::SameLine();ImGui::Spacing();ImGui::SameLine();
-        ImGui::SetNextItemWidth(150);
+        ImGui::SetNextItemWidth(100);
         ImGui::Combo("Channel", &m_fft_channel, vector_getter, (void *)&fftchannels, fftchannels.size());
 
         ImGui::EndChild();
@@ -224,14 +225,20 @@ public:
             if (m_logscale_frequency){
                 ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
             }
-            ImPlot::SetupAxesLimits(0.1f, xfftmax, -130, 0.0);
-            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0.1f, xfftmax);
-            ImPlotRect selection = ImPlot::GetPlotLimits(IMPLOT_AUTO);
-            if (channelcount>0 && m_fftfreqs) ImPlot::PlotLine("Audio FFT", m_fftfreqs, m_fftdraw, m_sound_data_x.size()/2);
-            if (m_compute_thd){
+            ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Linear);
+            ImPlot::SetupAxesLimits(10.f, xfftmax, -130.0, 0.0);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 10.f, xfftmax);
+            // ImPlot::SetupAxisLimitsConstraints(ImAxis_Y1, -130., 0);
+
+            if (m_compute_thd)
+            {
                 char thdtext[16];
                 snprintf(thdtext, 16, "THD : %.2f %%", m_thd);
-                ImPlot::PlotText(thdtext, selection.Min().x + (selection.Max().x - selection.Min().x)/2.0, -10.0f);
+                ImVec2 plotpos = ImPlot::GetPlotPos();
+                ImVec2 plotsize = ImPlot::GetPlotSize();
+                ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.3)));
+                ImPlot::PlotText(thdtext, pnt.x, pnt.y);
+
                 for (int i = 0; i < m_fft_found_peaks; ++i){
                     float fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 0., -130.};
                     ImPlot::PlotLine("Peaks", fund, fund+2, 2);
@@ -239,6 +246,12 @@ public:
             }
             float nf[4] = {0., (current_sample_rate)/2.f, m_noise_foor, m_noise_foor};
             ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
+            
+            if (channelcount>0 && m_fftfreqs)
+            {
+                ImPlot::PlotLine("Audio FFT", m_fftfreqs, m_fftdraw, m_sound_data_x.size()/2);
+            }
+
             ImPlot::EndPlot();
         }
         ImGui::EndChild();
@@ -292,9 +305,7 @@ public:
                 sum += fftout;
             }
 
-
             if (compute_noise_floor){
-                // Compute noise floor
                 float mean = sum / fft_capture_size;
                 float stddev = 0;
                 for (int i = 0; i < fft_capture_size; ++i){
@@ -313,7 +324,7 @@ public:
         // Source : https://stackoverflow.com/questions/22583391/peak-signal-detection-in-realtime-timeseries-data
         const int fft_capture_size = m_capture_size / 2;
 
-        smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, 50, 4, 0.f);
+        smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, 100, 4, 0.f);
         int one_count = 0;
         int found = 0;
 
@@ -360,13 +371,14 @@ public:
         // Source http://www.r-type.org/addtext/add183.htm
         m_thd = 0;
         float fundamental_db = m_fftdraw[m_fft_highest_idx[fundamental_idx]];
-        float fundamental = powf(10.f, fundamental_db/20.f);
+        
         for (int i = fundamental_idx + 1; i < m_fft_found_peaks; ++i){
-            float dbc = m_fftdraw[m_fft_highest_idx[i]] - fundamental_db;
-            float v = powf(10.f, dbc/20.f);
-            m_thd += (v * v) ; 
+            float dbc = -(fundamental_db - m_fftdraw[m_fft_highest_idx[i]]);
+            float v_rms = powf(10.f, dbc/20.f);
+            m_thd += (v_rms * v_rms) ; 
         }
-        m_thd = sqrtf(m_thd) / fundamental * 100.f;
+
+        m_thd = sqrtf(m_thd) * 100.f;
     }
 
     void draw_tools_windows(){
