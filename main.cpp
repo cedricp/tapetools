@@ -371,10 +371,10 @@ public:
         // Source http://www.r-type.org/addtext/add183.htm
         m_thd = 0;
         float fundamental_db = m_fftdraw[m_fft_highest_idx[fundamental_idx]];
-        
+
         for (int i = fundamental_idx + 1; i < m_fft_found_peaks; ++i){
-            float dbc = -(fundamental_db - m_fftdraw[m_fft_highest_idx[i]]);
-            float v_rms = powf(10.f, dbc/20.f);
+            float dBc = m_fftdraw[m_fft_highest_idx[i]] - fundamental_db;
+            float v_rms = powf(10.f, dBc/20.f);
             m_thd += (v_rms * v_rms) ; 
         }
 
