@@ -338,11 +338,13 @@ public:
                 one_count++;
                 continue;
             }
+            // We've found a valid range
+            // Now let's find the max value inside
             if(one_count && current_sample < 1.f){
                 int freq_start = i - one_count;
                 float max = -130;
                 int freq_idx = freq_start;
-                // Find max value in range
+                // Find max value
                 for (int j = freq_start; j < i; ++j){
                     if (m_fftdraw[j] > max){
                         freq_idx = j;

@@ -19,6 +19,7 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
     if (outstream == nullptr){
         return;
     }
+    
     audioSineGenerator* udata = (audioSineGenerator*)outstream->userdata;
     double float_sample_rate = outstream->sample_rate;
     double seconds_per_frame = 1.0 / float_sample_rate;
@@ -95,7 +96,7 @@ bool audioSineGenerator::init(audioManager& manager, int device_idx, int sampler
         m_outstream = nullptr;
     }
 
-    m_outstream = manager.get_out_stream("SineGenerator", latency, samplerate, SoundIoFormatS16NE, device_idx);
+    m_outstream = manager.get_out_stream(latency, samplerate, SoundIoFormatS16NE, device_idx);
 
     if (m_outstream == nullptr){
         fprintf(stderr, "unable to open device index: %i\n", device_idx);
@@ -136,7 +137,7 @@ bool audioSineGenerator::start()
         return false;
     }
     int err;
-    if ((err = soundio_outstream_start(m_outstream))) {
+    if ((err = soundio_outstream_start(m_outstream))){
         fprintf(stderr, "unable to start device: %s\n", soundio_strerror(err));
         return false;
     }

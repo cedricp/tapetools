@@ -12,6 +12,7 @@ class audioManager
     SoundIoDevice* m_in_device = nullptr;
     SoundIo *m_soundio = nullptr;
     bool m_valid = false;
+    std::string m_stream_name = "TapeTools";
 
     std::vector<std::string> m_input_devices;
     std::vector<std::string> m_output_devices;
@@ -24,8 +25,8 @@ public:
     audioManager(SoundIoBackend backend = SoundIoBackendNone);
     ~audioManager();
 
-    SoundIoOutStream*   get_out_stream(std::string stream_name, double latency, int sample_rate, SoundIoFormat format, int device_index = -1);
-    SoundIoInStream*    get_in_stream(std::string stream_name, double latency, int sample_rate, SoundIoFormat format, int device_id = -1);
+    SoundIoOutStream*   get_out_stream(double latency, int sample_rate, SoundIoFormat format, int device_index = -1);
+    SoundIoInStream*    get_in_stream(double latency, int sample_rate, SoundIoFormat format, int device_id = -1);
 
     SoundIoDevice*      get_output_device(){return m_out_device;}
     const std::vector<std::string>& get_input_devices(){return m_input_devices;}

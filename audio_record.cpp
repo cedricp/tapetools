@@ -39,7 +39,7 @@ bool audioRecorder::init(float latency, int device_idx, int samplerate)
         return false;
     }
 
-    m_instream = m_manager.get_in_stream("TapeTools_audioRecorder", latency, samplerate, SoundIoFormatS16NE, device_idx);
+    m_instream = m_manager.get_in_stream(latency, samplerate, SoundIoFormatS16NE, device_idx);
     fprintf(stderr, "audioRecorder::init : new stream %d\n", samplerate);
     if (m_instream == nullptr){
         return false;

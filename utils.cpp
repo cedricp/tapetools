@@ -21,7 +21,7 @@ float stddev(const float data[], int len) {
 
     int i;
     for(i=0; i<len; ++i) {
-        standardDeviation += pow(data[i] - the_mean, 2);
+        standardDeviation += powf(data[i] - the_mean, 2.f);
     }
 
     return sqrt(standardDeviation/len);
