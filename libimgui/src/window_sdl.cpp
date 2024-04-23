@@ -580,7 +580,6 @@ void App_SDL::run()
         // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         SDL_Event event;
-        int event_raised = 0;
 
         while (SDL_PollEvent(&event))
         {
@@ -596,34 +595,26 @@ void App_SDL::run()
 
         	bool event_flag = false;
         	for(auto window: _impl->_windows){
-        		if (window->do_event(&event)){
-        			//window->draw(true);
-        		}
-        		//event_raised = 3;
+        		window->do_event(&event);
+				//window->draw(true);
         	}
 
-            // Events handler
-        	event_flag |= handle_timer_events();
-        	std::vector<UserEvent*>::iterator it = _impl->m_user_events.begin();
-        	for (; it < _impl->m_user_events.end(); ++it){
-        		if (event.type == (*it)->get_evt_idx()){
-        			event_flag |= true;
-        			(*it)->on_callback(event.user.data1, event.user.data2);
-        			event_raised = 2;
-        		}
-        	}
         }
+		// Events handler
+		handle_timer_events();
+		std::vector<UserEvent*>::iterator it = _impl->m_user_events.begin();
+		for (; it < _impl->m_user_events.end(); ++it){
+			if (event.type == (*it)->get_evt_idx()){
+				(*it)->on_callback(event.user.data1, event.user.data2);
+			}
+		}
+
 		//ImPlot::SetCurrentContext(_implotcontext);
 		for(auto window: _impl->_windows){
 			window->draw(false);
 		}
 
-        // while (event_raised--){
-		// 	for(auto window: _impl->_windows){
-		// 		window->draw(event_raised > 0);
-		// 	}
-        // }
-        // usleep(5000);
+        usleep(5000);
     }
 	end:;
 }
