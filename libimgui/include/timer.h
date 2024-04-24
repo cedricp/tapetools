@@ -21,6 +21,7 @@ public:
 	bool is_active(){ return m_running;}
 	unsigned long get_time(){return m_time;}
 	unsigned long get_start_time(){return m_start_time;}
+	void set(unsigned long time){m_time = time;}
 
 	void on_timer_event();
 };
