@@ -2,10 +2,8 @@
 
 #include <vector>
 
-bool sg_smooth(const float *v, float *res, const int size, const int width, const int deg);
-std::vector<float> sg_derivative(const std::vector<float> &v, const int w,
-                                const int deg, const float h=1.0);
 void smoothed_z_score(const float y[], float signals[], const int count, const int lag, const float threshold, const float influence);
+bool sg_smooth(const float *v, float *res, const int size, const int width, const int deg);
 
 float rectangle_fft_window(int i, int length)
 {
@@ -62,7 +60,7 @@ float blackman_harris_fft_window(int i, int length)
 
 static float zeroethOrderBessel(float x)
 {
-	const float eps = 0.000001;
+	const float eps = 0.000001f;
 
 	//  initialize the series term for m=0 and the result
 	float besselValue = 0;
@@ -80,13 +78,21 @@ static float zeroethOrderBessel(float x)
 	return besselValue;
 }
 
-static float keiser5_fft_window(int i,int len){   
+static inline float kaiser_fft_window(float shape, int i,int len)
+{   
      //  Pre-compute the shared denominator in the Kaiser equation. 
-	const float shape = 5.f;
 	const float oneOverDenom = 1.0 / zeroethOrderBessel( shape );
 	const unsigned int N = len - 1;
 	const float oneOverN = 1.0 / N;
 	const float K = (2.0 * (float)(i) * oneOverN) - 1.0;
 	const float arg = sqrtf( 1.0 - (K * K) );        
 	return zeroethOrderBessel(shape * arg) * oneOverDenom;
+}
+
+static float kaiser5_fft_window(int i,int len){
+	return kaiser_fft_window(5.f, i, len);
+}
+
+static float kaiser7_fft_window(int i,int len){
+	return kaiser_fft_window(7.f, i, len);
 }

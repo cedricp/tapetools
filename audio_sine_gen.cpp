@@ -6,8 +6,6 @@
 #include <stdint.h>
 #include <math.h>
 
-static const double PI = 3.14159265358979323846264338328;
-
 static void write_sample(char *ptr, double sample) {
     int16_t *buf = (int16_t *)ptr;
     constexpr double range = (double)INT16_MAX - (double)INT16_MIN;
@@ -41,7 +39,7 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
 
         const SoundIoChannelLayout *layout = &outstream->layout;
 
-        double radians_per_second = pitch * 2.0 * PI;
+        double radians_per_second = pitch * 2.0 * M_PI;
         for (int frame = 0; frame < frame_count; frame += 1) {
             double sample = sin((udata->m_seconds_offset + frame * seconds_per_frame) * radians_per_second);
             for (int channel = 0; channel < layout->channel_count; channel += 1) {
