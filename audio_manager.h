@@ -5,6 +5,37 @@
 #include <map>
 #include <vector>
 
+class ringBuffer
+{
+    SoundIoRingBuffer* rb;
+public:
+    ringBuffer(SoundIo* sio, int size){
+        rb = soundio_ring_buffer_create(sio, size);
+    }
+    ~ringBuffer(){
+        soundio_ring_buffer_destroy(rb);
+    }
+    char* write_ptr(){
+        return soundio_ring_buffer_write_ptr(rb);
+    }
+    char* read_ptr(){
+        return soundio_ring_buffer_read_ptr(rb);
+    }
+    void advance_read_ptr(int size){
+        soundio_ring_buffer_advance_read_ptr(rb, size);
+    }
+    void advance_write_ptr(int size){
+        soundio_ring_buffer_advance_write_ptr(rb, size);
+    }
+    int free_count(){
+        return soundio_ring_buffer_free_count(rb);
+    }
+    int fill_count(){
+        return soundio_ring_buffer_fill_count(rb);
+    }
+};                    
+
+
 class audioManager
 {
     SoundIoBackend m_backend = SoundIoBackendNone;
@@ -54,7 +85,7 @@ public:
     bool valid(){return m_valid;}
     SoundIo* get_soundio(){return m_soundio;}
 
-    SoundIoRingBuffer* get_new_ringbuffer(int capacity);
+    ringBuffer* get_new_ringbuffer(int capacity);
 };
 
 

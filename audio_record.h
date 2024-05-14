@@ -2,10 +2,11 @@
 
 #include "audio_manager.h"
 
+
 class audioRecorder
 {
     SoundIoInStream *m_instream = nullptr;
-    SoundIoRingBuffer *m_ring_buffer = nullptr;
+    ringBuffer *m_ring_buffer = nullptr;
     static void read_callback(SoundIoInStream *instream, int frame_count_min, int frame_count_max);
     static void overflow_callback(SoundIoInStream *instream);
     static void error_callback(SoundIoInStream *instream, int err);

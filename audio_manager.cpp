@@ -385,7 +385,7 @@ const std::vector<int> audioManager::get_output_sample_rates(int devidx)
     return sample_rates;
 }
 
-SoundIoRingBuffer* audioManager::get_new_ringbuffer(int capacity)
+ringBuffer* audioManager::get_new_ringbuffer(int capacity)
 {
-    return soundio_ring_buffer_create(m_soundio, capacity);
+    return new ringBuffer(m_soundio, capacity);
 }
