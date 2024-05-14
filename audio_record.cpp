@@ -6,6 +6,7 @@
 
 #include "audio_record.h"
 
+
 audioRecorder::audioRecorder(audioManager& manager) : m_manager(manager)
 {
 
@@ -90,6 +91,7 @@ void audioRecorder::read_callback(SoundIoInStream *instream, int frame_count_min
 
     int write_frames = std::min(free_count, frame_count_max);
     int frames_left = write_frames;
+    int written_frames = 0;
 
     for (;;) {
         int frame_count = frames_left;
@@ -98,6 +100,8 @@ void audioRecorder::read_callback(SoundIoInStream *instream, int frame_count_min
             fprintf(stderr, "begin read error: %s", soundio_strerror(err));
             exit(1);
         }
+
+        written_frames += frame_count;
 
         if (!frame_count)
             break;
@@ -126,7 +130,7 @@ void audioRecorder::read_callback(SoundIoInStream *instream, int frame_count_min
             break;
     }
 
-    int advance_bytes = write_frames * instream->bytes_per_frame;
+    int advance_bytes = written_frames * instream->bytes_per_frame;
     soundio_ring_buffer_advance_write_ptr(ar->m_ring_buffer, advance_bytes);
 }
 
@@ -153,13 +157,13 @@ bool audioRecorder::pause(bool p)
 void audioRecorder::get_data(std::vector<float>& data, size_t size)
 {
     if (!m_ring_buffer){
-        data.clear();
         return;
     }
 
     size_t fill_bytes = soundio_ring_buffer_fill_count(m_ring_buffer);
     int16_t *read_buf = (int16_t*)soundio_ring_buffer_read_ptr(m_ring_buffer);
-    if (data.size() != size) data.resize(size);
+
+    if (data.size() != size) data.resize(size, 0);
 
     constexpr float inv16 = 1.0f / float(INT16_MAX);
     for (int i = 0; i < size; ++i){
