@@ -53,6 +53,8 @@ class AudioToolWindow : public Event, Widget
     int     m_fft_found_peaks = 0;
     float   m_thd = 0; 
 
+    float   m_rms_left, m_rms_right;
+
     bool    m_sweep_started = false;
     int     m_sweep_current_frequency;
     int     m_sweep_span = 250;
@@ -329,10 +331,31 @@ public:
             ImPlot::SetupAxes("Time (ms)", "Amplitude", 0, ImPlotAxisFlags_Lock);
             ImPlot::SetupAxesLimits(0, xmax, -1.f, 1.f);
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xmax);
-            if (channelcount > 0)
-                ImPlot::PlotLine("Channel 1", m_sound_data_x.data(), m_sound_data1.data(), m_sound_data_x.size());
-            if (channelcount > 1)
-                ImPlot::PlotLine("Channel 2", m_sound_data_x.data(), m_sound_data2.data(), m_sound_data_x.size());
+            if (channelcount > 0){
+                ImPlot::PlotLine("Left channel", m_sound_data_x.data(), m_sound_data1.data(), m_sound_data_x.size());
+            }
+            if (channelcount > 1){
+                ImPlot::PlotLine("Right channel", m_sound_data_x.data(), m_sound_data2.data(), m_sound_data_x.size());
+            }
+            
+            char rmstext[20];
+            ImVec2 plotpos = ImPlot::GetPlotPos();
+            ImVec2 plotsize = ImPlot::GetPlotSize();
+
+            if (channelcount > 0){
+                ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1)));
+                snprintf(rmstext, 20, "RMS left :  %.4f", m_rms_left);
+                ImPlot::PlotText(rmstext, pnt.x, pnt.y);
+                float rms[4] = {0., (current_sample_rate)/2.f, m_rms_left, m_rms_left};
+                ImPlot::PlotLine("signal RMS left", rms, rms+2, 2);
+            }
+            if (channelcount > 1){
+                ImPlotPoint pnt2 = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1) + 10));
+                snprintf(rmstext, 20, "RMS right : %.4f", m_rms_right);
+                ImPlot::PlotText(rmstext, pnt2.x, pnt2.y);
+                float rms[4] = {0., (current_sample_rate)/2.f, m_rms_right, m_rms_right};
+                ImPlot::PlotLine("signal RMS right", rms, rms+2, 2);
+            }
             ImPlot::EndPlot();
         }
 
@@ -453,20 +476,36 @@ public:
         m_audiorecorder.get_data(m_raw_buffer, m_capture_size * channelcount);
         m_sound_data_x.resize(m_capture_size);
 
+        m_rms_left = m_rms_right = 0.f;
+
         // Fill audio waveform
         for (int i = 0; i < m_capture_size; i++){
             m_sound_data1[i] = m_raw_buffer[i*channelcount] * m_audio_gain;
+                
             // THD test for non linear signal by applying little distortion
-            // m_sound_data1[i] += 0.7f*sin(1000.*float(i) *2.f*3.14159*1./current_sample_rate);
+            //m_sound_data1[i] += 0.7f*sin(1000.*float(i) *2.f*3.14159*1./current_sample_rate);
             // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.1f);
             // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.1f);
-            if(channelcount>1) m_sound_data2[i] = m_raw_buffer[i*channelcount+1] * m_audio_gain;
             if (m_fft_channel == 0){
                 m_fftin[i] = m_sound_data1[i] * m_window_fn(i, m_capture_size);
             } else {
                 m_fftin[i] = m_sound_data2[i] * m_window_fn(i, m_capture_size);
             }
             m_sound_data_x[i] = float(i) * inv_current_sample_rate * 1000.f;
+
+            m_rms_left += m_sound_data1[i] * m_sound_data1[i];
+            if(channelcount>1){
+                m_sound_data2[i] = m_raw_buffer[i*channelcount+1] * m_audio_gain;
+                m_rms_right += m_sound_data2[i] * m_sound_data2[i];
+            }
+        }
+
+        m_rms_left = m_rms_left / m_capture_size;
+        m_rms_left = sqrtf(m_rms_left);
+
+        if (channelcount > 1){
+            m_rms_right = m_rms_right / m_capture_size;
+            m_rms_right = sqrtf(m_rms_right);
         }
         
         if (compute_fft){
