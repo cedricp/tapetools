@@ -7,7 +7,7 @@
 
 class ringBuffer
 {
-    SoundIoRingBuffer* rb;
+    SoundIoRingBuffer* rb = nullptr;
 public:
     ringBuffer(SoundIo* sio, int size){
         rb = soundio_ring_buffer_create(sio, size);

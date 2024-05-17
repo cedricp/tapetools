@@ -21,5 +21,5 @@ public:
 
     int get_samplerate();
 
-    void setPitch(double pitch);
+    void set_pitch(double pitch);
 };

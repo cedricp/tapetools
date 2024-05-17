@@ -140,7 +140,7 @@ public:
         int current_sine_samplerate = m_audiomanager.get_output_sample_rates(m_audio_out_idx)[m_out_sample_rate];
         m_sine_generator.destroy();
         m_sine_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, m_sinegen_latency);
-        m_sine_generator.setPitch(m_pitch);
+        m_sine_generator.set_pitch(m_pitch);
         m_sine_generator.start();
         m_sine_generator.pause(!m_sine_generator_switch);
     }
@@ -172,7 +172,7 @@ public:
 
 
         m_sweep_current_frequency += m_sweep_span;
-        m_sine_generator.setPitch(m_sweep_current_frequency);
+        m_sine_generator.set_pitch(m_sweep_current_frequency);
         m_sweep_timer.start();
     }
 
@@ -213,7 +213,7 @@ public:
         m_sweep_values.clear();
         m_sine_generator_switch = true;
         reset_sine_generator();
-        m_sine_generator.setPitch(m_sweep_current_frequency);
+        m_sine_generator.set_pitch(m_sweep_current_frequency);
         m_sweep_timer.start();
     }
 
@@ -256,10 +256,17 @@ public:
         ImGui::SameLine();
 
         ImGui::BeginChild("ScopesChild4", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::SetNextItemWidth(70);
         if(ImGui::DragInt("Delay (ms)", &m_measure_delay, 1.f, m_recorder_latency * 2, 3000)){
             // Set a comfortable time amount to let the FFT settle (at leat 400ms for 200ms latency)
             m_sweep_timer.set(m_measure_delay);
         }
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildSpan", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::SetNextItemWidth(70);
+        ImGui::DragInt("Sweep span (Hz)", &m_sweep_span, 10.f, 50, 2000);
         ImGui::EndChild();
 
         ImGui::SameLine();
@@ -604,7 +611,7 @@ public:
                 }
                 ImGui::SameLine();
                 if(ImGui::SliderFloat("Pitch", &m_pitch, 100, 20000)){
-                    m_sine_generator.setPitch(m_pitch);
+                    m_sine_generator.set_pitch(m_pitch);
                 }
                 ImGui::End();
             }

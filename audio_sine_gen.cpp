@@ -38,9 +38,8 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
             break;
 
         const SoundIoChannelLayout *layout = &outstream->layout;
-
         double radians_per_second = pitch * 2.0 * M_PI;
-        for (int frame = 0; frame < frame_count; frame += 1) {
+        for (int frame = 0; frame < frame_count; ++frame) {
             double sample = sin((udata->m_seconds_offset + frame * seconds_per_frame) * radians_per_second);
             for (int channel = 0; channel < layout->channel_count; channel += 1) {
                 write_sample(areas[channel].ptr, sample);
@@ -157,7 +156,7 @@ bool audioSineGenerator::pause(bool pause)
     return true;
 }
 
-void audioSineGenerator::setPitch(double pitch){
+void audioSineGenerator::set_pitch(double pitch){
     m_pitch = pitch;
 }
 
