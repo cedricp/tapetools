@@ -14,7 +14,7 @@ class AudioToolWindow : public Event, Widget
     
     bool m_sine_generator_switch = false;
     float m_pitch = 440;
-    float m_sinegen_latency = 0.05f;
+    float m_sinegen_latency = 0.01f;
     int m_recorder_latency = 100;
     
     int m_audio_out_idx = -1;
@@ -65,6 +65,12 @@ class AudioToolWindow : public Event, Widget
     std::vector<float> m_sweep_values;
     std::vector<float> m_sweep_freqs;
     Timer   m_sweep_timer;
+    bool    m_pause_compute = false;
+
+    bool    m_use_targetdb = false;
+    bool    m_lockdb = false;
+    float   m_target_db = 1.0f;
+    float   m_locked_db_value = 0.f;
 
     STATIC_CALLBACK_METHOD(on_timer_event, AudioToolWindow)
 
@@ -220,6 +226,7 @@ public:
         reset_sine_generator();
         m_sine_generator.set_pitch(m_sweep_current_frequency);
         m_sweep_timer.start();
+        //m_pause_compute = true;
     }
 
     void stop_sweep_gen(){
@@ -227,10 +234,11 @@ public:
         m_sine_generator_switch = false;
         m_sine_generator.pause();
         m_sweep_timer.stop();
+        //m_pause_compute = false;
     }
 
     void draw_sweep_tab(){
-        compute();
+        if(!m_pause_compute) compute();
 
         int channelcount = m_audiorecorder.get_channel_count(); 
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
@@ -323,7 +331,7 @@ public:
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
         bool must_reinit_recorder = false;
 
-        if (compute() && m_compute_thd)
+        if (!m_pause_compute && compute() && m_compute_thd)
         {
             compute_thd();
         }
@@ -346,23 +354,45 @@ public:
        
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildYzoom", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::SetNextItemWidth(70);
         ImGui::SliderFloat("Amplitude mult", &m_scopezoom, 1, 50);
         ImGui::EndChild();
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildCalib", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         static float rms_calibration = 1.f;
+        ImGui::SetNextItemWidth(70);
         ImGui::InputFloat("Measured RMS", &rms_calibration);
         ImGui::SameLine();
+        ImGui::SetNextItemWidth(70);
         if (ImGui::Button("Calibrate from left")){
+
             m_rms_calibration_scale = rms_calibration / m_rms_left;
         }
         ImGui::SameLine();
+        ImGui::SetNextItemWidth(70);
         if (ImGui::Button("Calibrate from right")){
             m_rms_calibration_scale = rms_calibration / m_rms_right;
         }
         ImGui::EndChild();
 
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildTargetVolt", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::ToggleButton("Targetdb", &m_use_targetdb);
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Show dB target");
+        if (m_use_targetdb){
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(70);
+            ImGui::SliderFloat("dB target", &m_target_db, -20, 20);
+            ImGui::SameLine();
+            ImGui::ToggleButton("Lock", &m_lockdb);
+            ImGui::SameLine();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Lock");
+        }
+        ImGui::EndChild();
 
         if (ImPlot::BeginPlot("Audio", ImVec2(m_show_xy ? width()-plotheight-10 : -1, -1)))
         {
@@ -406,6 +436,15 @@ public:
                 float rms[4] = {0., (current_sample_rate)/2.f, m_rms_right, m_rms_right};
                 ImPlot::PlotLine("signal RMS right", rms, rms+2, 2);
             }
+
+            if(m_use_targetdb){
+                if (!m_lockdb){
+                    m_locked_db_value = m_rms_left * powf(10, m_target_db/20.f);
+                }
+                float tgtpnt[4] = {0., (current_sample_rate)/2.f, m_locked_db_value, m_locked_db_value};
+                ImPlot::PlotLine("target dB", tgtpnt, tgtpnt+2, 2);
+            }
+
             ImPlot::EndPlot();
         }
         ImGui::SameLine();
@@ -546,7 +585,7 @@ public:
             m_sound_data1[i] = m_raw_buffer[i*channelcount] * m_audio_gain;
                 
             // THD test for non linear signal by applying little distortion
-            m_sound_data1[i] = 0.7f*sin(1000.*float(i) *2.f*3.14159*1./current_sample_rate);
+            //m_sound_data1[i] = 0.7f*sin(1000.*float(i) *2.f*3.14159*1./current_sample_rate);
             // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.1f);
             // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.1f);
             if (m_fft_channel == 0){
