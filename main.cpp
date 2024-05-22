@@ -347,8 +347,12 @@ public:
         static float rms_calibration = 1.f;
         ImGui::InputFloat("Measured RMS", &rms_calibration);
         ImGui::SameLine();
-        if (ImGui::Button("Calibrate")){
+        if (ImGui::Button("Calibrate from left")){
             m_rms_calibration_scale = rms_calibration / m_rms_left;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Calibrate from right")){
+            m_rms_calibration_scale = rms_calibration / m_rms_right;
         }
         ImGui::EndChild();
 
