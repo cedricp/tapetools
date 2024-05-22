@@ -41,6 +41,7 @@ class AudioToolWindow : public Event, Widget
     bool m_compute_thd = false;
     bool m_logscale_frequency = true;
     bool m_show_xy = false;
+    bool m_show0db;
     float m_rms_calibration_scale = 1.0f;
     float m_scopezoom = 1;;
     std::vector<std::string> m_wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann", "Kaiser 5", "Kaiser 7"};
@@ -377,6 +378,14 @@ public:
         ImGui::EndChild();
 
         ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildShow0db", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::ToggleButton("Show 0dB", &m_show0db);
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Show 0dBm Ref");
+        ImGui::EndChild();
+
+        ImGui::SameLine();
         ImGui::BeginChild("ScopesChildTargetVolt", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("Targetdb", &m_use_targetdb);
         ImGui::SameLine();
@@ -443,6 +452,12 @@ public:
                 }
                 float tgtpnt[4] = {0., (current_sample_rate)/2.f, m_locked_db_value, m_locked_db_value};
                 ImPlot::PlotLine("target dB", tgtpnt, tgtpnt+2, 2);
+            }
+
+            if (m_show0db){
+                float zerodb = .775f / m_rms_calibration_scale;
+                float rms[4] = {0., (current_sample_rate)/2.f, zerodb, zerodb};
+                ImPlot::PlotLine("0 dB Reference", rms, rms+2, 2);
             }
 
             ImPlot::EndPlot();
