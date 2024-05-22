@@ -40,6 +40,7 @@ class AudioToolWindow : public Event, Widget
     bool m_tone_generator_open = false;
     bool m_compute_thd = false;
     bool m_logscale_frequency = true;
+    bool m_show_xy = false;
     std::vector<std::string> m_wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann", "Kaiser 5", "Kaiser 7"};
     std::vector<std::string> m_fftchannels = {"Left", "Right"};
 
@@ -325,7 +326,7 @@ public:
         float plotheight = height() / 2.0f - 5.f;
 
         ImGui::BeginChild("ScopesChild1", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
-        if (ImPlot::BeginPlot("Audio", ImVec2(-1, -1)))
+        if (ImPlot::BeginPlot("Audio", ImVec2(m_show_xy ? width()-plotheight-10 : -1, -1)))
         {
             float xmax = current_sample_rate > 0 ? float(m_capture_size) * (1.f / (current_sample_rate * 0.001f)) : INFINITY;
             ImPlot::SetupAxes("Time (ms)", "Amplitude", 0, ImPlotAxisFlags_Lock);
@@ -358,17 +359,38 @@ public:
             }
             ImPlot::EndPlot();
         }
+        ImGui::SameLine();
+        if (m_show_xy && ImPlot::BeginPlot("X-Y Diagram", ImVec2(plotheight, -1)))
+        {
+            ImPlot::SetupAxes("X", "Y", ImPlotAxisFlags_Lock, ImPlotAxisFlags_Lock);
+            ImPlot::SetupAxesLimits(-1.f, 1.f, -1.f, 1.f);
+            //ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xmax);
+            if (channelcount > 1){
+                ImPlot::PlotLine("Channels phase", m_sound_data1.data(), m_sound_data2.data(), m_sound_data_x.size());
+            }
+            ImPlot::EndPlot();
+        }
 
         ImGui::EndChild();
 
         ImGui::BeginChild("ScopesChild2", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
         ImGui::BeginChild("ScopesChild3", ImVec2(-FLT_MIN, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_None);
+
+        ImGui::BeginChild("ScopesChildShowXY", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::ToggleButton("Show XY diagram", &m_show_xy);
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("XY diagram");
+        ImGui::EndChild();
+
+        ImGui::SameLine();  
         ImGui::BeginChild("ScopesChild4", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("LogFreq", &m_logscale_frequency);
         ImGui::SameLine();
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Log scale frequency");
         ImGui::EndChild();
+
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild5", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("CTHD", &m_compute_thd);
@@ -498,6 +520,7 @@ public:
                 m_sound_data2[i] = m_raw_buffer[i*channelcount+1] * m_audio_gain;
                 m_rms_right += m_sound_data2[i] * m_sound_data2[i];
             }
+            //m_sound_data2[i] += 0.7f*sin(1000.*float(i + 500) *2.f*3.14159*1./current_sample_rate);
         }
 
         m_rms_left = m_rms_left / m_capture_size;
