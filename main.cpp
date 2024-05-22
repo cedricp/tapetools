@@ -15,7 +15,7 @@ class AudioToolWindow : public Event, Widget
     bool m_sine_generator_switch = false;
     float m_pitch = 440;
     float m_sinegen_latency = 0.05f;
-    int m_recorder_latency = 200;
+    int m_recorder_latency = 100;
     
     int m_audio_out_idx = -1;
     int m_audio_in_idx = -1;
@@ -41,6 +41,8 @@ class AudioToolWindow : public Event, Widget
     bool m_compute_thd = false;
     bool m_logscale_frequency = true;
     bool m_show_xy = false;
+    float m_rms_calibration_scale = 1.0f;
+    float m_scopezoom = 1;;
     std::vector<std::string> m_wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann", "Kaiser 5", "Kaiser 7"};
     std::vector<std::string> m_fftchannels = {"Left", "Right"};
 
@@ -326,12 +328,45 @@ public:
         float plotheight = height() / 2.0f - 5.f;
 
         ImGui::BeginChild("ScopesChild1", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
+
+
+        ImGui::BeginChild("ScopesChildShowXY", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::ToggleButton("Show XY diagram", &m_show_xy);
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("XY diagram");
+        ImGui::EndChild();
+       
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildYzoom", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::SliderFloat("Amplitude mult", &m_scopezoom, 1, 50);
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildCalib", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        static float rms_calibration = 1.f;
+        ImGui::InputFloat("Measured RMS", &rms_calibration);
+        ImGui::SameLine();
+        if (ImGui::Button("Calibrate")){
+            m_rms_calibration_scale = rms_calibration / m_rms_left;
+        }
+        ImGui::EndChild();
+
+
         if (ImPlot::BeginPlot("Audio", ImVec2(m_show_xy ? width()-plotheight-10 : -1, -1)))
         {
+            float x_limit = 1.0f / m_scopezoom;
             float xmax = current_sample_rate > 0 ? float(m_capture_size) * (1.f / (current_sample_rate * 0.001f)) : INFINITY;
+            ImPlot::SetupAxisLimits(ImAxis_X1, 0, xmax);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, -x_limit, x_limit, ImPlotCond_Always);
+
+            if (m_rms_calibration_scale != 1.f){
+                ImPlot::SetupAxis(ImAxis_Y2, "Volts", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
+                ImPlot::SetupAxisLimits(ImAxis_Y2, -m_rms_calibration_scale / m_scopezoom, m_rms_calibration_scale / m_scopezoom, ImPlotCond_Always);
+            }
             ImPlot::SetupAxes("Time (ms)", "Amplitude", 0, ImPlotAxisFlags_Lock);
-            ImPlot::SetupAxesLimits(0, xmax, -1.f, 1.f);
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xmax);
+            
             if (channelcount > 0){
                 ImPlot::PlotLine("Left channel", m_sound_data_x.data(), m_sound_data1.data(), m_sound_data_x.size());
             }
@@ -345,14 +380,17 @@ public:
 
             if (channelcount > 0){
                 ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1)));
-                snprintf(rmstext, 20, "RMS left :  %.4f", m_rms_left);
+                float rmsl = m_rms_left * m_rms_calibration_scale;
+
+                snprintf(rmstext, 20, "V RMS left :  %.4f", rmsl);
                 ImPlot::PlotText(rmstext, pnt.x, pnt.y);
                 float rms[4] = {0., (current_sample_rate)/2.f, m_rms_left, m_rms_left};
                 ImPlot::PlotLine("signal RMS left", rms, rms+2, 2);
             }
             if (channelcount > 1){
+                float rmsr = m_rms_right * m_rms_calibration_scale;
                 ImPlotPoint pnt2 = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1) + 10));
-                snprintf(rmstext, 20, "RMS right : %.4f", m_rms_right);
+                snprintf(rmstext, 20, "V RMS right : %.4f", rmsr);
                 ImPlot::PlotText(rmstext, pnt2.x, pnt2.y);
                 float rms[4] = {0., (current_sample_rate)/2.f, m_rms_right, m_rms_right};
                 ImPlot::PlotLine("signal RMS right", rms, rms+2, 2);
@@ -363,8 +401,8 @@ public:
         if (m_show_xy && ImPlot::BeginPlot("X-Y Diagram", ImVec2(plotheight, -1)))
         {
             ImPlot::SetupAxes("X", "Y", ImPlotAxisFlags_Lock, ImPlotAxisFlags_Lock);
-            ImPlot::SetupAxesLimits(-1.f, 1.f, -1.f, 1.f);
-            //ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xmax);
+            float limit = 1.f / m_scopezoom;
+            ImPlot::SetupAxesLimits(-limit, limit, -limit, limit, ImPlotCond_Always);
             if (channelcount > 1){
                 ImPlot::PlotLine("Channels phase", m_sound_data1.data(), m_sound_data2.data(), m_sound_data_x.size());
             }
@@ -376,14 +414,6 @@ public:
         ImGui::BeginChild("ScopesChild2", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
         ImGui::BeginChild("ScopesChild3", ImVec2(-FLT_MIN, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_None);
 
-        ImGui::BeginChild("ScopesChildShowXY", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::ToggleButton("Show XY diagram", &m_show_xy);
-        ImGui::SameLine();
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("XY diagram");
-        ImGui::EndChild();
-
-        ImGui::SameLine();  
         ImGui::BeginChild("ScopesChild4", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("LogFreq", &m_logscale_frequency);
         ImGui::SameLine();
@@ -505,7 +535,7 @@ public:
             m_sound_data1[i] = m_raw_buffer[i*channelcount] * m_audio_gain;
                 
             // THD test for non linear signal by applying little distortion
-            //m_sound_data1[i] += 0.7f*sin(1000.*float(i) *2.f*3.14159*1./current_sample_rate);
+            m_sound_data1[i] = 0.7f*sin(1000.*float(i) *2.f*3.14159*1./current_sample_rate);
             // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.1f);
             // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.1f);
             if (m_fft_channel == 0){
@@ -557,6 +587,7 @@ public:
                 m_noise_foor = mean + stddev;
             } // compute_noise_floor
         } // compute_fft
+
         return true;
     }
 
