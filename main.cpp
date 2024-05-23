@@ -55,6 +55,7 @@ class AudioToolWindow : public Event, Widget
     int     m_fft_highest_idx[200];
     float   m_fft_highest_val;
     int     m_fft_found_peaks = 0;
+    bool    m_smooth_fft = true;
     float   m_thd = 0; 
 
     float   m_rms_left, m_rms_right;
@@ -234,6 +235,37 @@ public:
         //m_pause_compute = false;
     }
 
+    void set_window_fn(){
+        switch (m_fft_window_fn){
+            case 0:
+                m_window_fn = rectangle_fft_window;
+                break;
+            case 1:
+                m_window_fn = hamming_fft_window;
+                break;
+            case 2:
+                m_window_fn = hann_poisson_fft_window;
+                break;
+            case 3:
+                m_window_fn = blackman_fft_window;
+                break;
+            case 4:
+                m_window_fn = blackman_harris_fft_window;
+                break;
+            case 5:
+                m_window_fn = hann_fft_window;
+                break;
+            case 6:
+                m_window_fn = kaiser5_fft_window;
+                break;
+            case 7:
+                m_window_fn = kaiser7_fft_window;
+                break;
+            default:
+                m_window_fn = rectangle_fft_window;
+                break;
+        }
+    }
     void draw_sweep_tab(){
         if(!m_pause_compute) compute();
 
@@ -289,14 +321,7 @@ public:
         ImGui::SetNextItemWidth(150);
         if (ImGui::Combo("Window mode", &m_fft_window_fn, vector_getter, (void *)&m_wmodes, m_wmodes.size()))
         {
-            if (m_fft_window_fn == 0) m_window_fn = rectangle_fft_window;
-            else if (m_fft_window_fn == 1) m_window_fn = hamming_fft_window;
-            else if (m_fft_window_fn == 2) m_window_fn = hann_poisson_fft_window;
-            else if (m_fft_window_fn == 3) m_window_fn = blackman_fft_window;
-            else if (m_fft_window_fn == 4) m_window_fn = blackman_harris_fft_window;
-            else if (m_fft_window_fn == 5) m_window_fn = hann_fft_window;
-            else if (m_fft_window_fn == 6) m_window_fn = kaiser5_fft_window;
-            else if (m_fft_window_fn == 7) m_window_fn = kaiser7_fft_window;
+            set_window_fn();
         }
         ImGui::EndChild();
         ImGui::SameLine();
@@ -341,17 +366,50 @@ public:
         float frameh = ImGui::GetFrameHeightWithSpacing();
         float padh = 3.0f * ImGui::GetStyle().FramePadding.y + ImGui::GetStyle().ItemSpacing.y;
 
+        /*
+        * Tone Generator
+        */
+        ImGui::BeginChild("ScopesChildToneGen", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_None);
+
+        ImGui::BeginChild("ScopesChildTonGenSwitch", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        if(ImGui::ToggleButton("Tone generator", &m_sine_generator_switch)){
+            reset_sine_generator();
+        }
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildToneFreq", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        if (ImGui::SliderInt("Pitch", &m_pitch, 20, 20000)){
+            m_sine_generator.set_pitch(m_pitch);
+        }
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        if (ImGui::SliderInt("Intensity", &m_sine_volume_db, -100, 0, "%d dB")){
+            m_sine_generator.set_volume(m_sine_volume_db);
+        }
+        ImGui::EndChild();
+
+        ImGui::EndChild();
+
+        /*
+        * Time domain analysis
+        */
+
         ImGui::BeginChild("ScopesChild", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
         float plotheight = height() / 2.0f - 5.f;
 
+
         ImGui::BeginChild("ScopesChild1", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
 
-
-        ImGui::BeginChild("ScopesChildShowXY", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::ToggleButton("XY diagram", &m_show_xy);
-        ImGui::EndChild();
+        if (channelcount > 1){
+            ImGui::BeginChild("ScopesChildShowXY", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            ImGui::ToggleButton("XY diagram", &m_show_xy);
+            ImGui::EndChild();
+            ImGui::SameLine();
+        }
        
-        ImGui::SameLine();
         ImGui::BeginChild("ScopesChildYzoom", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(70);
         ImGui::SliderFloat("Amplitude mult", &m_scopezoom, 1, 50);
@@ -368,10 +426,12 @@ public:
 
             m_rms_calibration_scale = rms_calibration / m_rms_left;
         }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(70);
-        if (ImGui::Button("Calibrate from right")){
-            m_rms_calibration_scale = rms_calibration / m_rms_right;
+        if (channelcount > 1){
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(70);
+            if (ImGui::Button("Calibrate from right")){
+                m_rms_calibration_scale = rms_calibration / m_rms_right;
+            }
         }
         ImGui::EndChild();
 
@@ -466,41 +526,18 @@ public:
         ImGui::EndChild();
 
         /*
-        * Tone Generator
-        */
-        ImGui::BeginChild("ScopesChildToneGen", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_None);
-
-        ImGui::BeginChild("ScopesChildTonGenSwitch", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        if(ImGui::ToggleButton("Tone generator", &m_sine_generator_switch)){
-            reset_sine_generator();
-        }
-        ImGui::EndChild();
-
-        ImGui::SameLine();
-        ImGui::BeginChild("ScopesChildToneFreq", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        if (ImGui::SliderInt("Pitch", &m_pitch, 20, 20000)){
-            m_sine_generator.set_pitch(m_pitch);
-        }
-        ImGui::EndChild();
-
-        ImGui::SameLine();
-        ImGui::BeginChild("ScopesChildToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        if (ImGui::SliderInt("Volume", &m_sine_volume_db, -100, 0, "%d dB")){
-            m_sine_generator.set_volume(m_sine_volume_db);
-        }
-        ImGui::EndChild();
-
-        ImGui::EndChild();
-
-
-        /*
-        * FFT analysis
+        * Frequency domain analysis
         */
         ImGui::BeginChild("fftscopechild", ImVec2(0, -1), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
         ImGui::BeginChild("ScopesChild3", ImVec2(-FLT_MIN, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_None);
 
         ImGui::BeginChild("ScopesChild4", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("Log scale frequency", &m_logscale_frequency);
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildSmoothFFT", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::ToggleButton("Smooth FFT", &m_smooth_fft);
         ImGui::EndChild();
 
         ImGui::SameLine();
@@ -512,14 +549,7 @@ public:
         ImGui::SetNextItemWidth(150);
         if (ImGui::Combo("Window mode", &m_fft_window_fn, vector_getter, (void *)&m_wmodes, m_wmodes.size()))
         {
-            if (m_fft_window_fn == 0) m_window_fn = rectangle_fft_window;
-            else if (m_fft_window_fn == 1) m_window_fn = hamming_fft_window;
-            else if (m_fft_window_fn == 2) m_window_fn = hann_poisson_fft_window;
-            else if (m_fft_window_fn == 3) m_window_fn = blackman_fft_window;
-            else if (m_fft_window_fn == 4) m_window_fn = blackman_harris_fft_window;
-            else if (m_fft_window_fn == 5) m_window_fn = hann_fft_window;
-            else if (m_fft_window_fn == 6) m_window_fn = kaiser5_fft_window;
-            else if (m_fft_window_fn == 7) m_window_fn = kaiser7_fft_window;
+            set_window_fn();
         }
         ImGui::EndChild();
         ImGui::SameLine();
@@ -549,7 +579,6 @@ public:
             ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Linear);
             ImPlot::SetupAxesLimits(20.f, xfftmax, -130.0, 0.0);
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 20.f, 20000.f);
-            // ImPlot::SetupAxisLimitsConstraints(ImAxis_Y1, -130., 0);
 
             if (m_compute_thd)
             {
@@ -561,8 +590,14 @@ public:
                 ImPlot::PlotText(thdtext, pnt.x, pnt.y);
 
                 for (int i = 0; i < m_fft_found_peaks; ++i){
-                    float fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 0., -130.};
+                    float fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 0.f, -200.f};
                     ImPlot::PlotLine("Peaks", fund, fund+2, 2);
+                    float y_pos = m_fftdraw[m_fft_highest_idx[i]];
+                    snprintf(thdtext, 16, "%.4fdB", y_pos);
+                    ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos);
+                    float freq = m_fftfreqs[m_fft_highest_idx[i]] / 1000.f;
+                    snprintf(thdtext, 16, "%.4fKHz", freq);
+                    ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos - 8);
                 }
             }
             float nf[4] = {0., (current_sample_rate)/2.f, m_noise_foor, m_noise_foor};
@@ -613,10 +648,10 @@ public:
         for (int i = 0; i < m_capture_size; i++){
             m_sound_data1[i] = m_raw_buffer[i*channelcount] * m_audio_gain;
                 
-            // THD test for non linear signal by applying little distortion
-            //m_sound_data1[i] = 0.7f*sin(1000.*float(i) *2.f*3.14159*1./current_sample_rate);
-            // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.1f);
-            // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.1f);
+            // THD test for non linear signal by applying small odd harmomics distortion
+            // m_sound_data1[i] += 0.7f*sin(1000.*float(i) *2.f*3.14159*1./current_sample_rate);
+            // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.4);
+            // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.4f);
             if (m_fft_channel == 0){
                 m_fftin[i] = m_sound_data1[i] * m_window_fn(i, m_capture_size);
             } else {
@@ -653,7 +688,10 @@ public:
                 sum += fftout;
             }
 
-            //sg_smooth(fftdata.data(), m_fftdraw, fft_capture_size, 10, 1);
+            if (m_smooth_fft){
+                sg_smooth(m_fftdraw, fftdata.data(), fft_capture_size, 5, 1);
+                memcpy(m_fftdraw, fftdata.data(), fftdata.size()*4);
+            }
 
             if (compute_noise_floor){
                 float mean = sum / fft_capture_size;
@@ -728,8 +766,8 @@ public:
 
             for (int i = fundamental_idx + 1; i < m_fft_found_peaks; ++i){
                 float dBc = m_fftdraw[m_fft_highest_idx[i]] - fundamental_db;
-                float v_rms = powf(10.f, dBc/20.f);
-                m_thd += (v_rms * v_rms) ; 
+                float v_rms = powf(10.f, dBc/10.f);
+                m_thd += v_rms ; 
             }
 
             m_thd = sqrtf(m_thd) * 100.f;
@@ -798,7 +836,7 @@ int main(int argc, char *argv[])
     ImGui::GetStyle().WindowRounding= 4.0;
     ImGui::GetStyle().GrabRounding = 4.0;
     ImGui::GetStyle().GrabMinSize = 4.0; 
-    window->set_minimum_window_size(800,600);
+    window->set_minimum_window_size(1400,800);
     app->add_window(window);
     app->run();
     return 0;
