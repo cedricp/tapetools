@@ -5,6 +5,7 @@
 class audioSineGenerator{
     double m_seconds_offset = 0;
     double m_pitch;
+    double m_volume = 1.f;
     SoundIoOutStream *m_outstream = nullptr;
 
     static void write_callback(SoundIoOutStream *outstream, int frame_count_min, int frame_count_max);
@@ -22,4 +23,5 @@ public:
     int get_samplerate();
 
     void set_pitch(double pitch);
+    void set_volume(int db);
 };

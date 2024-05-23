@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <math.h>
 
-static void write_sample(char *ptr, double sample) {
+static inline void write_sample(char *ptr, double sample) {
     int16_t *buf = (int16_t *)ptr;
     constexpr double range = (double)INT16_MAX - (double)INT16_MIN;
     double val = sample * range / 2.0;
@@ -40,7 +40,7 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
         const SoundIoChannelLayout *layout = &outstream->layout;
         double radians_per_second = pitch * 2.0 * M_PI;
         for (int frame = 0; frame < frame_count; ++frame) {
-            double sample = sin((udata->m_seconds_offset + frame * seconds_per_frame) * radians_per_second);
+            double sample = udata->m_volume * sin((udata->m_seconds_offset + frame * seconds_per_frame) * radians_per_second);
             for (int channel = 0; channel < layout->channel_count; channel += 1) {
                 write_sample(areas[channel].ptr, sample);
                 areas[channel].ptr += areas[channel].step;
@@ -156,8 +156,14 @@ bool audioSineGenerator::pause(bool pause)
     return true;
 }
 
-void audioSineGenerator::set_pitch(double pitch){
+void audioSineGenerator::set_pitch(double pitch)
+{
     m_pitch = pitch;
+}
+
+void audioSineGenerator::set_volume(int db)
+{
+    m_volume = pow(10, (double)db/20);    
 }
 
 

@@ -13,9 +13,10 @@ class AudioToolWindow : public Event, Widget
     audioRecorder m_audiorecorder;
     
     bool m_sine_generator_switch = false;
-    float m_pitch = 440;
+    int  m_pitch = 440;
     float m_sinegen_latency = 0.01f;
     int m_recorder_latency = 100;
+    int m_sine_volume_db = 0.f;
     
     int m_audio_out_idx = -1;
     int m_audio_in_idx = -1;
@@ -37,7 +38,6 @@ class AudioToolWindow : public Event, Widget
     int m_out_sample_rate = 0;
 
     bool m_sound_setup_open = false;
-    bool m_tone_generator_open = false;
     bool m_compute_thd = false;
     bool m_logscale_frequency = true;
     bool m_show_xy = false;
@@ -197,10 +197,6 @@ public:
                 ImGui::MenuItem("Sound card setup", nullptr, &m_sound_setup_open);
                 ImGui::EndMenu();
             }
-            if (ImGui::BeginMenu("Tools")){
-                ImGui::MenuItem("Tone generator", nullptr, &m_tone_generator_open);
-                ImGui::EndMenu();
-            }
             ImGui::EndMainMenuBar();
         }
 
@@ -259,13 +255,18 @@ public:
             }
         }
         ImGui::EndChild();
+
+        ImGui::SameLine();
+        ImGui::BeginChild("FFTChildToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::SetNextItemWidth(70);
+        if (ImGui::SliderInt("Tone power", &m_sine_volume_db, -100, 0, "%d dB")){
+            m_sine_generator.set_volume(m_sine_volume_db);
+        }
+        ImGui::EndChild();
         
         ImGui::SameLine();
-
         ImGui::BeginChild("ScopesChild3", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::ToggleButton("LOGFREG", &m_logscale_frequency);
-        ImGui::SameLine();
-        ImGui::AlignTextToFramePadding();ImGui::Text("Log scale frequency");
+        ImGui::ToggleButton("Log scale frequency", &m_logscale_frequency);
         ImGui::EndChild();
         ImGui::SameLine();
 
@@ -347,10 +348,7 @@ public:
 
 
         ImGui::BeginChild("ScopesChildShowXY", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::ToggleButton("Show XY diagram", &m_show_xy);
-        ImGui::SameLine();
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("XY diagram");
+        ImGui::ToggleButton("XY diagram", &m_show_xy);
         ImGui::EndChild();
        
         ImGui::SameLine();
@@ -379,27 +377,18 @@ public:
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildShow0db", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::ToggleButton("Show 0dB", &m_show0db);
-        ImGui::SameLine();
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("Show 0dBm Ref");
+        ImGui::ToggleButton("Show 0dBm Ref", &m_show0db);
         ImGui::EndChild();
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildTargetVolt", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::ToggleButton("Targetdb", &m_use_targetdb);
-        ImGui::SameLine();
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("Show dB target");
+        ImGui::ToggleButton("Show dB target", &m_use_targetdb);
         if (m_use_targetdb){
             ImGui::SameLine();
             ImGui::SetNextItemWidth(70);
             ImGui::SliderFloat("dB target", &m_target_db, -20, 20);
             ImGui::SameLine();
             ImGui::ToggleButton("Lock", &m_lockdb);
-            ImGui::SameLine();
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Lock");
         }
         ImGui::EndChild();
 
@@ -476,22 +465,47 @@ public:
 
         ImGui::EndChild();
 
-        ImGui::BeginChild("ScopesChild2", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
+        /*
+        * Tone Generator
+        */
+        ImGui::BeginChild("ScopesChildToneGen", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_None);
+
+        ImGui::BeginChild("ScopesChildTonGenSwitch", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        if(ImGui::ToggleButton("Tone generator", &m_sine_generator_switch)){
+            reset_sine_generator();
+        }
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildToneFreq", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        if (ImGui::SliderInt("Pitch", &m_pitch, 20, 20000)){
+            m_sine_generator.set_pitch(m_pitch);
+        }
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        if (ImGui::SliderInt("Volume", &m_sine_volume_db, -100, 0, "%d dB")){
+            m_sine_generator.set_volume(m_sine_volume_db);
+        }
+        ImGui::EndChild();
+
+        ImGui::EndChild();
+
+
+        /*
+        * FFT analysis
+        */
+        ImGui::BeginChild("fftscopechild", ImVec2(0, -1), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
         ImGui::BeginChild("ScopesChild3", ImVec2(-FLT_MIN, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_None);
 
         ImGui::BeginChild("ScopesChild4", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::ToggleButton("LogFreq", &m_logscale_frequency);
-        ImGui::SameLine();
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("Log scale frequency");
+        ImGui::ToggleButton("Log scale frequency", &m_logscale_frequency);
         ImGui::EndChild();
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild5", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::ToggleButton("CTHD", &m_compute_thd);
-        ImGui::SameLine();
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("Compute THD");
+        ImGui::ToggleButton("Compute THD", &m_compute_thd);
         ImGui::EndChild();
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild6", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
@@ -661,11 +675,11 @@ public:
         // Source : https://stackoverflow.com/questions/22583391/peak-signal-detection-in-realtime-timeseries-data
         const int fft_capture_size = m_capture_size / 2;
 
-        smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, 100, 4, 0.f);
+        smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, 50, 4, 0.f);
         int one_count = 0;
         int found = 0;
 
-        for(int i = 200; i < fft_capture_size; ++i){
+        for(int i = 50; i < fft_capture_size; ++i){
             float current_sample = m_fftfiltered[i];
             if (one_count == 0 && current_sample > 0){
                 one_count++;
@@ -753,19 +767,6 @@ public:
                 ImGui::PopItemWidth();
             }
             ImGui::End();
-        }
-
-        if (m_tone_generator_open && !m_sweep_started){
-            if(ImGui::Begin("Tone Generator", &m_tone_generator_open)){
-                if (ImGui::ToggleButton("Sine", &m_sine_generator_switch)){
-                    reset_sine_generator();
-                }
-                ImGui::SameLine();
-                if(ImGui::SliderFloat("Pitch", &m_pitch, 100, 20000)){
-                    m_sine_generator.set_pitch(m_pitch);
-                }
-                ImGui::End();
-            }
         }
     }
 };

@@ -15724,6 +15724,11 @@ bool ImGui::ToggleButton(const char* str_id, bool* v)
 
     draw_list->AddRectFilled(p, ImVec2(p.x + width, p.y + height), col_bg, height * 0.5f);
     draw_list->AddCircleFilled(ImVec2(p.x + radius + t * (width - radius * 2.0f), p.y + radius), radius - 1.5f, IM_COL32(255, 255, 255, 255));
+
+    ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text(str_id);
+
     return clicked;
 }
 
