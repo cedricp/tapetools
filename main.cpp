@@ -142,10 +142,14 @@ public:
 
     void reinit_recorder()
     {
-        if (m_audiorecorder.init(float(m_recorder_latency) / 1000.f, m_audio_in_idx, m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate]))
-        {
-            m_audiorecorder.start();
+        if (m_audio_in_idx < 0){
+            return;
         }
+
+            if (m_audiorecorder.init(float(m_recorder_latency) / 1000.f, m_audio_in_idx, m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate]))
+            {
+                m_audiorecorder.start();
+            }
         init_capture();
     }
 
@@ -632,9 +636,11 @@ public:
         }
 
         const float current_sample_rate = m_audiorecorder.get_current_samplerate();
+        const float half_sample_rate = current_sample_rate / 2.f;
         const float inv_current_sample_rate = 1.0f / current_sample_rate;
         const int fft_capture_size = m_capture_size / 2;
         const float inv_fft_capture_size = 1.0f / float(fft_capture_size);
+        const float fft_step = half_sample_rate * inv_fft_capture_size;
         m_fft_highest_val = -100;
         
         m_sound_data1.resize(m_capture_size);
@@ -681,7 +687,7 @@ public:
             std::vector<float> fftdata(fft_capture_size);
             float sum = 0;
             for (int i = 0; i < fft_capture_size; ++i){
-                m_fftfreqs[i] = current_sample_rate * 0.5f * inv_fft_capture_size * (float)(i); 
+                m_fftfreqs[i] = fft_step * (float)(i);
                 float fftout = sqrtf(m_fftout[i][0] * m_fftout[i][0] + m_fftout[i][1] * m_fftout[i][1]) * inv_fft_capture_size;
                 fftout = std::max(20.f * log10(fftout), -200.f);
                 m_fftdraw[i] = isnan(fftout) ? -200.f : fftout;
@@ -776,6 +782,7 @@ public:
 
     void draw_tools_windows(){
         if (m_sound_setup_open && !m_sweep_started){
+            ImGui::SetNextWindowSize(ImVec2(600, 150));
             if(ImGui::Begin("Sound card setup", &m_sound_setup_open)){
                 ImVec2 winsize = ImGui::GetWindowSize();
                 ImGui::PushItemWidth(winsize.x / 3);
@@ -786,7 +793,7 @@ public:
                     reset_sine_generator();
                 }
                 ImGui::SameLine();
-                const std::vector<std::string> out_samplerate = m_audiomanager.get_output_sample_rates_str(m_audio_out_idx);
+                const std::vector<std::string> out_samplerate = m_audio_out_idx >= 0 ? m_audiomanager.get_output_sample_rates_str(m_audio_out_idx) : std::vector<std::string>();
                 if (ImGui::Combo("Samplerate##1", &m_out_sample_rate, vector_getter, (void*)&out_samplerate, out_samplerate.size())){
                     reset_sine_generator();
                 }
@@ -798,7 +805,7 @@ public:
                     reinit_recorder();
                 }
                 ImGui::SameLine();
-                const std::vector<std::string> in_samplerate = m_audiomanager.get_input_sample_rates_str(m_audio_in_idx);
+                const std::vector<std::string> in_samplerate = m_audio_in_idx >= 0 ? m_audiomanager.get_input_sample_rates_str(m_audio_in_idx) : std::vector<std::string>();
                 if (ImGui::Combo("Samplerate##2", &m_in_sample_rate, vector_getter, (void*)&in_samplerate, in_samplerate.size())){
                     reinit_recorder();
                 }
