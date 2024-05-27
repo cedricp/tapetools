@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 #include "imgui.h"
 #include "implot.h"
@@ -20,6 +21,7 @@ class Window_SDL;
 struct ImFont;
 
 class ChildWidget;
+
 
 class Widget
 {
@@ -45,6 +47,8 @@ public:
 	void add_child(ChildWidget* child){_childrens.push_back(child);}
 	void draw_widget();
 	virtual void draw();
+	virtual void get_configuration_int(std::map<std::string, int> &){}
+	virtual void set_configuration_int(std::string, int) {}
 
 	int width(), height();
 	ImVec2 size();
@@ -98,8 +102,11 @@ public:
 	void set_imgui_context();
 	bool is_shown();
 
+	void get_configuration_int(std::map<std::string, int>& );
+	void set_configuration_int(std::string, int);
+
 private:
-	impl* _impl;
+	impl *_impl;
 	int _width, _height;
 };
 

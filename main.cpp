@@ -41,7 +41,7 @@ class AudioToolWindow : public Event, Widget
     bool m_compute_thd = false;
     bool m_logscale_frequency = true;
     bool m_show_xy = false;
-    bool m_show0db;
+    bool m_show0db = false;
     float m_rms_calibration_scale = 1.0f;
     float m_scopezoom = 1;;
     std::vector<std::string> m_wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann", "Kaiser 5", "Kaiser 7"};
@@ -814,6 +814,23 @@ public:
             ImGui::End();
         }
     }
+
+    void get_configuration_int(std::map<std::string, int> &cnf) override
+    {
+        cnf["logScaleFFT"] = m_logscale_frequency == true ? 1 : 0;
+        cnf["smoothFFT"] = m_smooth_fft == true ? 1 : 0;
+        cnf["FFTwindowType"] = m_fft_window_fn;
+    }
+
+    void set_configuration_int(std::string s, int i) override
+    {
+        if (s == "logScaleFFT")
+            m_logscale_frequency = i;
+        if (s == "smoothFFT")
+            m_smooth_fft = i;
+        if (s == "FFTwindowType")
+            m_fft_window_fn = i;
+    }
 };
 
 class MainWindow : public Window_SDL
@@ -833,17 +850,17 @@ public:
     }
 };
 
-
 int main(int argc, char *argv[])
 {
-    App_SDL* app = App_SDL::get();
-    Window_SDL* window = new MainWindow;
+    App_SDL *app = App_SDL::get();
+    Window_SDL *window = new MainWindow;
+
     ImGui::GetStyle().FrameRounding = 5.0;
     ImGui::GetStyle().ChildRounding = 5.0;
-    ImGui::GetStyle().WindowRounding= 4.0;
+    ImGui::GetStyle().WindowRounding = 4.0;
     ImGui::GetStyle().GrabRounding = 4.0;
-    ImGui::GetStyle().GrabMinSize = 4.0; 
-    window->set_minimum_window_size(1400,800);
+    ImGui::GetStyle().GrabMinSize = 4.0;
+    window->set_minimum_window_size(1400, 800);
     app->add_window(window);
     app->run();
     return 0;

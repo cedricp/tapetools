@@ -3,6 +3,7 @@
 
 #include "backends/imgui_impl_sdl2.h"
 #include "backends/imgui_impl_opengl3.h"
+#include <imgui_internal.h>
 #include <GL/glew.h>
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -13,6 +14,7 @@
 #include <algorithm>
 #include <unistd.h>
 #include <map>
+#include <iostream>
 
 #include "timer.h"
 //#include "3dlut.h"
@@ -66,6 +68,51 @@ const void* userParam )
 	}
 }
 
+static void *UISettingsHandler_ReadOpen(ImGuiContext *ctx, ImGuiSettingsHandler *h, const char *line)
+{
+	return h;
+}
+
+static void UISettingsHandler_WriteAll(ImGuiContext *ctx, ImGuiSettingsHandler *handler, ImGuiTextBuffer *buf)
+{
+	Window_SDL *wsdl = (Window_SDL*)handler->UserData;
+	std::map<std::string, int> mapint;
+	wsdl->get_configuration_int(mapint);
+
+	if (mapint.size() == 0){
+		return;
+	}
+
+	buf->appendf("[%s][Settings]\n", handler->TypeName);
+	for (std::pair<std::string, int> cnf: mapint){
+		buf->appendf("%s=%i\n", cnf.first.c_str(), cnf.second);
+	}
+}
+
+static void UISettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *handler, void *entry, const char *line)
+{
+	Window_SDL *wsdl = (Window_SDL *)handler->UserData;
+
+	std::map<std::string, int> map;
+	int i = 0;
+	char buffer[64];
+	char intbuffer[64];
+
+	while(!(*line == '=' || *line == 0)){
+		buffer[i++] = *line++;
+	}
+	buffer[i] = 0;
+	line++;i = 0;
+	while (*line != 0)
+	{
+		intbuffer[i++] = *line++;
+	}
+	intbuffer[i] = 0;
+	if (sscanf(intbuffer, "%d", &i) == 1){
+		wsdl->set_configuration_int(buffer, i);
+	}
+}
+
 static App_SDL* _APP_INSTANCE_ = 0L;
 
 Window_SDL::Window_SDL(std::string name, int width, int height, bool fullscreen) : _width(width), _height(height)
@@ -77,8 +124,25 @@ Window_SDL::Window_SDL(std::string name, int width, int height, bool fullscreen)
 
 Window_SDL::~Window_SDL()
 {
+	ImGui::DestroyContext(_impl->_imguicontext);
 	for (auto win: _impl->widgets){
 		delete win;
+	}
+}
+
+void Window_SDL::get_configuration_int(std::map<std::string, int> &cnf)
+{
+	for (auto win : _impl->widgets)
+	{
+		win->get_configuration_int(cnf);
+	}
+}
+
+void Window_SDL::set_configuration_int(std::string s, int i)
+{
+	for (auto win : _impl->widgets)
+	{
+		win->set_configuration_int(s, i);
 	}
 }
 
@@ -108,13 +172,23 @@ void Window_SDL::show(bool show)
 
 		// Setup Platform/Renderer backends
 		const char* glsl_version = "#version 130";
-		ImFont* font = NULL;
-		ImGuiContext *ref_ctx = (ImGuiContext*)App_SDL::get()->get_ref_imgui_context();
+		// ImFont* font = NULL;
+		// ImGuiContext *ref_ctx = (ImGuiContext*)App_SDL::get()->get_ref_imgui_context();
 		ImFontAtlas* atlas = NULL;
-		atlas = ImGui::GetIO().Fonts;
+		// atlas = ImGui::GetIO().Fonts;
 
 		_impl->_imguicontext = ImGui::CreateContext(atlas);
 		ImGui::SetCurrentContext(_impl->_imguicontext);
+
+		ImGuiSettingsHandler ui_ini_handler;
+		ui_ini_handler.UserData = this;
+		ui_ini_handler.TypeName = "TapeTools";
+		ui_ini_handler.TypeHash = ImHashStr("TapeTools");
+		ui_ini_handler.ReadOpenFn = UISettingsHandler_ReadOpen;
+		ui_ini_handler.ReadLineFn = UISettingsHandler_ReadLine;
+		ui_ini_handler.WriteAllFn = UISettingsHandler_WriteAll;
+		ImGui::AddSettingsHandler(&ui_ini_handler);
+
 		ImGui_ImplSDL2_InitForOpenGL(_impl->_window, _impl->_gl_context);
 		ImGui_ImplOpenGL3_Init(glsl_version);
 
@@ -424,10 +498,6 @@ App_SDL::App_SDL() {
 
 
 App_SDL::~App_SDL() {
-	for (auto window: _impl->_windows){
-		if (window) delete window;
-	}
-
 	//ImGui::SetCurrentContext(_impl->_refimguicontext);
 
     // Cleanup
@@ -436,7 +506,13 @@ App_SDL::~App_SDL() {
     ImPlot::DestroyContext(_implotcontext);
 	ImGui::DestroyContext(_impl->_refimguicontext);
 
-    delete _impl;
+	for (auto window : _impl->_windows)
+	{
+		if (window)
+			delete window;
+	}
+
+	delete _impl;
     SDL_Quit();
 }
 
