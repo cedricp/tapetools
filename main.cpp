@@ -561,12 +561,14 @@ public:
             ImGui::SliderFloat("dB target", &m_target_db, -20, 20);
             ImGui::SameLine();
             ImGui::ToggleButton("Lock", &m_lockdb);
-            float target_val_left = 1.f - fabsf(m_target_db - (m_lockdb ? m_locked_db_value : m_rms_left)) * 0.1f;
-            float target_val_right = 1.f - fabsf(m_target_db - (m_lockdb ? m_locked_db_value : m_rms_right)) * 0.1f;
-            ImGui::SameLine();
-            ImGui::ProgressBar(target_val_left, ImVec2(70,0));
-            ImGui::SameLine();
-            ImGui::ProgressBar(target_val_right, ImVec2(70,0));
+            if (m_lockdb){
+                float target_val_left = 1.f - fabsf( m_locked_db_value - m_rms_left * m_rms_calibration_scale ) * 10.f;
+                float target_val_right = 1.f - fabsf( m_locked_db_value - m_rms_right * m_rms_calibration_scale ) *10.f;
+                ImGui::SameLine();
+                ImGui::ProgressBar(target_val_left, ImVec2(70,0));
+                ImGui::SameLine();
+                ImGui::ProgressBar(target_val_right, ImVec2(70,0));
+            }
         }
         ImGui::EndChild();
 
@@ -821,7 +823,7 @@ public:
             }
 
             if (m_smooth_fft){
-                sg_smooth(m_fftdraw, fftdata.data(), fft_capture_size, 5, 1);
+                sg_smooth(m_fftdraw, fftdata.data(), fft_capture_size, 5, 0);
                 memcpy(m_fftdraw, fftdata.data(), fftdata.size()*4);
             }
 
