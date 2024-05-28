@@ -22,7 +22,6 @@ struct ImFont;
 
 class ChildWidget;
 
-
 class Widget
 {
 	bool _is_open = false;
@@ -49,6 +48,9 @@ public:
 	virtual void draw();
 	virtual void get_configuration_int(std::map<std::string, int> &){}
 	virtual void set_configuration_int(std::string, int) {}
+
+	virtual void get_configuration_float(std::map<std::string, float> &){}
+	virtual void set_configuration_float(std::string, float) {}
 
 	int width(), height();
 	ImVec2 size();
@@ -104,6 +106,9 @@ public:
 
 	void get_configuration_int(std::map<std::string, int>& );
 	void set_configuration_int(std::string, int);
+
+	void get_configuration_float(std::map<std::string, float>& );
+	void set_configuration_float(std::string, float);
 
 private:
 	impl *_impl;

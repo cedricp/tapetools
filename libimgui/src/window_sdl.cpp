@@ -70,22 +70,34 @@ const void* userParam )
 
 static void *UISettingsHandler_ReadOpen(ImGuiContext *ctx, ImGuiSettingsHandler *h, const char *line)
 {
-	return h;
+	if (strcmp("SettingsF", line) == 0){
+		return (void*)1;
+	}
+	if (strcmp("SettingsI", line) == 0){
+		return (void*)2;
+	}
+	return NULL;
 }
 
 static void UISettingsHandler_WriteAll(ImGuiContext *ctx, ImGuiSettingsHandler *handler, ImGuiTextBuffer *buf)
 {
 	Window_SDL *wsdl = (Window_SDL*)handler->UserData;
 	std::map<std::string, int> mapint;
+	std::map<std::string, float> mapfloat;
 	wsdl->get_configuration_int(mapint);
+	wsdl->get_configuration_float(mapfloat);
 
 	if (mapint.size() == 0){
 		return;
 	}
 
-	buf->appendf("[%s][Settings]\n", handler->TypeName);
+	buf->appendf("[%s][SettingsI]\n", handler->TypeName);
 	for (std::pair<std::string, int> cnf: mapint){
 		buf->appendf("%s=%i\n", cnf.first.c_str(), cnf.second);
+	}
+	buf->appendf("[%s][SettingsF]\n", handler->TypeName);
+	for (std::pair<std::string, float> cnf: mapfloat){
+		buf->appendf("%s=%f\n", cnf.first.c_str(), cnf.second);
 	}
 }
 
@@ -108,8 +120,16 @@ static void UISettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *han
 		intbuffer[i++] = *line++;
 	}
 	intbuffer[i] = 0;
-	if (sscanf(intbuffer, "%d", &i) == 1){
-		wsdl->set_configuration_int(buffer, i);
+	if (entry == (void*)2){
+		if (sscanf(intbuffer, "%d", &i) == 1){
+			wsdl->set_configuration_int(buffer, i);
+		}
+	}
+	if (entry == (void*)1){
+		float f;
+		if (sscanf(intbuffer, "%f", &f) == 1){
+			wsdl->set_configuration_float(buffer, f);
+		}
 	}
 }
 
@@ -143,6 +163,22 @@ void Window_SDL::set_configuration_int(std::string s, int i)
 	for (auto win : _impl->widgets)
 	{
 		win->set_configuration_int(s, i);
+	}
+}
+
+void Window_SDL::get_configuration_float(std::map<std::string, float> &cnf)
+{
+	for (auto win : _impl->widgets)
+	{
+		win->get_configuration_float(cnf);
+	}
+}
+
+void Window_SDL::set_configuration_float(std::string s, float f)
+{
+	for (auto win : _impl->widgets)
+	{
+		win->set_configuration_float(s, f);
 	}
 }
 

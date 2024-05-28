@@ -6,11 +6,49 @@
 #include "timer.h"
 #include <fftw3.h>
 
+#define W 8
+#define H 4
+#define v ImVec2
+#define dr(n,i)d->AddConvexPolyFilled(pp,6,(kd[n]>>(6-i))&1 ? IM_COL32(255,0,0,255) : ImGui::ColorConvertFloat4ToU32(bg))
+char kd[]={0x7E,0x30,0x6D,0x79,0x33,0x5B,0x5F,0x70,0x7F,0x7B};
+void digit(ImDrawList*d,int n,v e,v p){
+    ImGuiStyle* style = &ImGui::GetStyle();
+    ImVec4* colors = style->Colors;
+    ImVec4 bg = colors[ImGuiCol_WindowBg];
+    bg.x += 0.05;bg.y += 0.05;bg.z += 0.05;
+    float r[7][4]={{-1,-1,H,H},{1,-1,-H,H},{1,0,-H,-H},{-1,1,H,-W*1.5},{-1,0,H,-H},{-1,-1,H,H},{-1,0,H,-H},};
+    for(int i=0;i<7;i++){
+        v a,b;
+        if(i%3==0){
+            a=v(p.x+r[i][0]*e.x+r[i][2],p.y+r[i][1]*e.y+r[i][3]-H);
+            b=v(a.x+e.x*2-W,a.y+W);
+        }else{
+            a=v(p.x+r[i][0]*e.x+r[i][2]-H,p.y+r[i][1]*e.y+r[i][3]);
+            b=v(a.x+W,a.y+e.y-W);
+        }
+        v q = v(b.x-a.x, b.y-a.y);
+        float s=W*0.6,u=s-H;
+        if(q.x>q.y){
+            v pp[]={{a.x+u,a.y+q.y*.5f},{a.x+s,a.y},{b.x-s,a.y},{b.x-u,a.y+q.y*.5f},{b.x-s,b.y},{a.x+s,b.y}};
+            dr(n,i);
+        }else{
+            v pp[]={{a.x+q.x*.5f,a.y+u},{b.x,a.y+s},{b.x,b.y-s},{b.x-q.x*.5f,b.y-u},{a.x,b.y-s},{a.x,a.y+s}};
+            dr(n,i);
+        }
+    }
+}
+#undef W
+#undef H
+#undef v
+#undef dr
+
 class AudioToolWindow : public Event, Widget
 {
     audioManager m_audiomanager;
     audioSineGenerator m_sine_generator;
     audioRecorder m_audiorecorder;
+
+    int  m_uitheme = 0;
     
     bool m_sine_generator_switch = false;
     int  m_pitch = 440;
@@ -59,6 +97,7 @@ class AudioToolWindow : public Event, Widget
     float   m_thd = 0; 
 
     float   m_rms_left, m_rms_right;
+    bool    m_show_rms_voltage = false;
 
     bool    m_sweep_started = false;
     int     m_sweep_current_frequency;
@@ -193,6 +232,18 @@ public:
         m_sweep_timer.start();
     }
 
+    void set_theme(){
+        if (m_uitheme == 0){
+            ImGui::StyleColorsDark();   
+        }
+        if (m_uitheme == 1){
+            ImGui::StyleColorsLight();   
+        }
+        if (m_uitheme == 2){
+            ImGui::StyleColorsClassic();   
+        }
+    }
+
     void draw() override {
         m_audiomanager.flush();
         int channelcount = m_audiorecorder.get_channel_count();
@@ -200,6 +251,22 @@ public:
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("Preferences")){
                 ImGui::MenuItem("Sound card setup", nullptr, &m_sound_setup_open);
+                
+                if (ImGui::BeginMenu("Theme")){
+                    if (ImGui::MenuItem("Dark", nullptr, nullptr)){
+                        m_uitheme = 0;
+                        set_theme();
+                    }
+                    if (ImGui::MenuItem("Light", nullptr, nullptr)){
+                        m_uitheme = 1;
+                        set_theme();
+                    }
+                    if (ImGui::MenuItem("Classic", nullptr, nullptr)){
+                        m_uitheme = 2;
+                        set_theme();
+                    }
+                    ImGui::EndMenu();
+                }
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();
@@ -357,6 +424,32 @@ public:
         ImGui::EndChild();
     }
 
+    void draw_lcd(float value, ImVec2 size)
+    {
+        char voltmeter[10];
+        snprintf(voltmeter, 20, "%.4f", value);
+
+        ImGui::InvisibleButton("canvas", size);
+        ImVec2 p0 = ImGui::GetItemRectMin();
+        ImVec2 p1 = ImGui::GetItemRectMax();
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->PushClipRect(p0, p1);
+
+        int textsize = strlen(voltmeter);
+        float p=0.02*size.x,s=size.x/textsize-p,x=s*.5,y=size.y*.5;
+        for(int i=textsize-1;i>=0;i--){
+            if (voltmeter[i] >= '0' && voltmeter[i] <= '9'){
+                int _d = voltmeter[i] - '0';
+                digit(draw_list,_d,ImVec2(s*.5,y),ImVec2(p1.x-x,p0.y+y));
+                x+=s+p;
+            } else {
+                draw_list->AddCircleFilled(ImVec2(p1.x-x,p0.y+(2.f*y) -12.f), 4.f, IM_COL32(255 ,0 ,0, 255), 8);
+                x+=s/2+p;
+            }
+        }
+        draw_list->PopClipRect();
+    }
+
     void draw_rt_analysis_tab(){
         int channelcount = m_audiorecorder.get_channel_count(); 
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
@@ -413,6 +506,11 @@ public:
             ImGui::EndChild();
             ImGui::SameLine();
         }
+
+        ImGui::BeginChild("ScopesChildShowRmsVolts", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::ToggleButton("Show voltmeter", &m_show_rms_voltage);
+        ImGui::EndChild();
+        ImGui::SameLine();
        
         ImGui::BeginChild("ScopesChildYzoom", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(70);
@@ -422,19 +520,29 @@ public:
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildCalib", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         static float rms_calibration = 1.f;
-        ImGui::SetNextItemWidth(70);
-        ImGui::InputFloat("Measured RMS", &rms_calibration);
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(70);
-        if (ImGui::Button("Calibrate from left")){
-
-            m_rms_calibration_scale = rms_calibration / m_rms_left;
-        }
-        if (channelcount > 1){
+        if (m_rms_calibration_scale == 1.f){
+            ImGui::SetNextItemWidth(70);
+            ImGui::InputFloat("Measured RMS", &rms_calibration);
             ImGui::SameLine();
             ImGui::SetNextItemWidth(70);
-            if (ImGui::Button("Calibrate from right")){
-                m_rms_calibration_scale = rms_calibration / m_rms_right;
+            if (ImGui::Button("Calibrate from left")){
+
+                m_rms_calibration_scale = rms_calibration / m_rms_left;
+            }
+            if (channelcount > 1){
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(70);
+                if (ImGui::Button("Calibrate from right")){
+                    m_rms_calibration_scale = rms_calibration / m_rms_right;
+                }
+            }
+        }
+        if (m_rms_calibration_scale != 1.f){
+            ImGui::SameLine();
+            if (ImGui::Button("Clear calibration")){
+
+                m_rms_calibration_scale = 1.0f;
+                rms_calibration = 1.f;
             }
         }
         ImGui::EndChild();
@@ -445,7 +553,7 @@ public:
         ImGui::EndChild();
 
         ImGui::SameLine();
-        ImGui::BeginChild("ScopesChildTargetVolt", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::BeginChild("ScopesChildTargetVolt", ImVec2(-1, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("Show dB target", &m_use_targetdb);
         if (m_use_targetdb){
             ImGui::SameLine();
@@ -453,8 +561,35 @@ public:
             ImGui::SliderFloat("dB target", &m_target_db, -20, 20);
             ImGui::SameLine();
             ImGui::ToggleButton("Lock", &m_lockdb);
+            float target_val_left = 1.f - fabsf(m_target_db - (m_lockdb ? m_locked_db_value : m_rms_left)) * 0.1f;
+            float target_val_right = 1.f - fabsf(m_target_db - (m_lockdb ? m_locked_db_value : m_rms_right)) * 0.1f;
+            ImGui::SameLine();
+            ImGui::ProgressBar(target_val_left, ImVec2(70,0));
+            ImGui::SameLine();
+            ImGui::ProgressBar(target_val_right, ImVec2(70,0));
         }
         ImGui::EndChild();
+
+        if (m_show_rms_voltage){
+            ImGui::BeginChild("ScopesChildVoltageLcd", ImVec2(-1, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiWindowFlags_None);
+            
+            ImGui::BeginChild("ScopesChildVoltageLcd1", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
+            draw_lcd(m_rms_left * m_rms_calibration_scale, ImVec2(200, 70));
+            ImGui::SameLine();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Volts RMS Left");
+            ImGui::EndChild();
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(width());
+            ImGui::BeginChild("ScopesChildVoltageLcd2", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
+            draw_lcd(m_rms_right * m_rms_calibration_scale, ImVec2(200, 70));
+            ImGui::SameLine();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Volts RMS Right");
+            ImGui::EndChild();
+
+            ImGui::EndChild();
+        }
 
         if (ImPlot::BeginPlot("Audio", ImVec2(m_show_xy ? width()-plotheight-10 : -1, -1)))
         {
@@ -482,19 +617,10 @@ public:
             ImVec2 plotsize = ImPlot::GetPlotSize();
 
             if (channelcount > 0){
-                ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1)));
-                float rmsl = m_rms_left * m_rms_calibration_scale;
-
-                snprintf(rmstext, 20, "V RMS left :  %.4f", rmsl);
-                ImPlot::PlotText(rmstext, pnt.x, pnt.y);
                 float rms[4] = {0., (current_sample_rate)/2.f, m_rms_left, m_rms_left};
                 ImPlot::PlotLine("signal RMS left", rms, rms+2, 2);
             }
             if (channelcount > 1){
-                float rmsr = m_rms_right * m_rms_calibration_scale;
-                ImPlotPoint pnt2 = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1) + 10));
-                snprintf(rmstext, 20, "V RMS right : %.4f", rmsr);
-                ImPlot::PlotText(rmstext, pnt2.x, pnt2.y);
                 float rms[4] = {0., (current_sample_rate)/2.f, m_rms_right, m_rms_right};
                 ImPlot::PlotLine("signal RMS right", rms, rms+2, 2);
             }
@@ -820,6 +946,13 @@ public:
         cnf["logScaleFFT"] = m_logscale_frequency == true ? 1 : 0;
         cnf["smoothFFT"] = m_smooth_fft == true ? 1 : 0;
         cnf["FFTwindowType"] = m_fft_window_fn;
+        cnf["showVoltmeter"] = m_show_rms_voltage == true ? 1 : 0;
+        cnf["theme"] = m_uitheme;
+    }
+
+    void get_configuration_float(std::map<std::string, float> &cnf) override
+    {
+        cnf["calibrationValue"] = m_rms_calibration_scale;
     }
 
     void set_configuration_int(std::string s, int i) override
@@ -830,6 +963,19 @@ public:
             m_smooth_fft = i;
         if (s == "FFTwindowType")
             m_fft_window_fn = i;
+        if (s == "showVoltmeter")
+            m_show_rms_voltage = i;
+        if (s == "theme"){
+            m_uitheme = i;
+            set_theme();
+        }
+    }
+
+    void set_configuration_float(std::string s, float f) override
+    {
+        printf("%s %f\n", s.c_str(), f);
+        if (s == "calibrationValue")
+            m_rms_calibration_scale = f;
     }
 };
 
