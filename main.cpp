@@ -5,42 +5,49 @@
 #include "utils.h"
 #include "timer.h"
 #include <fftw3.h>
+#include <complex>
+
+uint32_t lcd_fg = IM_COL32(255,0,0,255);
+uint32_t lcd_bg = IM_COL32(0,0,0,255);
 
 #define W 8
 #define H 4
-#define v ImVec2
-#define dr(n,i)d->AddConvexPolyFilled(pp,6,(kd[n]>>(6-i))&1 ? IM_COL32(255,0,0,255) : ImGui::ColorConvertFloat4ToU32(bg))
+
+#define draw_poly(n,i)d->AddConvexPolyFilled(pp,6,(kd[n]>>(6-i))&1 ? lcd_fg : lcd_bg)
+
 char kd[]={0x7E,0x30,0x6D,0x79,0x33,0x5B,0x5F,0x70,0x7F,0x7B};
-void digit(ImDrawList*d,int n,v e,v p){
+void digit(ImDrawList*d,int n,ImVec2 e,ImVec2 p)
+{
     ImGuiStyle* style = &ImGui::GetStyle();
     ImVec4* colors = style->Colors;
     ImVec4 bg = colors[ImGuiCol_WindowBg];
-    bg.x += 0.05;bg.y += 0.05;bg.z += 0.05;
+    bg.x += 0.12;bg.y += 0.12;bg.z += 0.12;
+    lcd_bg = ImGui::ColorConvertFloat4ToU32(bg);
     float r[7][4]={{-1,-1,H,H},{1,-1,-H,H},{1,0,-H,-H},{-1,1,H,-W*1.5},{-1,0,H,-H},{-1,-1,H,H},{-1,0,H,-H},};
     for(int i=0;i<7;i++){
-        v a,b;
+        ImVec2 a,b;
         if(i%3==0){
-            a=v(p.x+r[i][0]*e.x+r[i][2],p.y+r[i][1]*e.y+r[i][3]-H);
-            b=v(a.x+e.x*2-W,a.y+W);
+            a=ImVec2(p.x+r[i][0]*e.x+r[i][2],p.y+r[i][1]*e.y+r[i][3]-H);
+            b=ImVec2(a.x+e.x*2-W,a.y+W);
         }else{
-            a=v(p.x+r[i][0]*e.x+r[i][2]-H,p.y+r[i][1]*e.y+r[i][3]);
-            b=v(a.x+W,a.y+e.y-W);
+            a=ImVec2(p.x+r[i][0]*e.x+r[i][2]-H,p.y+r[i][1]*e.y+r[i][3]);
+            b=ImVec2(a.x+W,a.y+e.y-W);
         }
-        v q = v(b.x-a.x, b.y-a.y);
+        ImVec2 q = ImVec2(b.x-a.x, b.y-a.y);
         float s=W*0.6,u=s-H;
         if(q.x>q.y){
-            v pp[]={{a.x+u,a.y+q.y*.5f},{a.x+s,a.y},{b.x-s,a.y},{b.x-u,a.y+q.y*.5f},{b.x-s,b.y},{a.x+s,b.y}};
-            dr(n,i);
+            ImVec2 pp[]={{a.x+u,a.y+q.y*.5f},{a.x+s,a.y},{b.x-s,a.y},{b.x-u,a.y+q.y*.5f},{b.x-s,b.y},{a.x+s,b.y}};
+            draw_poly(n,i);
         }else{
-            v pp[]={{a.x+q.x*.5f,a.y+u},{b.x,a.y+s},{b.x,b.y-s},{b.x-q.x*.5f,b.y-u},{a.x,b.y-s},{a.x,a.y+s}};
-            dr(n,i);
+            ImVec2 pp[]={{a.x+q.x*.5f,a.y+u},{b.x,a.y+s},{b.x,b.y-s},{b.x-q.x*.5f,b.y-u},{a.x,b.y-s},{a.x,a.y+s}};
+            draw_poly(n,i);
         }
     }
 }
 #undef W
 #undef H
 #undef v
-#undef dr
+#undef draw_poly
 
 class AudioToolWindow : public Event, Widget
 {
@@ -63,8 +70,10 @@ class AudioToolWindow : public Event, Widget
     std::vector<float> m_sound_data_x;
     std::vector<float> m_raw_buffer;
     fftwf_plan m_fftplan = NULL;
+    fftwf_plan m_invfftplan = NULL;
     float *m_fftin = nullptr;
     fftwf_complex *m_fftout = nullptr;
+    float *m_invfft = nullptr;
     float *m_fftdraw = nullptr;
     float *m_fftfreqs = nullptr;
     float *m_fftfiltered = nullptr;
@@ -85,7 +94,7 @@ class AudioToolWindow : public Event, Widget
     std::vector<std::string> m_wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann", "Kaiser 5", "Kaiser 7"};
     std::vector<std::string> m_fftchannels = {"Left", "Right"};
 
-    float (*m_window_fn)(int, int) = hann_fft_window;
+    float   (*m_window_fn)(int, int) = hann_fft_window;
     int     m_fft_window_fn = 5;
     int     m_fft_channel = 0;
     float   m_noise_foor = -100;
@@ -93,8 +102,12 @@ class AudioToolWindow : public Event, Widget
     int     m_fft_highest_idx[200];
     float   m_fft_highest_val;
     int     m_fft_found_peaks = 0;
+    int     m_fft_fund_idx_range_min = 0;
+    int     m_fft_fund_idx_range_max = 0;
     bool    m_smooth_fft = true;
-    float   m_thd = 0; 
+    float   m_thd = 0;
+    float   m_thdn = 0;
+    float   m_thddb = 0;
 
     float   m_rms_left, m_rms_right;
     bool    m_show_rms_voltage = false;
@@ -110,8 +123,9 @@ class AudioToolWindow : public Event, Widget
 
     bool    m_use_targetdb = false;
     bool    m_lockdb = false;
-    float   m_target_db = 1.0f;
+    float   m_target_db = 0.0f;
     float   m_locked_db_value = 0.f;
+    int     m_current_db_target_channel = 0;
 
     STATIC_CALLBACK_METHOD(on_timer_event, AudioToolWindow)
 
@@ -138,7 +152,8 @@ public:
         CONNECT_CALLBACK((&m_sweep_timer), on_timer_event);
     }
 
-    virtual ~AudioToolWindow(){
+    virtual ~AudioToolWindow()
+    {
         m_sine_generator.destroy();
         destroy_capture();
     }
@@ -146,12 +161,14 @@ public:
     void destroy_capture()
     {
         if (m_fftplan) fftwf_destroy_plan(m_fftplan);
+        if (m_invfftplan) fftwf_destroy_plan(m_invfftplan);
 
         delete[] m_fftin;
         delete[] m_fftout;
         delete[] m_fftdraw;
         delete[] m_fftfreqs;
         delete[] m_fftfiltered;
+        delete[] m_invfft;
         m_sound_data_x.clear();
 
         m_fftin = nullptr;
@@ -160,6 +177,7 @@ public:
         m_fftfreqs = nullptr;
         m_fftfiltered = nullptr;
         m_fftplan = nullptr;
+        m_invfftplan = nullptr;
     }
 
     void init_capture()
@@ -175,7 +193,9 @@ public:
         m_fftdraw = new float[capture_size/2];
         m_fftfreqs = new float[capture_size/2];   
         m_fftfiltered = new float[capture_size/2];   
-        m_fftplan = fftwf_plan_dft_r2c_1d(capture_size, m_fftin, m_fftout, FFTW_MEASURE | FFTW_PRESERVE_INPUT );
+        m_invfft = new float[capture_size];
+        m_fftplan = fftwf_plan_dft_r2c_1d(capture_size, m_fftin, m_fftout, FFTW_ESTIMATE);
+        m_invfftplan = fftwf_plan_dft_c2r_1d(capture_size, m_fftout, m_invfft, FFTW_ESTIMATE);
         m_fft_channel = 0;
     }
 
@@ -185,14 +205,15 @@ public:
             return;
         }
 
-            if (m_audiorecorder.init(float(m_recorder_latency) / 1000.f, m_audio_in_idx, m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate]))
-            {
-                m_audiorecorder.start();
-            }
+        if (m_audiorecorder.init(float(m_recorder_latency) / 1000.f, m_audio_in_idx, m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate]))
+        {
+            m_audiorecorder.start();
+        }
         init_capture();
     }
 
-    void reset_sine_generator(){
+    void reset_sine_generator()
+    {
         int current_sine_samplerate = m_audiomanager.get_output_sample_rates(m_audio_out_idx)[m_out_sample_rate];
         m_sine_generator.destroy();
         m_sine_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, m_sinegen_latency);
@@ -201,7 +222,8 @@ public:
         m_sine_generator.pause(!m_sine_generator_switch);
     }
 
-    CALLBACK_METHOD(on_timer_event){
+    CALLBACK_METHOD(on_timer_event)
+    {
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
         float fft_step = m_capture_size / current_sample_rate;
         
@@ -232,7 +254,8 @@ public:
         m_sweep_timer.start();
     }
 
-    void set_theme(){
+    void set_theme()
+    {
         if (m_uitheme == 0){
             ImGui::StyleColorsDark();   
         }
@@ -244,7 +267,8 @@ public:
         }
     }
 
-    void draw() override {
+    void draw() override 
+    {
         m_audiomanager.flush();
         int channelcount = m_audiorecorder.get_channel_count();
     
@@ -286,7 +310,8 @@ public:
         draw_tools_windows();
     }
 
-    void start_sweep_gen(){
+    void start_sweep_gen()
+    {
         m_sweep_started = true;
         m_sweep_current_frequency = 20;
         m_sweep_freqs.clear();
@@ -298,7 +323,8 @@ public:
         //m_pause_compute = true;
     }
 
-    void stop_sweep_gen(){
+    void stop_sweep_gen()
+    {
         m_sweep_started = false;
         m_sine_generator_switch = false;
         m_sine_generator.pause();
@@ -306,7 +332,8 @@ public:
         //m_pause_compute = false;
     }
 
-    void set_window_fn(){
+    void set_window_fn()
+    {
         switch (m_fft_window_fn){
             case 0:
                 m_window_fn = rectangle_fft_window;
@@ -337,7 +364,9 @@ public:
                 break;
         }
     }
-    void draw_sweep_tab(){
+
+    void draw_sweep_tab()
+    {
         if(!m_pause_compute) compute();
 
         int channelcount = m_audiorecorder.get_channel_count(); 
@@ -427,7 +456,7 @@ public:
     void draw_lcd(float value, ImVec2 size)
     {
         char voltmeter[10];
-        snprintf(voltmeter, 20, "%.4f", value);
+        snprintf(voltmeter, 10, "%.4f", value);
 
         ImGui::InvisibleButton("canvas", size);
         ImVec2 p0 = ImGui::GetItemRectMin();
@@ -436,21 +465,23 @@ public:
         draw_list->PushClipRect(p0, p1);
 
         int textsize = strlen(voltmeter);
-        float p=0.02*size.x,s=size.x/textsize-p,x=s*.5,y=size.y*.5;
-        for(int i=textsize-1;i>=0;i--){
+        const int lcd_digits_size = 6;
+        float p=0.02*size.x,s=size.x/lcd_digits_size-p,x=s*.5,y=size.y*.5;
+        for(int i=(textsize-1) - (textsize - lcd_digits_size);i>=0;i--){
             if (voltmeter[i] >= '0' && voltmeter[i] <= '9'){
                 int _d = voltmeter[i] - '0';
                 digit(draw_list,_d,ImVec2(s*.5,y),ImVec2(p1.x-x,p0.y+y));
                 x+=s+p;
             } else {
-                draw_list->AddCircleFilled(ImVec2(p1.x-x,p0.y+(2.f*y) -12.f), 4.f, IM_COL32(255 ,0 ,0, 255), 8);
+                draw_list->AddCircleFilled(ImVec2(p1.x-x,p0.y+(2.f*y) -12.f), 4.f, lcd_fg, 8);
                 x+=s/2+p;
             }
         }
         draw_list->PopClipRect();
     }
 
-    void draw_rt_analysis_tab(){
+    void draw_rt_analysis_tab()
+    {
         int channelcount = m_audiorecorder.get_channel_count(); 
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
         bool must_reinit_recorder = false;
@@ -458,7 +489,9 @@ public:
         if (!m_pause_compute && compute() && m_compute_thd)
         {
             compute_thd();
+            compute_thdn();
         }
+
 
         float frameh = ImGui::GetFrameHeightWithSpacing();
         float padh = 3.0f * ImGui::GetStyle().FramePadding.y + ImGui::GetStyle().ItemSpacing.y;
@@ -547,32 +580,47 @@ public:
         }
         ImGui::EndChild();
 
+        /*
+        *   0dBm Ref section 
+        */
+
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildShow0db", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("Show 0dBm Ref", &m_show0db);
         ImGui::EndChild();
 
+        /*
+        *  X dB target section
+        */
+
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildTargetVolt", ImVec2(-1, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::ToggleButton("Show dB target", &m_use_targetdb);
+        const char* items[] = {"left", "right"};
+        ImGui::ToggleButton("dB target", &m_use_targetdb);
         if (m_use_targetdb){
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(70);
-            ImGui::SliderFloat("dB target", &m_target_db, -20, 20);
+            if (!m_lockdb){
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(60);
+                ImGui::Combo("Channel", &m_current_db_target_channel, items, 2);
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(70);
+                ImGui::SliderFloat("dB", &m_target_db, -20, 20);
+            }
             ImGui::SameLine();
             ImGui::ToggleButton("Lock", &m_lockdb);
-            if (m_lockdb){
-                float target_val_left = 1.f - fabsf( m_locked_db_value - m_rms_left * m_rms_calibration_scale ) * 10.f;
-                float target_val_right = 1.f - fabsf( m_locked_db_value - m_rms_right * m_rms_calibration_scale ) *10.f;
-                ImGui::SameLine();
-                ImGui::ProgressBar(target_val_left, ImVec2(70,0));
-                ImGui::SameLine();
-                ImGui::ProgressBar(target_val_right, ImVec2(70,0));
-            }
         }
         ImGui::EndChild();
 
+        /*
+        *   LCD voltmeter
+        */
+
         if (m_show_rms_voltage){
+            if (m_rms_calibration_scale == 1.f){
+                lcd_fg = IM_COL32(200,0,0,255);
+            } else {
+                lcd_fg = IM_COL32(0,200,0,255);
+            }
             ImGui::BeginChild("ScopesChildVoltageLcd", ImVec2(-1, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiWindowFlags_None);
             
             ImGui::BeginChild("ScopesChildVoltageLcd1", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
@@ -580,7 +628,12 @@ public:
             ImGui::SameLine();
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Volts RMS Left");
+            if (m_lockdb && m_current_db_target_channel == 0){
+                float target_val_left = 1.f - fabsf( m_locked_db_value - m_rms_left * m_rms_calibration_scale ) * 10.f;
+                ImGui::ProgressBar(target_val_left);
+            }
             ImGui::EndChild();
+
             ImGui::SameLine();
             ImGui::SetCursorPosX(width());
             ImGui::BeginChild("ScopesChildVoltageLcd2", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
@@ -588,8 +641,11 @@ public:
             ImGui::SameLine();
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Volts RMS Right");
+            if (m_lockdb && m_current_db_target_channel == 1){
+                float target_val_right = 1.f - fabsf( m_locked_db_value - m_rms_right * m_rms_calibration_scale ) *10.f;
+                ImGui::ProgressBar(target_val_right);
+            }
             ImGui::EndChild();
-
             ImGui::EndChild();
         }
 
@@ -613,6 +669,10 @@ public:
             if (channelcount > 1){
                 ImPlot::PlotLine("Right channel", m_sound_data_x.data(), m_sound_data2.data(), m_sound_data_x.size());
             }
+
+            if (m_compute_thd){
+                ImPlot::PlotLine("No fundamental signal", m_sound_data_x.data(), m_invfft, m_sound_data_x.size());
+            }
             
             char rmstext[20];
             ImVec2 plotpos = ImPlot::GetPlotPos();
@@ -629,7 +689,7 @@ public:
 
             if(m_use_targetdb){
                 if (!m_lockdb){
-                    m_locked_db_value = m_rms_left * powf(10, m_target_db/20.f);
+                    m_locked_db_value = ((m_current_db_target_channel == 0) ? m_rms_left : m_rms_right) * powf(10, m_target_db/20.f);
                 }
                 float tgtpnt[4] = {0., (current_sample_rate)/2.f, m_locked_db_value, m_locked_db_value};
                 ImPlot::PlotLine("target dB", tgtpnt, tgtpnt+2, 2);
@@ -714,11 +774,14 @@ public:
 
             if (m_compute_thd)
             {
-                char thdtext[16];
-                snprintf(thdtext, 16, "THD : %.6f %%", m_thd);
+                char thdtext[64];
+                snprintf(thdtext, 32, "THD : %.3f %%", m_thd);
                 ImVec2 plotpos = ImPlot::GetPlotPos();
                 ImVec2 plotsize = ImPlot::GetPlotSize();
                 ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.3)));
+                ImPlot::PlotText(thdtext, pnt.x, pnt.y);
+                pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.4)));
+                snprintf(thdtext, 32, "THD+N : %.3f %% (%.2f dB)", m_thdn, m_thddb);
                 ImPlot::PlotText(thdtext, pnt.x, pnt.y);
 
                 for (int i = 0; i < m_fft_found_peaks; ++i){
@@ -731,7 +794,15 @@ public:
                     snprintf(thdtext, 16, "%.4fKHz", freq);
                     ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos - 8);
                 }
+
+                // THD+N clipping info
+                float range_min[4] = {m_fftfreqs[m_fft_fund_idx_range_min], m_fftfreqs[m_fft_fund_idx_range_min], 0, -200};
+                ImPlot::PlotLine("Cut min", range_min, range_min+2, 2);
+                float range_max[4] = {m_fftfreqs[m_fft_fund_idx_range_max], m_fftfreqs[m_fft_fund_idx_range_max], 0, -200};
+                ImPlot::PlotLine("Cut max", range_max, range_max+2, 2);
             }
+
+
             float nf[4] = {0., (current_sample_rate)/2.f, m_noise_foor, m_noise_foor};
             ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
             
@@ -756,7 +827,8 @@ public:
         }
     }
 
-    bool compute(bool compute_fft = true, bool compute_noise_floor = true){
+    bool compute(bool compute_fft = true, bool compute_noise_floor = true)
+    {
         const int channelcount = m_audiorecorder.get_channel_count();
 
         if (channelcount == 0 || m_audiorecorder.get_available_samples() < m_capture_size * channelcount){
@@ -823,7 +895,7 @@ public:
             }
 
             if (m_smooth_fft){
-                sg_smooth(m_fftdraw, fftdata.data(), fft_capture_size, 5, 0);
+                sg_smooth(m_fftdraw, fftdata.data(), fft_capture_size, 5, 2);
                 memcpy(m_fftdraw, fftdata.data(), fftdata.size()*4);
             }
 
@@ -842,7 +914,74 @@ public:
         return true;
     }
 
-    void compute_thd(){
+    void compute_thdn()
+    {
+        float max_val = -200;
+        int max_val_index = 0;
+        // Find main harmonic
+        for (int i = 0; i < m_capture_size/2; ++i){
+            if (m_fftdraw[i] > max_val){
+                max_val = m_fftdraw[i];
+                max_val_index = i;
+            }
+        }
+
+        // Find main harmonic range
+        float tmp = max_val;
+        for (int i = max_val_index; i < m_capture_size/2; ++i){
+            if (m_fftdraw[i] > tmp){
+                m_fft_fund_idx_range_max = i;
+                break;
+            }
+            tmp = m_fftdraw[i];
+        }
+        
+        tmp = max_val;
+        for (int i= max_val_index; i >= 0; --i){
+            if (m_fftdraw[i] > tmp){
+                m_fft_fund_idx_range_min = i;
+                break;
+            }
+            tmp = m_fftdraw[i];
+        }
+
+        if (m_fft_fund_idx_range_max - m_fft_fund_idx_range_min <=0){
+            m_fft_fund_idx_range_max = m_fft_fund_idx_range_min = 0;
+            return;
+        }
+
+        for (int i = m_fft_fund_idx_range_min; i < m_fft_fund_idx_range_max; ++i){
+            m_fftout[i][0] = 0;
+            m_fftout[i][1] = 0;
+
+            // Should be 0 already
+            m_fftout[i + (m_capture_size/2)][0] = 0;
+            m_fftout[i + (m_capture_size/2)][1] = 0;
+        }
+
+        fftwf_execute(m_invfftplan);
+
+        float inv_capture_size = 1.f / float(m_capture_size);
+        for (int i = 0; i < m_capture_size; ++i){
+            m_invfft[i] *= inv_capture_size;
+        }
+
+        float total_rms = m_fft_channel == 0 ? m_rms_left : m_rms_right;
+
+        float noise_rms = 0;
+        for (int i = 0; i < m_capture_size; ++i){
+            noise_rms = m_invfft[i] * m_invfft[i];
+        }
+        noise_rms /= m_capture_size;
+        noise_rms = sqrtf(noise_rms);
+
+        m_thdn = (noise_rms / total_rms);
+        m_thddb = 20.f * log10(m_thdn);
+        m_thdn *= 100.f;
+    }
+
+    void compute_thd()
+    {
         // Find peaks
         // Source : https://stackoverflow.com/questions/22583391/peak-signal-detection-in-realtime-timeseries-data
         const int fft_capture_size = m_capture_size / 2;
@@ -908,7 +1047,8 @@ public:
         }
     }
 
-    void draw_tools_windows(){
+    void draw_tools_windows()
+    {
         if (m_sound_setup_open && !m_sweep_started){
             ImGui::SetNextWindowSize(ImVec2(600, 150));
             if(ImGui::Begin("Sound card setup", &m_sound_setup_open)){
@@ -963,8 +1103,10 @@ public:
             m_logscale_frequency = i;
         if (s == "smoothFFT")
             m_smooth_fft = i;
-        if (s == "FFTwindowType")
+        if (s == "FFTwindowType"){
             m_fft_window_fn = i;
+            set_window_fn();
+        }
         if (s == "showVoltmeter")
             m_show_rms_voltage = i;
         if (s == "theme"){
@@ -975,7 +1117,6 @@ public:
 
     void set_configuration_float(std::string s, float f) override
     {
-        printf("%s %f\n", s.c_str(), f);
         if (s == "calibrationValue")
             m_rms_calibration_scale = f;
     }
@@ -990,10 +1131,13 @@ public:
         m_audiotool = new AudioToolWindow(this);
     }
 
-    virtual ~MainWindow(){
+    virtual ~MainWindow()
+    {
+
     }
 
-    void draw(bool c) override {
+    void draw(bool c) override
+    {
         Window_SDL::draw(c);
     }
 };
