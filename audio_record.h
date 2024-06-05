@@ -22,7 +22,7 @@ public:
     bool start();
     bool pause(bool);
 
-    void get_data(std::vector<float>& data, size_t size);
+    void get_data(std::vector<double>& data, size_t size);
     int  get_current_samplerate();
     int  get_channel_count();
 
