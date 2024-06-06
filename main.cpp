@@ -91,10 +91,12 @@ class AudioToolWindow : public Event, Widget
     double m_rms_calibration_scale = 1.0f;
     float m_scopezoom = 1;;
     std::vector<std::string> m_wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann", "Kaiser 5", "Kaiser 7"};
+    double m_window_amplitude_correction[8] = {0.0};
+    double m_window_energy_correction[8] = {0.0};
     std::vector<std::string> m_fftchannels = {"Left", "Right"};
 
     double   (*m_window_fn)(int, int) = hann_fft_window;
-    int     m_fft_window_fn = 5;
+    int     m_fft_window_fn_index = 5;
     int     m_fft_channel = 0;
     double  m_noise_foor = -100;
     double  m_fft_highest_pos[200];
@@ -141,6 +143,7 @@ public:
         set_movable(false);
         set_resizable(false);
         set_titlebar(false);
+        compute_fft_window_corrections();
 
         m_audiomanager.flush();
 
@@ -155,6 +158,7 @@ public:
         reinit_recorder();
 
         CONNECT_CALLBACK((&m_sweep_timer), on_timer_event);
+
     }
 
     virtual ~AudioToolWindow()
@@ -222,6 +226,26 @@ public:
         m_sine_generator.set_pitch(m_pitch);
         m_sine_generator.start();
         m_sine_generator.pause(!m_sine_generator_switch);
+    }
+
+    void compute_fft_window_corrections(){
+        int tmp = m_fft_window_fn_index;
+        for (int j = 0; j < 8; ++j){
+            m_fft_window_fn_index = j;
+            set_window_fn();
+            double sum = 0;
+            double rms = 0;
+            for (int i = 0; i < 1000; i++){
+                double val = m_window_fn(i, 1000);
+                sum += val;
+                rms += val*val;
+            }
+
+            m_window_amplitude_correction[j] = 1.0 / (sum * 0.001);
+            m_window_energy_correction[j] = 1.0 / sqrt(rms*0.001);
+        }
+        // Restore
+        m_fft_window_fn_index = tmp;
     }
 
     CALLBACK_METHOD(on_timer_event)
@@ -338,7 +362,7 @@ public:
 
     void set_window_fn()
     {
-        switch (m_fft_window_fn){
+        switch (m_fft_window_fn_index){
             case 0:
                 m_window_fn = rectangle_fft_window;
                 break;
@@ -423,7 +447,7 @@ public:
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild5", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(150);
-        if (ImGui::Combo("Window mode", &m_fft_window_fn, vector_getter, (void *)&m_wmodes, m_wmodes.size()))
+        if (ImGui::Combo("Window mode", &m_fft_window_fn_index, vector_getter, (void *)&m_wmodes, m_wmodes.size()))
         {
             set_window_fn();
         }
@@ -757,7 +781,7 @@ public:
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild6", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(150);
-        if (ImGui::Combo("Window mode", &m_fft_window_fn, vector_getter, (void *)&m_wmodes, m_wmodes.size()))
+        if (ImGui::Combo("Window mode", &m_fft_window_fn_index, vector_getter, (void *)&m_wmodes, m_wmodes.size()))
         {
             set_window_fn();
         }
@@ -807,8 +831,14 @@ public:
                 ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
             }
             ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Linear);
-            ImPlot::SetupAxesLimits(20.f, xfftmax, -130.0, 0.0);
+            ImPlot::SetupAxesLimits(20.f, xfftmax, -120.0, 20.0);
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 20.f, 20000.f);
+
+            if (m_rms_calibration_scale != 1.0){
+                double diffdb = 20.0 * log10(m_rms_calibration_scale);
+                ImPlot::SetupAxis(ImAxis_Y2, "dBu", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
+                ImPlot::SetupAxisLimits(ImAxis_Y2, -120 + diffdb, 20 + diffdb, ImPlotCond_Always);
+            }
 
             if (m_compute_thd)
             {
@@ -927,6 +957,7 @@ public:
             for (int i = 0; i < fft_capture_size; ++i){
                 m_fftfreqs[i] = fft_step * (double)(i);
                 double fftout = sqrt(m_fftout[i][0] * m_fftout[i][0] + m_fftout[i][1] * m_fftout[i][1]) * inv_fft_capture_size;
+                fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
                 fftout = std::max(20.0 * log10(fftout), -200.0);
                 m_fftdraw[i] = isnan(fftout) ? -200.f : fftout;
                 sum += fftout;
@@ -1138,7 +1169,7 @@ public:
     {
         cnf["logScaleFFT"] = m_logscale_frequency == true ? 1 : 0;
         cnf["smoothFFT"] = m_smooth_fft == true ? 1 : 0;
-        cnf["FFTwindowType"] = m_fft_window_fn;
+        cnf["FFTwindowType"] = m_fft_window_fn_index;
         cnf["showVoltmeter"] = m_show_rms_voltage == true ? 1 : 0;
         cnf["theme"] = m_uitheme;
     }
@@ -1155,7 +1186,7 @@ public:
         if (s == "smoothFFT")
             m_smooth_fft = i;
         if (s == "FFTwindowType"){
-            m_fft_window_fn = i;
+            m_fft_window_fn_index = i;
             set_window_fn();
         }
         if (s == "showVoltmeter")
