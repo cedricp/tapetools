@@ -3,7 +3,7 @@
 #include <vector>
 
 double mean(const double data[], int len) {
-    float sum = 0.0, mean = 0.0;
+    double sum = 0.0, mean = 0.0;
 
     int i;
     for(i=0; i<len; ++i) {
@@ -33,8 +33,8 @@ void smoothed_z_score(const double y[], double signals[], const int count, const
     memset(signals, 0, sizeof(double) * count);
     double filteredY[count];
     memcpy(filteredY, y, sizeof(double) * count);
-    double avgFilter[count];
-    double stdFilter[count];
+    double *avgFilter = (double*)alloca(count*sizeof(double));
+    double *stdFilter = (double*)alloca(count*sizeof(double));
 
     avgFilter[lag - 1] = mean(y, lag);
     stdFilter[lag - 1] = stddev(y, lag);

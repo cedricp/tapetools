@@ -127,6 +127,11 @@ class AudioToolWindow : public Event, Widget
     double   m_locked_db_value = 0.0;
     int     m_current_db_target_channel = 0;
 
+    int     m_zscore_lag = 40;
+    float   m_zscore_influence = 0.5;
+    float   m_zscore_threshold = 3.5;
+    bool    m_show_zscore_settings = false;
+
     STATIC_CALLBACK_METHOD(on_timer_event, AudioToolWindow)
 
 public:
@@ -271,8 +276,6 @@ public:
     
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("Preferences")){
-                ImGui::MenuItem("Sound card setup", nullptr, &m_sound_setup_open);
-                
                 if (ImGui::BeginMenu("Theme")){
                     if (ImGui::MenuItem("Dark", nullptr, nullptr)){
                         m_uitheme = 0;
@@ -287,6 +290,10 @@ public:
                         set_theme();
                     }
                     ImGui::EndMenu();
+                }
+                ImGui::MenuItem("Sound card setup", nullptr, &m_sound_setup_open);
+                if(ImGui::MenuItem("Show Zscore settings", nullptr, nullptr)){
+                    m_show_zscore_settings = !m_show_zscore_settings;
                 }
                 ImGui::EndMenu();
             }
@@ -502,6 +509,7 @@ public:
         if(ImGui::ToggleButton("Tone generator", &m_sine_generator_switch)){
             reset_sine_generator();
         }
+        ImGui::SetItemTooltip("Sine generator ON/OFF");
         ImGui::EndChild();
 
         ImGui::SameLine();
@@ -509,6 +517,7 @@ public:
         if (ImGui::SliderInt("Pitch", &m_pitch, 20, 20000)){
             m_sine_generator.set_pitch(m_pitch);
         }
+        ImGui::SetItemTooltip("Set the pitch of the sine generator");
         ImGui::EndChild();
 
         ImGui::SameLine();
@@ -516,6 +525,7 @@ public:
         if (ImGui::SliderInt("Intensity", &m_sine_volume_db, -100, 0, "%d dB")){
             m_sine_generator.set_volume(m_sine_volume_db);
         }
+        ImGui::SetItemTooltip("Set the generator intensity");
         ImGui::EndChild();
 
         ImGui::EndChild();
@@ -533,18 +543,21 @@ public:
         if (channelcount > 1){
             ImGui::BeginChild("ScopesChildShowXY", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
             ImGui::ToggleButton("XY diagram", &m_show_xy);
+            ImGui::SetItemTooltip("Shows the XY phase diagram panel");
             ImGui::EndChild();
             ImGui::SameLine();
         }
 
         ImGui::BeginChild("ScopesChildShowRmsVolts", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("Show voltmeter", &m_show_rms_voltage);
+        ImGui::SetItemTooltip("Shows the voltmeters panel");
         ImGui::EndChild();
         ImGui::SameLine();
        
         ImGui::BeginChild("ScopesChildYzoom", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(70);
         ImGui::SliderFloat("Amplitude mult", &m_scopezoom, 1, 50);
+        ImGui::SetItemTooltip("Zoom Y axis");
         ImGui::EndChild();
 
         ImGui::SameLine();
@@ -553,18 +566,21 @@ public:
         if (m_rms_calibration_scale == 1.0){
             ImGui::SetNextItemWidth(70);
             ImGui::InputDouble("Measured RMS", &rms_calibration);
+            ImGui::SetItemTooltip("Enter the measured RMS voltage here to calibrate the meters/graph");
             ImGui::SameLine();
             ImGui::SetNextItemWidth(70);
             if (ImGui::Button("Calibrate from left")){
 
                 m_rms_calibration_scale = rms_calibration / m_rms_left;
             }
+            ImGui::SetItemTooltip("Do the calibration from left channel");
             if (channelcount > 1){
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(70);
                 if (ImGui::Button("Calibrate from right")){
                     m_rms_calibration_scale = rms_calibration / m_rms_right;
                 }
+                ImGui::SetItemTooltip("Do the calibration from right channel");
             }
         }
         if (m_rms_calibration_scale != 1.0){
@@ -574,6 +590,7 @@ public:
                 m_rms_calibration_scale = 1.0;
                 rms_calibration = 1.0;
             }
+            ImGui::SetItemTooltip("Clear the calibration");
         }
         ImGui::EndChild();
 
@@ -584,6 +601,7 @@ public:
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildShow0db", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("Show 0dBm Ref", &m_show0db);
+        ImGui::SetItemTooltip("Shows the 0dB (775mV or 1mW/600ohms) on the graph");
         ImGui::EndChild();
 
         /*
@@ -594,17 +612,21 @@ public:
         ImGui::BeginChild("ScopesChildTargetVolt", ImVec2(-1, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         const char* items[] = {"left", "right"};
         ImGui::ToggleButton("dB target", &m_use_targetdb);
+        ImGui::SetItemTooltip("Set a target dB value relative to current measure");
         if (m_use_targetdb){
             if (!m_lockdb){
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(60);
                 ImGui::Combo("Channel", &m_current_db_target_channel, items, 2);
+                ImGui::SetItemTooltip("Which channel to work on");
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(70);
                 ImGui::SliderFloat("dB", &m_target_db, -20, 20);
+                ImGui::SetItemTooltip("Target dB value");
             }
             ImGui::SameLine();
             ImGui::ToggleButton("Lock", &m_lockdb);
+            ImGui::SetItemTooltip("Lock the current measure");
         }
         ImGui::EndChild();
 
@@ -718,16 +740,19 @@ public:
 
         ImGui::BeginChild("ScopesChild4", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("Log scale frequency", &m_logscale_frequency);
+        ImGui::SetItemTooltip("Log scale/linear scale X axis");
         ImGui::EndChild();
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildSmoothFFT", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("Smooth FFT", &m_smooth_fft);
+        ImGui::SetItemTooltip("Smooth the FFT (Do not use when computing THD)");
         ImGui::EndChild();
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild5", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("Compute THD", &m_compute_thd);
+        ImGui::SetItemTooltip("Enable THD measurement");
         ImGui::EndChild();
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild6", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
@@ -736,22 +761,42 @@ public:
         {
             set_window_fn();
         }
+        ImGui::SetItemTooltip("Set the FFT windowing mode");
         ImGui::EndChild();
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild7", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(100);
         ImGui::Combo("Channel", &m_fft_channel, vector_getter, (void *)&m_fftchannels, m_fftchannels.size());
+        ImGui::SetItemTooltip("Which audio channel to analyse");
         ImGui::EndChild();
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild8", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(100);
-        if(ImGui::InputInt("Capture size (ms)", &m_recorder_latency, 100, 200, ImGuiInputTextFlags_EnterReturnsTrue)){
-            if(m_recorder_latency < 100) m_recorder_latency = 100;
+        if(ImGui::InputInt("Capture size (ms)", &m_recorder_latency, 50, 200, ImGuiInputTextFlags_EnterReturnsTrue)){
+            if(m_recorder_latency < 50) m_recorder_latency = 50;
             if(m_recorder_latency > 1000) m_recorder_latency = 1000;
             must_reinit_recorder = true;
         }
+        ImGui::SetItemTooltip("Audio sampling time in millisecond");
         ImGui::EndChild();
+
+        if (m_show_zscore_settings && m_compute_thd){
+            ImGui::SameLine();
+            ImGui::BeginChild("ScopesChildZScore", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            ImGui::SetNextItemWidth(50);
+            ImGui::SliderInt("ZscoreLag", &m_zscore_lag, 5, 500);
+            ImGui::SetItemTooltip("Set the length of the Z-score algorithm (for peak detection)");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(50);
+            ImGui::SliderFloat("ZscoreInfl.", &m_zscore_influence, 0., 1.);
+            ImGui::SetItemTooltip("Influence of Z-score");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(50);
+            ImGui::SliderFloat("ZscoreThres.", &m_zscore_threshold, 0.5, 100.);
+            ImGui::SetItemTooltip("Threshold of Z-score");
+            ImGui::EndChild();
+        }
 
         ImGui::EndChild();
 
@@ -771,9 +816,9 @@ public:
                 snprintf(thdtext, 32, "THD : %.3f %%", m_thd);
                 ImVec2 plotpos = ImPlot::GetPlotPos();
                 ImVec2 plotsize = ImPlot::GetPlotSize();
-                ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.3)));
+                ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1)));
                 ImPlot::PlotText(thdtext, pnt.x, pnt.y);
-                pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.4)));
+                pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.14)));
                 snprintf(thdtext, 32, "THD+N : %.3f %% (%.2f dB)", m_thdn, m_thddb);
                 ImPlot::PlotText(thdtext, pnt.x, pnt.y);
 
@@ -926,7 +971,7 @@ public:
             }
         }
 
-        double fundamental_power = m_rms_fft[max_val_index];
+        double rms_fundamental = m_rms_fft[max_val_index];
 
         // Find FFT fundamental range
         double tmp = max_val;
@@ -956,14 +1001,15 @@ public:
         double noise = 0;
 
         // Start at 1, we don't want DC value
-        for (int i = 1; i < m_capture_size/2; ++i){
-            tot_rms += m_rms_fft[i] * m_rms_fft[i];
-            if ( i < m_fft_fund_idx_range_min || i > m_fft_fund_idx_range_max ){
-                noise += m_rms_fft[i] * m_rms_fft[i];
-            }
+        for (int i = 1; i < m_fft_fund_idx_range_min; ++i){
+            noise += (m_rms_fft[i] * m_rms_fft[i]);
+        }
+
+        for (int i = m_fft_fund_idx_range_max; i < m_capture_size / 2; ++i){
+            noise += (m_rms_fft[i] * m_rms_fft[i]);
         }
         
-        m_thdn = (sqrt(noise)/sqrt(tot_rms));
+        m_thdn = sqrt(noise) / rms_fundamental;
         m_thddb = 20.0 * log10(m_thdn);
         m_thdn *= 100.0;
     }
@@ -974,11 +1020,11 @@ public:
         // Source : https://stackoverflow.com/questions/22583391/peak-signal-detection-in-realtime-timeseries-data
         const int fft_capture_size = m_capture_size / 2;
 
-        smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, 20, 4, 0.f);
+        smoothed_z_score(m_fftdraw, m_fftfiltered, fft_capture_size, m_zscore_lag, m_zscore_threshold, m_zscore_influence);
         int one_count = 0;
         int found = 0;
 
-        for(int i = 20; i < fft_capture_size; ++i){
+        for(int i = m_zscore_lag; i < fft_capture_size; ++i){
             double current_sample = m_fftfiltered[i];
             if (one_count == 0 && current_sample > 0){
                 one_count++;
@@ -1018,6 +1064,22 @@ public:
                 fundamental_index = i; 
             }
         }
+
+        // int valid_idx = fundamental_index+1;
+        // int numskip = 0;
+        // // Keep harmonics only
+        // double fundamental_freq = m_fftfreqs[m_fft_highest_idx[fundamental_index]];
+        // for(int i = fundamental_index+1; i < m_fft_found_peaks; ++i){
+        //     double mod = fmod(m_fftfreqs[m_fft_highest_idx[i]], fundamental_freq);
+        //     if ( fundamental_freq - mod < 50 || mod < 50){
+        //         m_fft_highest_idx[valid_idx] = m_fft_highest_idx[i];
+        //         m_fft_highest_pos[valid_idx++] = m_fft_highest_pos[i];
+        //     } else {
+        //         numskip++;
+        //     }
+        // }
+// 
+        // m_fft_found_peaks -= numskip;
 
         // Compute Total Harmonic Distortion
         // Source http://www.r-type.org/addtext/add183.htm

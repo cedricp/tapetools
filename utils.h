@@ -42,7 +42,7 @@ double blackman_fft_window(int i, int length)
 	a1 = 9240.0/18608.0;
 	a2 = 1430.0/18608.0;
 	N1 = (double)(length-1);
-	w = a0 - a1*cosf(2*i*M_PI/N1) + a2*cosf(4*i*M_PI/N1);
+	w = a0 - a1*cos(2*i*M_PI/N1) + a2*cos(4*i*M_PI/N1);
 	return w;
 }
 
@@ -54,7 +54,7 @@ double blackman_harris_fft_window(int i, int length)
 	a2 = 0.14128;
 	a3 = 0.01168;
 	N1 = (double)(length-1);
-	w = a0 - a1*cosf(2*i*M_PI/N1) + a2*cosf(4*i*M_PI/N1) - a3*cosf(6*i*M_PI/N1);
+	w = a0 - a1*cos(2*i*M_PI/N1) + a2*cos(4*i*M_PI/N1) - a3*cos(6*i*M_PI/N1);
 	return w;
 }
 
@@ -85,7 +85,7 @@ static inline double kaiser_fft_window(double shape, int i,int len)
 	const unsigned int N = len - 1;
 	const double oneOverN = 1.0 / N;
 	const double K = (2.0 * (double)(i) * oneOverN) - 1.0;
-	const double arg = sqrtf( 1.0 - (K * K) );        
+	const double arg = sqrt( 1.0 - (K * K) );        
 	return zeroethOrderBessel(shape * arg) * oneOverDenom;
 }
 
