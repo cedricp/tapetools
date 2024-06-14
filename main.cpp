@@ -840,7 +840,7 @@ public:
                 ImPlot::SetupAxisLimits(ImAxis_Y2, -120 + diffdb, 20 + diffdb, ImPlotCond_Always);
             }
 
-            if (m_compute_thd)
+            if (m_compute_thd && m_fftfreqs)
             {
                 char thdtext[64];
                 snprintf(thdtext, 32, "THD : %.3f %%", m_thd);
@@ -1262,7 +1262,7 @@ int main(int argc, char *argv[])
 {
     App_SDL *app = App_SDL::get();
     Window_SDL *window = new MainWindow;
-    Window_SDL *window2 = new MainWindow2;
+    //Window_SDL *window2 = new MainWindow2;
 
     ImGui::GetStyle().FrameRounding = 5.0;
     ImGui::GetStyle().ChildRounding = 5.0;
@@ -1272,7 +1272,7 @@ int main(int argc, char *argv[])
     window->set_minimum_window_size(1400, 800);
 
     app->add_window(window);
-    app->add_window(window2);
+    //app->add_window(window2);
     app->run();
     return 0;
 }
