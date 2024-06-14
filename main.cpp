@@ -174,7 +174,8 @@ public:
         m_fftout = new fftwf_complex[capture_size];
         m_fftdraw = new float[capture_size/2];
         m_fftfreqs = new float[capture_size/2];   
-        m_fftfiltered = new float[capture_size/2];   
+        m_fftfiltered = new float[capture_size/2];
+        //  r2c DFTs are always FFTW_FORWARD and c2r DFTs are always FFTW_BACKWARD
         m_fftplan = fftwf_plan_dft_r2c_1d(capture_size, m_fftin, m_fftout, FFTW_MEASURE | FFTW_PRESERVE_INPUT );
         m_fft_channel = 0;
     }
@@ -998,10 +999,45 @@ public:
     }
 };
 
+class MainWindow2 : public Window_SDL
+{
+    class Test : public Widget {
+        public:
+        Test(Window_SDL *win) : Widget(win, "Test")
+        {
+        }
+        ~Test(){
+
+        }
+
+        void draw() override {
+            ImGui::ShowDemoWindow();
+        }
+    };
+
+    Test* test;
+
+    public:
+    MainWindow2() : Window_SDL("Test2", 1200, 900)
+    {
+        test = new Test(this);
+    }
+
+    virtual ~MainWindow2()
+    {
+    }
+
+    void draw(bool c) override
+    {
+        Window_SDL::draw(c);
+    }
+};
+
 int main(int argc, char *argv[])
 {
     App_SDL *app = App_SDL::get();
     Window_SDL *window = new MainWindow;
+    Window_SDL *window2 = new MainWindow2;
 
     ImGui::GetStyle().FrameRounding = 5.0;
     ImGui::GetStyle().ChildRounding = 5.0;
@@ -1009,7 +1045,9 @@ int main(int argc, char *argv[])
     ImGui::GetStyle().GrabRounding = 4.0;
     ImGui::GetStyle().GrabMinSize = 4.0;
     window->set_minimum_window_size(1400, 800);
+
     app->add_window(window);
+    app->add_window(window2);
     app->run();
     return 0;
 }
