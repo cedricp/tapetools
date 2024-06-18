@@ -97,6 +97,7 @@ class AudioToolWindow : public Event, Widget
 
     double   (*m_window_fn)(int, int) = hann_fft_window;
     int     m_fft_window_fn_index = 5;
+    double  *m_current_window_cache = nullptr;
     int     m_fft_channel = 0;
     double  m_noise_foor = -100;
     double  m_fft_highest_pos[200];
@@ -177,6 +178,7 @@ public:
         delete[] m_fftfreqs;
         delete[] m_fftfiltered;
         delete[] m_rms_fft;
+        delete[] m_current_window_cache;
         m_sound_data_x.clear();
 
         m_fftin = nullptr;
@@ -185,6 +187,7 @@ public:
         m_fftfreqs = nullptr;
         m_fftfiltered = nullptr;
         m_fftplan = nullptr;
+        m_current_window_cache = nullptr;
     }
 
     void init_capture()
@@ -201,8 +204,10 @@ public:
         m_fftfreqs = new double[capture_size/2];   
         m_fftfiltered = new double[capture_size/2];   
         m_rms_fft = new double[capture_size/2];
+        m_current_window_cache = new double[capture_size];
         m_fftplan = fftw_plan_dft_r2c_1d(capture_size, m_fftin, m_fftout, FFTW_MEASURE | FFTW_PRESERVE_INPUT);
         m_fft_channel = 0;
+        compute_fft_window_cache();
     }
 
     void reinit_recorder()
@@ -228,11 +233,21 @@ public:
         m_sine_generator.pause(!m_sine_generator_switch);
     }
 
+    void compute_fft_window_cache(){
+        if (m_current_window_cache == nullptr){
+            delete m_current_window_cache;
+        }
+        m_current_window_cache = new double[m_capture_size];
+        for(int i = 0; i < m_capture_size; ++i){
+            m_current_window_cache[i] = m_window_fn(i, m_capture_size);
+        }
+    }
+
     void compute_fft_window_corrections(){
         int tmp = m_fft_window_fn_index;
         for (int j = 0; j < 8; ++j){
             m_fft_window_fn_index = j;
-            set_window_fn();
+            set_window_fn(false);
             double sum = 0;
             double rms = 0;
             for (int i = 0; i < 1000; i++){
@@ -241,8 +256,9 @@ public:
                 rms += val*val;
             }
 
+            // Normalization
             m_window_amplitude_correction[j] = 1.0 / (sum * 0.001);
-            m_window_energy_correction[j] = 1.0 / sqrt(rms*0.001);
+            m_window_energy_correction[j] = 1.0 / sqrt(rms * 0.001);
         }
         // Restore
         m_fft_window_fn_index = tmp;
@@ -360,7 +376,7 @@ public:
         //m_pause_compute = false;
     }
 
-    void set_window_fn()
+    void set_window_fn(bool compute_cache = true)
     {
         switch (m_fft_window_fn_index){
             case 0:
@@ -390,6 +406,9 @@ public:
             default:
                 m_window_fn = rectangle_fft_window;
                 break;
+        }
+        if (compute_cache){
+            compute_fft_window_cache();
         }
     }
 
@@ -927,9 +946,9 @@ public:
             // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.4);
             // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.4f);
             if (m_fft_channel == 0){
-                m_fftin[i] = m_sound_data1[i] * m_window_fn(i, m_capture_size);
+                m_fftin[i] = m_sound_data1[i] * m_current_window_cache[i];
             } else {
-                m_fftin[i] = m_sound_data2[i] * m_window_fn(i, m_capture_size);
+                m_fftin[i] = m_sound_data2[i] * m_current_window_cache[i];
             }
             m_sound_data_x[i] = float(i) * inv_current_sample_rate * 1000.0;
 
@@ -1174,27 +1193,27 @@ public:
         cnf["theme"] = m_uitheme;
     }
 
-    void get_configuration_float(std::map<std::string, float> &cnf) override
-    {
-        cnf["calibrationValue"] = m_rms_calibration_scale;
-    }
-
     void set_configuration_int(std::string s, int i) override
     {
         if (s == "logScaleFFT")
             m_logscale_frequency = i;
-        if (s == "smoothFFT")
+        else if (s == "smoothFFT")
             m_smooth_fft = i;
-        if (s == "FFTwindowType"){
+        else if (s == "FFTwindowType"){
             m_fft_window_fn_index = i;
             set_window_fn();
         }
-        if (s == "showVoltmeter")
+        else if (s == "showVoltmeter")
             m_show_rms_voltage = i;
-        if (s == "theme"){
+        else if (s == "theme"){
             m_uitheme = i;
             set_theme();
         }
+    }
+
+    void get_configuration_float(std::map<std::string, float> &cnf) override
+    {
+        cnf["calibrationValue"] = m_rms_calibration_scale;
     }
 
     void set_configuration_float(std::string s, float f) override
