@@ -30,6 +30,7 @@ struct impl
 	ImGuiContext* _imguicontext = NULL;
 	bool _is_shown = false;
 	std::string _name;
+	std::string _inifilename;
 };
 
 struct app_impl
@@ -144,7 +145,8 @@ Window_SDL::Window_SDL(std::string name, int width, int height, bool fullscreen)
 
 Window_SDL::~Window_SDL()
 {
-	ImGui::DestroyContext(_impl->_imguicontext);
+	show(false);
+	//ImGui::DestroyContext(_impl->_imguicontext);
 	for (auto win: _impl->widgets){
 		delete win;
 	}
@@ -232,12 +234,17 @@ void Window_SDL::show(bool show)
 		ImGui::StyleColorsDark();
 		//ImGui::StyleColorsClassic();
 		_impl->_is_shown = true;
+
+		_impl->_inifilename = _impl->_name + ".ini";
+		ImGui::GetIO().IniFilename = _impl ->_inifilename.c_str();
 	}
 	if (!show && _impl->_is_shown){
 		ImGui::SetCurrentContext(_impl->_imguicontext);
-	    ImGui::DestroyContext(_impl->_imguicontext);
-	    SDL_GL_DeleteContext(_impl->_gl_context);
-	    SDL_DestroyWindow(_impl->_window);
+		ImGui_ImplOpenGL3_Shutdown();
+		ImGui_ImplSDL2_Shutdown();
+		ImGui::DestroyContext(_impl->_imguicontext);
+		SDL_GL_DeleteContext(_impl->_gl_context);
+		SDL_DestroyWindow(_impl->_window);
 	    _impl->_window = NULL;
 	    _impl->_imguicontext = NULL;
 	    _impl->_is_shown = false;
@@ -534,11 +541,8 @@ App_SDL::App_SDL() {
 
 
 App_SDL::~App_SDL() {
-	//ImGui::SetCurrentContext(_impl->_refimguicontext);
-
+	ImGui::SetCurrentContext(_impl->_refimguicontext);
     // Cleanup
-	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplSDL2_Shutdown();
     ImPlot::DestroyContext(_implotcontext);
 	ImGui::DestroyContext(_impl->_refimguicontext);
 
@@ -701,7 +705,22 @@ void App_SDL::run()
 
 			if (event.type == SDL_WINDOWEVENT){
 				if (event.window.event == SDL_WINDOWEVENT_CLOSE){
-					goto end;
+					int i = 0, found = -1;
+					for (auto window : _impl->_windows){
+						if (window->get_windid() == event.window.windowID){
+							found = i;
+						}
+						++i;
+					}
+					if (found >=0){
+						std::vector<Window_SDL *>::iterator it = _impl->_windows.begin() + found;
+						(*it)->show(false);
+						delete (*it);
+						_impl->_windows.erase(it);
+					}
+					if (_impl->_windows.empty()){
+						goto end;
+					}
 				}
 			}
 
