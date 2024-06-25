@@ -49,6 +49,40 @@ void digit(ImDrawList*d,int n,ImVec2 e,ImVec2 p)
 #undef v
 #undef draw_poly
 
+class MainWindow2 : public Window_SDL
+{
+    class Test : public Widget {
+        public:
+        Test(Window_SDL *win) : Widget(win, "Test")
+        {
+        }
+        ~Test(){
+
+        }
+
+        void draw() override {
+            ImGui::ShowDemoWindow();
+        }
+    };
+
+    Test* test;
+
+    public:
+    MainWindow2() : Window_SDL("Test2", 1200, 900)
+    {
+        test = new Test(this);
+    }
+
+    virtual ~MainWindow2()
+    {
+    }
+
+    void draw(bool c) override
+    {
+        Window_SDL::draw(c);
+    }
+};
+
 class AudioToolWindow : public Event, Widget
 {
     audioManager m_audiomanager;
@@ -59,8 +93,8 @@ class AudioToolWindow : public Event, Widget
     
     bool m_sine_generator_switch = false;
     int  m_pitch = 440;
-    float m_sinegen_latency = 0.01f;
-    int m_recorder_latency = 100;
+    float m_sinegen_latency_s = 0.05f;
+    int m_recorder_latency_ms = 100;
     int m_sine_volume_db = 0.f;
     
     int m_audio_out_idx = -1;
@@ -154,7 +188,7 @@ public:
         m_combo_in = m_audiomanager.get_input_device_reverse_map(m_audio_in_idx);
         m_combo_out = m_audiomanager.get_output_device_reverse_map(m_audio_out_idx);
 
-        m_sine_generator.init(m_audiomanager, m_audio_out_idx, -1, m_sinegen_latency);
+        m_sine_generator.init(m_audiomanager, m_audio_out_idx, -1, m_sinegen_latency_s);
 
         reinit_recorder();
 
@@ -192,7 +226,7 @@ public:
 
     void init_capture()
     {
-        int capture_size = m_audiorecorder.get_buffer_size(float(m_recorder_latency) / 1000.f, false);
+        int capture_size = m_audiorecorder.get_buffer_size(float(m_recorder_latency_ms) / 1000.f, false);
         if (capture_size == 0){
             return;
         }
@@ -216,7 +250,7 @@ public:
             return;
         }
 
-        if (m_audiorecorder.init(float(m_recorder_latency) / 1000.f, m_audio_in_idx, m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate]))
+        if (m_audiorecorder.init(float(m_recorder_latency_ms) / 1000.f, m_audio_in_idx, m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate]))
         {
             m_audiorecorder.start();
         }
@@ -227,7 +261,7 @@ public:
     {
         int current_sine_samplerate = m_audiomanager.get_output_sample_rates(m_audio_out_idx)[m_out_sample_rate];
         m_sine_generator.destroy();
-        m_sine_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, m_sinegen_latency);
+        m_sine_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, m_sinegen_latency_s);
         m_sine_generator.set_pitch(m_pitch);
         m_sine_generator.start();
         m_sine_generator.pause(!m_sine_generator_switch);
@@ -451,7 +485,7 @@ public:
 
         ImGui::BeginChild("ScopesChild4", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(70);
-        if(ImGui::DragInt("Delay (ms)", &m_measure_delay, 1.f, m_recorder_latency * 2, 3000)){
+        if(ImGui::DragInt("Delay (ms)", &m_measure_delay, 1.f, m_recorder_latency_ms * 2, 3000)){
             // Set a comfortable time amount to let the FFT settle (at leat 400ms for 200ms latency)
             m_sweep_timer.set(m_measure_delay);
         }
@@ -570,6 +604,14 @@ public:
         }
         ImGui::SetItemTooltip("Set the generator intensity");
         ImGui::EndChild();
+
+
+        ImGui::SameLine();
+        if(ImGui::Button("test")){
+            MainWindow2* win = new MainWindow2;
+            App_SDL::get()->add_window(win);
+            //get_underlying_window()->set_imgui_context();
+        }
 
         ImGui::EndChild();
 
@@ -816,9 +858,9 @@ public:
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild8", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(100);
-        if(ImGui::InputInt("Capture size (ms)", &m_recorder_latency, 50, 200, ImGuiInputTextFlags_EnterReturnsTrue)){
-            if(m_recorder_latency < 50) m_recorder_latency = 50;
-            if(m_recorder_latency > 1000) m_recorder_latency = 1000;
+        if(ImGui::InputInt("Capture size (ms)", &m_recorder_latency_ms, 50, 200, ImGuiInputTextFlags_EnterReturnsTrue)){
+            if(m_recorder_latency_ms < 50) m_recorder_latency_ms = 50;
+            if(m_recorder_latency_ms > 1000) m_recorder_latency_ms = 1000;
             must_reinit_recorder = true;
         }
         ImGui::SetItemTooltip("Audio sampling time in millisecond");
@@ -906,8 +948,8 @@ public:
         ImGui::EndChild();
 
         if (must_reinit_recorder){
-            if (m_measure_delay < m_recorder_latency * 2){
-                m_measure_delay = m_recorder_latency * 2;
+            if (m_measure_delay < m_recorder_latency_ms * 2){
+                m_measure_delay = m_recorder_latency_ms * 2;
                 m_sweep_timer.set(m_measure_delay);
             }
             reinit_recorder();
@@ -1150,32 +1192,38 @@ public:
 
     void draw_tools_windows()
     {
-        if (m_sound_setup_open && !m_sweep_started){
+        if (m_sound_setup_open && !m_sweep_started)
+        {
             ImGui::SetNextWindowSize(ImVec2(600, 150));
-            if(ImGui::Begin("Sound card setup", &m_sound_setup_open)){
+            if(ImGui::Begin("Sound card setup", &m_sound_setup_open))
+            {
                 ImVec2 winsize = ImGui::GetWindowSize();
                 ImGui::PushItemWidth(winsize.x / 3);
                 const std::vector<std::string>& out_devices = m_audiomanager.get_output_devices();
                 ImGui::SeparatorText("Output device");
-                if (ImGui::Combo("Ouput", &m_combo_out, vector_getter, (void*)&out_devices, out_devices.size())){
+                if (ImGui::Combo("Ouput", &m_combo_out, vector_getter, (void*)&out_devices, out_devices.size()))
+                {
                     m_audio_out_idx = m_audiomanager.get_output_device_map(m_combo_out);
                     reset_sine_generator();
                 }
                 ImGui::SameLine();
                 const std::vector<std::string> out_samplerate = m_audio_out_idx >= 0 ? m_audiomanager.get_output_sample_rates_str(m_audio_out_idx) : std::vector<std::string>();
-                if (ImGui::Combo("Samplerate##1", &m_out_sample_rate, vector_getter, (void*)&out_samplerate, out_samplerate.size())){
+                if (ImGui::Combo("Samplerate##1", &m_out_sample_rate, vector_getter, (void*)&out_samplerate, out_samplerate.size()))
+                {
                     reset_sine_generator();
                 }
                 
                 ImGui::SeparatorText("Input device");
                 const std::vector<std::string>& in_devices = m_audiomanager.get_input_devices();
-                if (ImGui::Combo("Input", &m_combo_in, vector_getter, (void*)&in_devices, in_devices.size())){
+                if (ImGui::Combo("Input", &m_combo_in, vector_getter, (void*)&in_devices, in_devices.size()))
+                {
                     m_audio_in_idx = m_audiomanager.get_input_device_map(m_combo_in);
                     reinit_recorder();
                 }
                 ImGui::SameLine();
                 const std::vector<std::string> in_samplerate = m_audio_in_idx >= 0 ? m_audiomanager.get_input_sample_rates_str(m_audio_in_idx) : std::vector<std::string>();
-                if (ImGui::Combo("Samplerate##2", &m_in_sample_rate, vector_getter, (void*)&in_samplerate, in_samplerate.size())){
+                if (ImGui::Combo("Samplerate##2", &m_in_sample_rate, vector_getter, (void*)&in_samplerate, in_samplerate.size()))
+                {
                     reinit_recorder();
                 }
                 ImGui::PopItemWidth();
@@ -1235,40 +1283,6 @@ public:
     virtual ~MainWindow()
     {
 
-    }
-
-    void draw(bool c) override
-    {
-        Window_SDL::draw(c);
-    }
-};
-
-class MainWindow2 : public Window_SDL
-{
-    class Test : public Widget {
-        public:
-        Test(Window_SDL *win) : Widget(win, "Test")
-        {
-        }
-        ~Test(){
-
-        }
-
-        void draw() override {
-            ImGui::ShowDemoWindow();
-        }
-    };
-
-    Test* test;
-
-    public:
-    MainWindow2() : Window_SDL("Test2", 1200, 900)
-    {
-        test = new Test(this);
-    }
-
-    virtual ~MainWindow2()
-    {
     }
 
     void draw(bool c) override

@@ -146,7 +146,6 @@ Window_SDL::Window_SDL(std::string name, int width, int height, bool fullscreen)
 Window_SDL::~Window_SDL()
 {
 	show(false);
-	//ImGui::DestroyContext(_impl->_imguicontext);
 	for (auto win: _impl->widgets){
 		delete win;
 	}
@@ -215,6 +214,7 @@ void Window_SDL::show(bool show)
 		ImFontAtlas* atlas = NULL;
 		// atlas = ImGui::GetIO().Fonts;
 
+		ImGuiContext* current_context = ImGui::GetCurrentContext();
 		_impl->_imguicontext = ImGui::CreateContext(atlas);
 		ImGui::SetCurrentContext(_impl->_imguicontext);
 
@@ -232,11 +232,11 @@ void Window_SDL::show(bool show)
 
 		// Setup Dear ImGui style
 		ImGui::StyleColorsDark();
-		//ImGui::StyleColorsClassic();
 		_impl->_is_shown = true;
 
 		_impl->_inifilename = _impl->_name + ".ini";
 		ImGui::GetIO().IniFilename = _impl ->_inifilename.c_str();
+		if (current_context) ImGui::SetCurrentContext(current_context);
 	}
 	if (!show && _impl->_is_shown){
 		ImGui::SetCurrentContext(_impl->_imguicontext);
@@ -249,6 +249,8 @@ void Window_SDL::show(bool show)
 	    _impl->_imguicontext = NULL;
 	    _impl->_is_shown = false;
 	}
+
+	// Restore context
 }
 
 bool Window_SDL::is_shown()
@@ -340,14 +342,8 @@ bool Window_SDL::do_event(void* ev)
 	if (!_impl->_is_shown)
 		return false;
 	SDL_Event* event = (SDL_Event*)ev;
-	if (event->window.windowID != get_windid())
-		return false;
 	set_imgui_context();
 	bool evok = ImGui_ImplSDL2_ProcessEvent(event);
-	if (event->type == SDL_WINDOWEVENT && event->window.event == SDL_WINDOWEVENT_CLOSE && event->window.windowID == get_windid()){
-		show(false);
-		evok = true;
-	}
 	return evok;
 }
 
@@ -579,14 +575,14 @@ void App_SDL::add_window(Window_SDL* win) {
 }
 
 void App_SDL::register_user_event(UserEvent* ev) {
-	std::vector<UserEvent*>::iterator it = std::find(_impl->m_user_events.begin(), _impl->m_user_events.end(), ev);
+	auto it = std::find(_impl->m_user_events.begin(), _impl->m_user_events.end(), ev);
 	if (it != _impl->m_user_events.end())
 		return;
 	_impl->m_user_events.push_back(ev);
 }
 
 void App_SDL::unregister_user_event(UserEvent* ev) {
-	std::vector<UserEvent*>::iterator it = std::find(_impl->m_user_events.begin(),_impl->m_user_events.end(), ev);
+	auto it = std::find(_impl->m_user_events.begin(),_impl->m_user_events.end(), ev);
 	if (it == _impl->m_user_events.end())
 		return;
 	_impl->m_user_events.erase(it);
@@ -594,7 +590,7 @@ void App_SDL::unregister_user_event(UserEvent* ev) {
 
 void App_SDL::register_timer(Timer* t)
 {
-	std::vector<Timer*>::iterator it = std::find(_impl->m_timers.begin(), _impl->m_timers.end(), t);
+	auto it = std::find(_impl->m_timers.begin(), _impl->m_timers.end(), t);
 	if (it != _impl->m_timers.end())
 		return;
 	_impl->m_timers.push_back(t);
@@ -602,7 +598,7 @@ void App_SDL::register_timer(Timer* t)
 
 void App_SDL::unregister_timer(Timer* t)
 {
-	std::vector<Timer*>::iterator it = std::find(_impl->m_timers.begin(), _impl->m_timers.end(), t);
+	auto it = std::find(_impl->m_timers.begin(), _impl->m_timers.end(), t);
 	if (it == _impl->m_timers.end())
 		return;
 	_impl->m_timers.erase(it);
@@ -639,7 +635,7 @@ ImFont* App_SDL::load_font(std::string fontname, float size)
 bool App_SDL::handle_timer_events()
 {
 	bool event = false;
-	std::vector<Timer*>::iterator it_timer = _impl->m_timers.begin();
+	auto it_timer = _impl->m_timers.begin();
 	long timestamp = this->timestamp();
 	for (; it_timer < _impl->m_timers.end(); ++it_timer){
 		if ((*it_timer)->is_active()){
@@ -712,8 +708,8 @@ void App_SDL::run()
 						}
 						++i;
 					}
-					if (found >=0){
-						std::vector<Window_SDL *>::iterator it = _impl->_windows.begin() + found;
+					if (found >= 0){
+						auto it = _impl->_windows.begin() + found;
 						(*it)->show(false);
 						delete (*it);
 						_impl->_windows.erase(it);
@@ -724,24 +720,21 @@ void App_SDL::run()
 				}
 			}
 
-        	bool event_flag = false;
         	for(auto window: _impl->_windows){
         		window->do_event(&event);
-				//window->draw(true);
         	}
-
         }
+
 		// Events handler
 		handle_timer_events();
-		std::vector<UserEvent*>::iterator it = _impl->m_user_events.begin();
-		for (; it < _impl->m_user_events.end(); ++it){
-			if (event.type == (*it)->get_evt_idx()){
-				(*it)->on_callback(event.user.data1, event.user.data2);
+		for (auto user_event: _impl->m_user_events){
+			if (event.type == user_event->get_evt_idx()){
+				user_event->on_callback(event.user.data1, event.user.data2);
 			}
 		}
 
-		//ImPlot::SetCurrentContext(_implotcontext);
-		for(auto window: _impl->_windows){
+		auto windows = _impl->_windows;
+		for(auto window: windows){
 			window->draw(false);
 		}
 
