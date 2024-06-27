@@ -23,6 +23,8 @@ public:
 	unsigned long get_start_time(){return m_start_time;}
 	void set(unsigned long time){m_time = time;}
 
+	void connect_event(event_cb_t ev, void* cb_data){set_callback(ev, cb_data);}
+
 	void on_timer_event();
 };
 

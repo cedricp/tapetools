@@ -157,7 +157,7 @@ public:
 
         reinit_recorder();
 
-        CONNECT_CALLBACK((&m_sweep_timer), on_timer_event);
+        m_sweep_timer.connect_event(static_method_on_timer_event, this);
 
     }
 
