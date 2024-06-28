@@ -90,17 +90,18 @@ static void UISettingsHandler_WriteAll(ImGuiContext *ctx, ImGuiSettingsHandler *
 	wsdl->get_configuration_int(mapint);
 	wsdl->get_configuration_float(mapfloat);
 
-	if (mapint.size() == 0){
-		return;
+	if (!mapint.empty()){
+		buf->appendf("[%s][SettingsI]\n", handler->TypeName);
+		for (std::pair<std::string, int> cnf: mapint){
+			buf->appendf("%s=%i\n", cnf.first.c_str(), cnf.second);
+		}
 	}
 
-	buf->appendf("[%s][SettingsI]\n", handler->TypeName);
-	for (std::pair<std::string, int> cnf: mapint){
-		buf->appendf("%s=%i\n", cnf.first.c_str(), cnf.second);
-	}
-	buf->appendf("[%s][SettingsF]\n", handler->TypeName);
-	for (std::pair<std::string, float> cnf: mapfloat){
-		buf->appendf("%s=%f\n", cnf.first.c_str(), cnf.second);
+	if (!mapfloat.empty()){
+		buf->appendf("[%s][SettingsF]\n", handler->TypeName);
+		for (std::pair<std::string, float> cnf: mapfloat){
+			buf->appendf("%s=%f\n", cnf.first.c_str(), cnf.second);
+		}
 	}
 }
 
@@ -222,8 +223,8 @@ void Window_SDL::show(bool show)
 
 		ImGuiSettingsHandler ui_ini_handler;
 		ui_ini_handler.UserData = this;
-		ui_ini_handler.TypeName = "TapeTools";
-		ui_ini_handler.TypeHash = ImHashStr("TapeTools");
+		ui_ini_handler.TypeName = _impl->_name.c_str();
+		ui_ini_handler.TypeHash = ImHashStr(_impl->_name.c_str());
 		ui_ini_handler.ReadOpenFn = UISettingsHandler_ReadOpen;
 		ui_ini_handler.ReadLineFn = UISettingsHandler_ReadLine;
 		ui_ini_handler.WriteAllFn = UISettingsHandler_WriteAll;
@@ -251,8 +252,6 @@ void Window_SDL::show(bool show)
 	    _impl->_imguicontext = NULL;
 	    _impl->_is_shown = false;
 	}
-
-	// Restore context
 }
 
 bool Window_SDL::is_shown()
