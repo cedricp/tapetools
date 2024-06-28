@@ -115,6 +115,8 @@ private:
 	int _width, _height;
 };
 
+class Thread;
+
 class App_SDL
 {
 	app_impl* _impl;
@@ -134,6 +136,11 @@ public:
 	void unregister_timer(Timer* t);
 	unsigned long timestamp(void);
 	std::string get_app_path();
+	void add_thread(Thread*);
+	Thread* get_thread(std::string name);
+	bool abort_thread(std::string name);
+	void release_finished_threads();
+	void pause_thread(std::string name, bool pause = true);
 
 	void set_str_config(std::string key, std::string val);
 	std::string get_str_config(std::string key);

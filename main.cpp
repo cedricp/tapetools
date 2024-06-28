@@ -6,6 +6,7 @@
 #include "timer.h"
 #include <fftw3.h>
 #include <complex>
+#include <thread.h>
 
 uint32_t lcd_fg = IM_COL32(255,0,0,255);
 uint32_t lcd_bg = IM_COL32(0,0,0,255);
@@ -48,6 +49,24 @@ void digit(ImDrawList*d,int n,ImVec2 e,ImVec2 p)
 #undef H
 #undef v
 #undef draw_poly
+
+class ThreadTest : public ASyncLoopTask{
+public:
+    UserEvent thread_ev;
+    ThreadTest() : ASyncLoopTask("testthread"){
+
+    }
+
+    void entry() override {
+        usleep(100000);
+        static int num = 0;
+        thread_ev.push(0, (void*)num);
+        num++;
+        if (num > 5){
+            stop();
+        }
+    }
+};
 
 class MainWindow2 : public Window_SDL
 {
@@ -170,7 +189,12 @@ class AudioToolWindow : public Event, Widget
     bool    m_show_zscore_settings = false;
 
     STATIC_CALLBACK_METHOD(on_timer_event, AudioToolWindow)
-
+    STATIC_CALLBACK_METHOD(on_thread_event, AudioToolWindow)
+    CALLBACK_METHOD(on_thread_event)
+    {
+        void* num = sender_object->get_data1();
+        printf("Test %x\n", num);
+    }
 public:
     AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_sweep_timer(m_measure_delay, true)
     {
@@ -192,8 +216,11 @@ public:
 
         reinit_recorder();
 
-        m_sweep_timer.connect_event(static_method_on_timer_event, this);
+        m_sweep_timer.connect_event(STATIC_METHOD(on_timer_event), this);
 
+        ThreadTest* t = new ThreadTest;
+        CONNECT_CALLBACK(&t->thread_ev, on_thread_event);
+        t->start();
     }
 
     virtual ~AudioToolWindow()

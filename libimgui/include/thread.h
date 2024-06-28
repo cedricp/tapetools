@@ -9,7 +9,7 @@
 #include <pthread.h>
 #endif
 
-#include "callback.h"
+#include "string"
 
 class ThreadMutex
 {
@@ -58,7 +58,7 @@ public:
 class Thread
 {
 protected:
-    UserEvent m_thread_exit_event;
+    std::string m_name;
 #ifdef WIN32
     DWORD m_thread_id;
     HANDLE m_thread_handle = NULL;
@@ -72,19 +72,18 @@ protected:
     bool m_loop;
 
 public:
-    Thread(bool loop);
+    Thread(std::string name = "default", bool loop = false);
     virtual ~Thread();
     void start();
     bool join();
     void usleep(unsigned long us);
+    const std::string& name(){return m_name;}
 
     /*
      * Main thread code
      * If the code needs to loop, set loop=true in the constructor
      */
     virtual void entry() = 0;
-
-    virtual void on_exit_event(Event* sender_object, void* data){}
 
     void stop()
     {
@@ -96,20 +95,28 @@ public:
         return m_running;
     }
 
-    DECLARE_STATIC_CALLBACK_METHOD(on_exit_event)
+    void pause(bool p = true)
+    {
+        m_pause = p;
+    }
+
+    bool is_paused()
+    {
+        return m_pause;
+    }
 };
 
 class ASyncTask : public Thread
 {
 public:
-    ASyncTask() : Thread(false){};
+    ASyncTask(std::string name = "default") : Thread(name, false){};
     virtual ~ASyncTask() {}
 };
 
 class ASyncLoopTask : public Thread
 {
 public:
-    ASyncLoopTask() : Thread(true){};
+    ASyncLoopTask(std::string name = "default") : Thread(name, true){};
     virtual ~ASyncLoopTask() {}
     void pause(bool p)
     {

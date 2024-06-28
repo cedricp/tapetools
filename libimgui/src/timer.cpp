@@ -33,7 +33,7 @@ void Timer::on_timer_event()
 		start();
 	}
 	if (m_callback){
-		m_callback(this, (void*)NULL, m_callback_data);
+		m_callback(this, m_callback_data);
 	} else {
 		fprintf(stderr, "Timer event callback not set\n");
 	}

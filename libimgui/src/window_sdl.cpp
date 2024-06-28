@@ -7,6 +7,7 @@
 #include <GL/glew.h>
 #include <SDL.h>
 #include <SDL_opengl.h>
+#include <thread.h>
 
 #include <time.h>
 #include <sys/time.h>
@@ -40,6 +41,7 @@ struct app_impl
 	std::vector<Timer*> m_timers;
 	ImGuiContext* _refimguicontext = 0L;
 	std::map< std::string, std::string > _str_configs;
+	std::vector<Thread*> _threadpool;
 };
 
 
@@ -350,10 +352,12 @@ bool Window_SDL::do_event(void* ev)
 UserEvent::UserEvent()
 {
 	m_event_idx = SDL_RegisterEvents(1);
-	if (m_event_idx != -1)
+	if (m_event_idx != -1){
 		App_SDL::get()->register_user_event(this);
-	else
+		printf("Registered ev %d\n", m_event_idx);
+	} else {
 		fprintf(stderr, "Cannot register user event\n");
+	}
 }
 
 UserEvent::~UserEvent()
@@ -371,7 +375,9 @@ void UserEvent::push(int code, void* data1, void* data2)
 		event.user.code = code;
 		event.user.data1 = data1;
 		event.user.data2 = data2;
-		SDL_PushEvent(&event);
+		if (!SDL_PushEvent(&event)){
+			fprintf(stderr, "Cannot push user event\n");
+		}
 	} else {
 		fprintf(stderr, "Cannot push user event\n");
 	}
@@ -384,7 +390,7 @@ UserEvent::on_callback(void* data1, void* data2)
 	if (m_callback){
 		m_userdata1 = data1;
 		m_userdata2 = data2;
-		m_callback(this, (void*)this, m_callback_data);
+		m_callback(this, m_callback_data);
 	}
 }
 
@@ -537,8 +543,11 @@ App_SDL::App_SDL() {
 
 
 App_SDL::~App_SDL() {
+	for (auto thread: _impl->_threadpool){
+		delete thread;
+	}
+
 	ImGui::SetCurrentContext(_impl->_refimguicontext);
-    // Cleanup
     ImPlot::DestroyContext(_implotcontext);
 	ImGui::DestroyContext(_impl->_refimguicontext);
 
@@ -610,7 +619,7 @@ ImFont* App_SDL::load_font(std::string fontname, float size)
 	ImVector<ImWchar> ranges;
 	ImFontGlyphRangesBuilder builder;
 	builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesDefault());
-	builder.AddChar(0x221E);                               // Add a specific character
+	builder.AddChar(0x221E);
 	builder.BuildRanges(&ranges); 
 	ImFont* font = ImGui::GetIO().Fonts->AddFontFromFileTTF(fontname.c_str(), size, NULL, ranges.Data);
 	assert(font);
@@ -676,6 +685,69 @@ std::string App_SDL::get_app_path()
 	return SDL_GetBasePath();
 }
 
+void App_SDL::add_thread(Thread* thread)
+{
+	for (auto t: _impl->_threadpool){
+		if (t->name() == thread->name()){
+			std::cout << "App_SDL::add_thread : Cannot insert multiple threads with the same name" << std::endl;
+			return;
+		}
+	}
+	_impl->_threadpool.push_back(thread);
+}
+
+Thread* App_SDL::get_thread(std::string name)
+{
+	for (auto thread: _impl->_threadpool){
+		if (name == thread->name()){
+			return thread;
+		}
+	}
+	return NULL;
+}
+
+bool App_SDL::abort_thread(std::string name)
+{
+	int threadnum = 0;
+	for (auto thread: _impl->_threadpool){
+		if (thread->name() == name){
+			thread->stop();
+			thread->join();
+			#ifdef DEBUG
+			std::cout << "Deleted thread " << thread->name() << std::endl;
+			#endif
+			delete thread;
+			_impl->_threadpool.erase(_impl->_threadpool.begin() + threadnum);
+			return true;
+		}
+		threadnum++;
+	}
+	return false;
+}
+
+void App_SDL::pause_thread(std::string name, bool pause)
+{
+	for (auto thread: _impl->_threadpool){
+		if (thread->name() == name){
+			thread->pause(pause);
+		}
+	}
+}
+
+void App_SDL::release_finished_threads()
+{
+	std::vector<std::string> del_list;
+	for (auto thread: _impl->_threadpool){
+		if (!thread->is_running()){
+			del_list.push_back(thread->name());
+		}
+	}
+	for(auto del: del_list){
+		std::cout << "Deleting finished thread... " << std::endl;
+		abort_thread(del);
+	}
+}
+
 void App_SDL::run()
 {
     bool done = false;
@@ -723,20 +795,23 @@ void App_SDL::run()
         	for(auto window: _impl->_windows){
         		window->do_event(&event);
         	}
-        }
 
-		// Events handler
-		handle_timer_events();
-		for (auto user_event: _impl->m_user_events){
-			if (event.type == user_event->get_evt_idx()){
-				user_event->on_callback(event.user.data1, event.user.data2);
+			// Events handler
+			handle_timer_events();
+			for (auto user_event: _impl->m_user_events){
+				int idx = user_event->get_evt_idx();
+				if (event.type == idx){
+					user_event->on_callback(event.user.data1, event.user.data2);
+				}
 			}
-		}
+        }
 
 		auto windows = _impl->_windows;
 		for(auto window: windows){
 			window->draw(false);
 		}
+
+		App_SDL::get()->release_finished_threads();
 
         usleep(5000);
     }

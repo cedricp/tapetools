@@ -31,6 +31,10 @@ if(MINGW)
     set_target_properties(tapetools PROPERTIES LINK_FLAGS "${LINKFLAGS}")
 endif(MINGW)
 
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_definitions(-DDEBUG)
+endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+
 install (TARGETS tapetools RUNTIME DESTINATION bin)
 
 if(MINGW)

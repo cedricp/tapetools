@@ -2,11 +2,10 @@
 #include <assert.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <window_sdl.h>
 
 	
 typedef void * (*THREADFUNCPTR)(void *);
-
-IMPLEMENT_STATIC_CALLBACK_METHOD(on_exit_event, Thread)
 
 #ifdef WIN32
 DWORD WINAPI Thread::run_win32(LPVOID userdata)
@@ -28,7 +27,6 @@ DWORD WINAPI Thread::run_win32(LPVOID userdata)
             break;
     }
     thread->m_running = false;
-    thread->m_thread_exit_event.push();
     CoUninitialize();
     return 0;
 }
@@ -55,14 +53,15 @@ void *Thread::run_posix()
 }
 #endif
 
-Thread::Thread(bool loop) : m_running(false), m_loop(loop), m_thread_id(0)
+Thread::Thread(std::string name, bool loop) : m_running(false), m_loop(loop), m_thread_id(0), m_name(name)
 {
-    CONNECT_CALLBACK((&m_thread_exit_event), on_exit_event)
+    App_SDL::get()->add_thread(this);
 }
 
 Thread::~Thread()
 {
     m_loop = false;
+    stop();
     join();
     m_running = false;
 }
