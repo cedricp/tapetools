@@ -637,12 +637,11 @@ public:
         ImGui::EndChild();
 
 
-        ImGui::SameLine();
-        if(ImGui::Button("test")){
-            MainWindow2* win = new MainWindow2;
-            App_SDL::get()->add_window(win);
-            //get_underlying_window()->set_imgui_context();
-        }
+        // ImGui::SameLine();
+        // if(ImGui::Button("test")){
+        //     MainWindow2* win = new MainWindow2;
+        //     App_SDL::get()->add_window(win);
+        // }
 
         ImGui::EndChild();
 
@@ -1188,22 +1187,6 @@ public:
             }
         }
 
-        // int valid_idx = fundamental_index+1;
-        // int numskip = 0;
-        // // Keep harmonics only
-        // double fundamental_freq = m_fftfreqs[m_fft_highest_idx[fundamental_index]];
-        // for(int i = fundamental_index+1; i < m_fft_found_peaks; ++i){
-        //     double mod = fmod(m_fftfreqs[m_fft_highest_idx[i]], fundamental_freq);
-        //     if ( fundamental_freq - mod < 50 || mod < 50){
-        //         m_fft_highest_idx[valid_idx] = m_fft_highest_idx[i];
-        //         m_fft_highest_pos[valid_idx++] = m_fft_highest_pos[i];
-        //     } else {
-        //         numskip++;
-        //     }
-        // }
-// 
-        // m_fft_found_peaks -= numskip;
-
         // Compute Total Harmonic Distortion
         // Source http://www.r-type.org/addtext/add183.htm
         if (m_fft_found_peaks){
@@ -1325,8 +1308,8 @@ public:
 int main(int argc, char *argv[])
 {
     App_SDL *app = App_SDL::get();
+    app->set_app_name("TapeTools");
     Window_SDL *window = new MainWindow;
-    //Window_SDL *window2 = new MainWindow2;
 
     ImGui::GetStyle().FrameRounding = 5.0;
     ImGui::GetStyle().ChildRounding = 5.0;
@@ -1336,7 +1319,6 @@ int main(int argc, char *argv[])
     window->set_minimum_window_size(1400, 800);
 
     app->add_window(window);
-    //app->add_window(window2);
     app->run();
     return 0;
 }

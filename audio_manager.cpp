@@ -40,7 +40,7 @@ audioManager::audioManager(SoundIoBackend backend)
     int err = (m_backend == SoundIoBackendNone) ? soundio_connect(m_soundio) : soundio_connect_backend(m_soundio, m_backend);
 
     if (err) {
-        fprintf(stderr, "Unable to connect to m_backend: %s\n", soundio_strerror(err));
+        fprintf(stderr, "Unable to connect to backend: %s\n", soundio_strerror(err));
         return;
     }
 

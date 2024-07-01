@@ -122,6 +122,7 @@ class App_SDL
 	app_impl* _impl;
 	bool handle_timer_events();
 	void* get_ref_imgui_context();
+	std::string m_appname = "unnamed";
 	App_SDL();
 	~App_SDL();
 public:
@@ -129,6 +130,7 @@ public:
 #ifdef IMP_METHOD
 	void destroy();
 #endif
+	void set_app_name(std::string name){ m_appname = name; }
 	ImFont* load_font(std::string fontname, float size);
 	void register_user_event(UserEvent* ev);
 	void unregister_user_event(UserEvent* ev);
