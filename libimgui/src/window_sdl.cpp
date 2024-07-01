@@ -690,6 +690,7 @@ void App_SDL::add_thread(Thread* thread)
 	for (auto t: _impl->_threadpool){
 		if (t->name() == thread->name()){
 			std::cout << "App_SDL::add_thread : Cannot insert multiple threads with the same name" << std::endl;
+			delete t;
 			return;
 		}
 	}

@@ -27,9 +27,11 @@ DWORD WINAPI Thread::run_win32(LPVOID userdata)
             break;
     }
     thread->m_running = false;
+    thread->on_finished();
     CoUninitialize();
     return 0;
 }
+
 #else
 void *Thread::run_posix()
 {
@@ -48,6 +50,7 @@ void *Thread::run_posix()
     }
     m_running = false;
     m_thread_exit_event.push();
+    thread->on_finished();
     pthread_exit(NULL);
     return NULL;
 }

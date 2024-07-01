@@ -85,6 +85,8 @@ public:
      */
     virtual void entry() = 0;
 
+    virtual void on_finished(){}
+
     void stop()
     {
         m_running = false;

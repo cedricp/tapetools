@@ -66,6 +66,10 @@ public:
             stop();
         }
     }
+
+    void on_finished() override {
+        printf("Thread finished!\n");
+    }
 };
 
 class MainWindow2 : public Window_SDL
