@@ -40,7 +40,7 @@ void smoothed_z_score(const double y[], double signals[], const int count, const
     stdFilter[lag - 1] = stddev(y, lag);
 
     for (int i = lag; i < count; i++) {
-        if (fabsf(y[i] - avgFilter[i-1]) > threshold * stdFilter[i-1]) {
+        if (fabs(y[i] - avgFilter[i-1]) > threshold * stdFilter[i-1]) {
             if (y[i] > avgFilter[i-1]) {
                 signals[i] = 1;
             } else {

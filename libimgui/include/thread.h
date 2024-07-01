@@ -55,6 +55,17 @@ public:
     }
 };
 
+class AutoLockMutex {
+    ThreadMutex &m_mutex;
+public:
+    AutoLockMutex(ThreadMutex& mutex) : m_mutex(mutex){
+        m_mutex.lock();
+    }
+    ~AutoLockMutex(){
+        m_mutex.unlock();
+    }
+};
+
 class Thread
 {
 protected:

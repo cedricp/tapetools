@@ -116,7 +116,7 @@ class AudioToolWindow : public Event, Widget
     
     bool m_sine_generator_switch = false;
     int  m_pitch = 440;
-    float m_sinegen_latency_s = 0.05f;
+    float m_sinegen_latency_s = 0.1f;
     int m_recorder_latency_ms = 100;
     int m_sine_volume_db = 0.f;
     
@@ -354,7 +354,6 @@ public:
 
         m_sweep_values.push_back(max_val);
         m_sweep_freqs.push_back(m_sweep_current_frequency);
-
 
         m_sweep_current_frequency += m_sweep_span;
         m_sine_generator.set_pitch(m_sweep_current_frequency);
@@ -763,7 +762,7 @@ public:
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Volts RMS Left");
             if (m_lockdb && m_current_db_target_channel == 0){
-                float target_val_left = 1.f - fabsf( m_locked_db_value - m_rms_left * m_rms_calibration_scale ) * 10.f;
+                float target_val_left = 1.f - fabs( m_locked_db_value - m_rms_left * m_rms_calibration_scale ) * 10.f;
                 ImGui::ProgressBar(target_val_left);
             }
             ImGui::EndChild();
@@ -776,7 +775,7 @@ public:
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Volts RMS Right");
             if (m_lockdb && m_current_db_target_channel == 1){
-                float target_val_right = 1.f - fabsf( m_locked_db_value - m_rms_right * m_rms_calibration_scale ) *10.f;
+                float target_val_right = 1.f - fabs( m_locked_db_value - m_rms_right * m_rms_calibration_scale ) *10.f;
                 ImGui::ProgressBar(target_val_right);
             }
             ImGui::EndChild();

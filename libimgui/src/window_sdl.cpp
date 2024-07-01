@@ -658,10 +658,9 @@ bool App_SDL::handle_timer_events()
 
 App_SDL* App_SDL::get()
 {
-	_implotcontext = ImPlot::CreateContext();
-
 	if (_APP_INSTANCE_ == 0L){
 		_APP_INSTANCE_ = new App_SDL;
+		_implotcontext = ImPlot::CreateContext();
 	}
 	return _APP_INSTANCE_;
 }
@@ -797,7 +796,6 @@ void App_SDL::run()
         	}
 
 			// Events handler
-			handle_timer_events();
 			for (auto user_event: _impl->m_user_events){
 				int idx = user_event->get_evt_idx();
 				if (event.type == idx){
@@ -805,6 +803,8 @@ void App_SDL::run()
 				}
 			}
         }
+		
+		handle_timer_events();
 
 		auto windows = _impl->_windows;
 		for(auto window: windows){

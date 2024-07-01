@@ -23,9 +23,11 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
     double seconds_per_frame = 1.0 / float_sample_rate;
     SoundIoChannelArea *areas;
     int err;
+    
+    static int old_pitch = -1;
 
     int frames_left = frame_count_max;
-    int pitch = udata->m_pitch;
+    double pitch = udata->m_pitch;
 
     for (;;) {
         int frame_count = frames_left;
@@ -37,14 +39,20 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
         if (!frame_count)
             break;
 
+        double step = 0;
+        if (old_pitch > 0){
+            step = (pitch - old_pitch) / (double)frame_count;
+        }
+
         const SoundIoChannelLayout *layout = &outstream->layout;
-        double radians_per_second = pitch * 2.0 * M_PI;
         for (int frame = 0; frame < frame_count; ++frame) {
+            double radians_per_second = pitch * 2.0 * M_PI; 
             double sample = udata->m_volume * sin((udata->m_seconds_offset + frame * seconds_per_frame) * radians_per_second);
             for (int channel = 0; channel < layout->channel_count; channel += 1) {
                 write_sample(areas[channel].ptr, sample);
                 areas[channel].ptr += areas[channel].step;
             }
+            pitch += step;
         }
         udata->m_seconds_offset = fmod(udata->m_seconds_offset + seconds_per_frame * frame_count, 1.0);
 
@@ -59,6 +67,7 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
         if (frames_left <= 0)
             break;
     }
+    old_pitch = udata->m_pitch;
 }
 
 void audioSineGenerator::error_callback(SoundIoOutStream *outstream, int err)
