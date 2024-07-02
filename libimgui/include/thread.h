@@ -76,7 +76,7 @@ protected:
     static DWORD WINAPI run_win32(LPVOID userdata);
 #else
     pthread_t m_thread_id;
-    void* run_posix();
+    static void* run_posix(void* userdata);
 #endif
     volatile bool m_running;
     volatile bool m_pause;

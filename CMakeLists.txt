@@ -16,6 +16,10 @@ find_package(FFTW REQUIRED)
 message(STATUS "FFTW3 libs ${FFTW_DOUBLE_LIB}")
 message(STATUS "FFTW3 includes ${FFTW_INCLUDE_DIRS}")
 
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_definitions(-DDEBUG)
+endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+
 add_subdirectory(libsoundio)
 add_subdirectory(libimgui)
 
@@ -31,9 +35,6 @@ if(MINGW)
     set_target_properties(tapetools PROPERTIES LINK_FLAGS "${LINKFLAGS}")
 endif(MINGW)
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_definitions(-DDEBUG)
-endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 install (TARGETS tapetools RUNTIME DESTINATION bin)
 

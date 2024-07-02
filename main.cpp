@@ -89,7 +89,6 @@ class MainWindow2 : public Window_SDL
     };
 
     Test* test;
-
     public:
     MainWindow2() : Window_SDL("Test2", 1200, 900)
     {
@@ -192,13 +191,44 @@ class AudioToolWindow : public Event, Widget
     float   m_zscore_threshold = 3.5;
     bool    m_show_zscore_settings = false;
 
-    STATIC_CALLBACK_METHOD(on_timer_event, AudioToolWindow)
-    STATIC_CALLBACK_METHOD(on_thread_event, AudioToolWindow)
-    CALLBACK_METHOD(on_thread_event)
+    CALLBACK_METHOD(on_thread_event, AudioToolWindow)
     {
         void* num = sender_object->get_data1();
         printf("Test %x\n", num);
     }
+    
+    CALLBACK_METHOD(on_timer_event, AudioToolWindow)
+    {
+        float current_sample_rate = m_audiorecorder.get_current_samplerate();
+        float fft_step = m_capture_size / current_sample_rate;
+        
+        if (m_sweep_current_frequency >= 20000){
+            // We reached the end of the measure
+            stop_sweep_gen();
+            return;
+        }
+
+        compute();
+
+        int min_freq_idx = std::max(int((m_sweep_current_frequency-500)*fft_step), 0);
+        int max_freq_idx = std::min(int((m_sweep_current_frequency+500)*fft_step), m_capture_size / 2);
+
+        float max_val = m_noise_foor;
+        for (int i = min_freq_idx; i < max_freq_idx; ++i){
+            if (m_fftdraw[i] > max_val){
+                max_val = m_fftdraw[i];
+            }
+        }
+
+        m_sweep_values.push_back(max_val);
+        m_sweep_freqs.push_back(m_sweep_current_frequency);
+
+
+        m_sweep_current_frequency += m_sweep_span;
+        m_sine_generator.set_pitch(m_sweep_current_frequency);
+        m_sweep_timer.start();
+    }
+
 public:
     AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_sweep_timer(m_measure_delay, true)
     {
@@ -329,37 +359,6 @@ public:
         m_fft_window_fn_index = tmp;
     }
 
-    CALLBACK_METHOD(on_timer_event)
-    {
-        float current_sample_rate = m_audiorecorder.get_current_samplerate();
-        float fft_step = m_capture_size / current_sample_rate;
-        
-        if (m_sweep_current_frequency >= 20000){
-            // We reached the end of the measure
-            stop_sweep_gen();
-            return;
-        }
-
-        compute();
-
-        int min_freq_idx = std::max(int((m_sweep_current_frequency-500)*fft_step), 0);
-        int max_freq_idx = std::min(int((m_sweep_current_frequency+500)*fft_step), m_capture_size / 2);
-
-        float max_val = m_noise_foor;
-        for (int i = min_freq_idx; i < max_freq_idx; ++i){
-            if (m_fftdraw[i] > max_val){
-                max_val = m_fftdraw[i];
-            }
-        }
-
-        m_sweep_values.push_back(max_val);
-        m_sweep_freqs.push_back(m_sweep_current_frequency);
-
-        m_sweep_current_frequency += m_sweep_span;
-        m_sine_generator.set_pitch(m_sweep_current_frequency);
-        m_sweep_timer.start();
-    }
-
     void set_theme()
     {
         if (m_uitheme == 0){
@@ -371,6 +370,11 @@ public:
         if (m_uitheme == 2){
             ImGui::StyleColorsClassic();   
         }
+        ImGui::GetStyle().FrameRounding = 5.0;
+        ImGui::GetStyle().ChildRounding = 5.0;
+        ImGui::GetStyle().WindowRounding = 4.0;
+        ImGui::GetStyle().GrabRounding = 4.0;
+        ImGui::GetStyle().GrabMinSize = 4.0;
     }
 
     void draw() override 
@@ -754,32 +758,30 @@ public:
             } else {
                 lcd_fg = IM_COL32(0,200,0,255);
             }
-            ImGui::BeginChild("ScopesChildVoltageLcd", ImVec2(-1, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiWindowFlags_None);
-            
+            ImGui::BeginChild("ScopesChildVoltageLcd", ImVec2(0, -1), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeX  | ImGuiWindowFlags_None);
+             
             ImGui::BeginChild("ScopesChildVoltageLcd1", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
-            draw_lcd(m_rms_left * m_rms_calibration_scale, ImVec2(200, 70));
-            ImGui::SameLine();
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Volts RMS Left");
+            draw_lcd(m_rms_left * m_rms_calibration_scale, ImVec2(200, 70));
             if (m_lockdb && m_current_db_target_channel == 0){
                 float target_val_left = 1.f - fabs( m_locked_db_value - m_rms_left * m_rms_calibration_scale ) * 10.f;
                 ImGui::ProgressBar(target_val_left);
             }
             ImGui::EndChild();
 
-            ImGui::SameLine();
-            ImGui::SetCursorPosX(width());
+            //ImGui::SetCursorPosY(height());
             ImGui::BeginChild("ScopesChildVoltageLcd2", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
-            draw_lcd(m_rms_right * m_rms_calibration_scale, ImVec2(200, 70));
-            ImGui::SameLine();
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Volts RMS Right");
+            draw_lcd(m_rms_right * m_rms_calibration_scale, ImVec2(200, 70));
             if (m_lockdb && m_current_db_target_channel == 1){
                 float target_val_right = 1.f - fabs( m_locked_db_value - m_rms_right * m_rms_calibration_scale ) *10.f;
                 ImGui::ProgressBar(target_val_right);
             }
             ImGui::EndChild();
             ImGui::EndChild();
+            ImGui::SameLine();
         }
 
         if (ImPlot::BeginPlot("Audio", ImVec2(m_show_xy ? width()-plotheight-10 : -1, -1)))
@@ -954,9 +956,9 @@ public:
                 }
 
                 // THD+N clipping info
-                double range_min[4] = {m_fftfreqs[m_fft_fund_idx_range_min], m_fftfreqs[m_fft_fund_idx_range_min], 0, -200};
+                double range_min[4] = {m_fftfreqs[m_fft_fund_idx_range_min], m_fftfreqs[m_fft_fund_idx_range_min], 200, -200};
                 ImPlot::PlotLine("Cut min", range_min, range_min+2, 2);
-                double range_max[4] = {m_fftfreqs[m_fft_fund_idx_range_max], m_fftfreqs[m_fft_fund_idx_range_max], 0, -200};
+                double range_max[4] = {m_fftfreqs[m_fft_fund_idx_range_max], m_fftfreqs[m_fft_fund_idx_range_max], 200, -200};
                 ImPlot::PlotLine("Cut max", range_max, range_max+2, 2);
             }
 
@@ -1310,11 +1312,6 @@ int main(int argc, char *argv[])
     app->set_app_name("TapeTools");
     Window_SDL *window = new MainWindow;
 
-    ImGui::GetStyle().FrameRounding = 5.0;
-    ImGui::GetStyle().ChildRounding = 5.0;
-    ImGui::GetStyle().WindowRounding = 4.0;
-    ImGui::GetStyle().GrabRounding = 4.0;
-    ImGui::GetStyle().GrabMinSize = 4.0;
     window->set_minimum_window_size(1400, 800);
 
     app->add_window(window);

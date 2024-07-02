@@ -353,7 +353,6 @@ UserEvent::UserEvent()
 	m_event_idx = SDL_RegisterEvents(1);
 	if (m_event_idx != -1){
 		App_SDL::get()->register_user_event(this);
-		printf("Registered ev %d\n", m_event_idx);
 	} else {
 		fprintf(stderr, "Cannot register user event\n");
 	}
@@ -375,10 +374,10 @@ void UserEvent::push(int code, void* data1, void* data2)
 		event.user.data1 = data1;
 		event.user.data2 = data2;
 		if (!SDL_PushEvent(&event)){
-			fprintf(stderr, "Cannot push user event\n");
+			fprintf(stderr, "UserEvent::push : Cannot push user event [1]\n");
 		}
 	} else {
-		fprintf(stderr, "Cannot push user event\n");
+		fprintf(stderr, "UserEvent::push : Cannot push user event [2]\n");
 	}
 }
 
@@ -417,15 +416,13 @@ Widget::draw()
 int
 Widget::width()
 {
-	ImVec2 winsize = ImGui::GetContentRegionAvail();
-	return winsize.x;
+	return ImGui::GetContentRegionAvail().x;
 }
 
 int
 Widget::height()
 {
-	ImVec2 winsize = ImGui::GetContentRegionAvail();
-	return winsize.y;
+	return ImGui::GetContentRegionAvail().y;
 }
 
 ImVec2
@@ -742,7 +739,6 @@ void App_SDL::release_finished_threads()
 		}
 	}
 	for(auto del: del_list){
-		std::cout << "Deleting finished thread... " << std::endl;
 		abort_thread(del);
 	}
 }

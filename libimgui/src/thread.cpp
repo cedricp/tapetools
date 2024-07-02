@@ -5,7 +5,7 @@
 #include <window_sdl.h>
 
 	
-typedef void * (*THREADFUNCPTR)(void *);
+typedef void* (*THREADFUNCPTR)(void*);
 
 #ifdef WIN32
 DWORD WINAPI Thread::run_win32(LPVOID userdata)
@@ -33,23 +33,23 @@ DWORD WINAPI Thread::run_win32(LPVOID userdata)
 }
 
 #else
-void *Thread::run_posix()
+void *Thread::run_posix(void* userdata)
 {
-    while (m_running)
+    Thread *thread = (Thread *)userdata;
+    while (thread->m_running)
     {
-        if (!m_pause)
+        if (!thread->m_pause)
         {
-            entry();
+            thread->entry();
         }
         else
         {
-            usleep(10000U);
+            thread->usleep(10000U);
         }
-        if (!m_loop)
+        if (!thread->m_loop)
             break;
     }
-    m_running = false;
-    m_thread_exit_event.push();
+    thread->m_running = false;
     thread->on_finished();
     pthread_exit(NULL);
     return NULL;
@@ -97,7 +97,7 @@ bool Thread::join(){
         m_thread_id = 0;
         return retcode != 0;
     }
-    return NULL;
+    return false;
 #else
     if (m_thread_handle) {
         DWORD err = WaitForSingleObject(m_thread_handle, INFINITE);

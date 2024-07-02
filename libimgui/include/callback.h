@@ -5,6 +5,8 @@ class Event;
 
 typedef void (*event_cb_t)(Event*, void*);
 
+
+
 #define STATIC_METHOD(methname) static_method_##methname
 
 #define STATIC_CALLBACK_METHOD(methname, ClassType) \
@@ -26,7 +28,8 @@ typedef void (*event_cb_t)(Event*, void*);
 #define DECLARE_VIRTUAL_CALLBACK_METHOD(methname) virtual void methname(Event* sender_object);
 #define DECLARE_METHODS(methname) DECLARE_STATIC_CALLBACK_METHOD(methname) DECLARE_CALLBACK_METHOD(methname)
 #define IMPLEMENT_CALLBACK_METHOD(methname, classname) IMPLEMENT_STATIC_CALLBACK_METHOD(methname, classname) void classname::methname(Event* sender_object)
-#define CALLBACK_METHOD(methname) void methname(Event* sender_object)
+
+#define CALLBACK_METHOD(methname, ClassType) STATIC_CALLBACK_METHOD(methname, ClassType) void methname(Event* sender_object)
 
 /*
  * Callback connection macros
