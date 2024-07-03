@@ -24,7 +24,6 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
     SoundIoChannelArea *areas;
     int err;
     
-    static int old_pitch = -1;
 
     int frames_left = frame_count_max;
     double pitch = udata->m_pitch;
@@ -39,11 +38,6 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
         if (!frame_count)
             break;
 
-        double step = 0;
-        if (old_pitch > 0){
-            step = (pitch - old_pitch) / (double)frame_count;
-        }
-
         const SoundIoChannelLayout *layout = &outstream->layout;
         for (int frame = 0; frame < frame_count; ++frame) {
             double radians_per_second = pitch * 2.0 * M_PI; 
@@ -52,7 +46,6 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
                 write_sample(areas[channel].ptr, sample);
                 areas[channel].ptr += areas[channel].step;
             }
-            pitch += step;
         }
         udata->m_seconds_offset = fmod(udata->m_seconds_offset + seconds_per_frame * frame_count, 1.0);
 
@@ -67,7 +60,7 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
         if (frames_left <= 0)
             break;
     }
-    old_pitch = udata->m_pitch;
+    udata->m_oldpitch = udata->m_pitch;
 }
 
 void audioSineGenerator::error_callback(SoundIoOutStream *outstream, int err)
@@ -83,7 +76,8 @@ void audioSineGenerator::underflow_callback(SoundIoOutStream *outstream) {
 
 audioSineGenerator::audioSineGenerator(){
     m_outstream = nullptr;
-    m_pitch = 440;
+    m_pitch = 1000;
+    m_oldpitch = 1000;
 }
 
 audioSineGenerator::~audioSineGenerator(){
@@ -91,6 +85,9 @@ audioSineGenerator::~audioSineGenerator(){
 }
 
 bool audioSineGenerator::init(audioManager& manager, int device_idx, int samplerate, float latency){
+    m_pitch = 1000;
+    m_oldpitch = 1000;
+
     if (!manager.valid()){
         fprintf(stderr, "audioSine::init : AudioManager not valid\n");
     }

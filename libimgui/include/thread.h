@@ -55,13 +55,13 @@ public:
     }
 };
 
-class AutoLockMutex {
+class ScopedMutex {
     ThreadMutex &m_mutex;
 public:
-    AutoLockMutex(ThreadMutex& mutex) : m_mutex(mutex){
+    ScopedMutex(ThreadMutex& mutex) : m_mutex(mutex){
         m_mutex.lock();
     }
-    ~AutoLockMutex(){
+    ~ScopedMutex(){
         m_mutex.unlock();
     }
 };

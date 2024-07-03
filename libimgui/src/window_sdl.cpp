@@ -215,7 +215,7 @@ void Window_SDL::show(bool show)
 		// ImFont* font = NULL;
 		// ImGuiContext *ref_ctx = (ImGuiContext*)App_SDL::get()->get_ref_imgui_context();
 		ImFontAtlas* atlas = NULL;
-		// atlas = ImGui::GetIO().Fonts;
+		atlas = ImGui::GetIO().Fonts;
 
 		ImGuiContext* current_context = ImGui::GetCurrentContext();
 		_impl->_imguicontext = ImGui::CreateContext(atlas);
@@ -304,7 +304,6 @@ void Window_SDL::draw(bool compute_only)
 		return;
 	set_imgui_context();
 	SDL_GL_MakeCurrent(_impl->_window, _impl->_gl_context);
-	//ImGui_ImplSDL2_Set_Window(_impl->_window);
 	static bool show_demo = true;
     ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.00f);
     ImGuiIO& io = ImGui::GetIO();
@@ -533,7 +532,8 @@ App_SDL::App_SDL() {
     _impl->_refimguicontext = ImGui::CreateContext();
 
 	_impl->_str_configs["APP_PATH"] = get_app_path();
-
+	_implotcontext = ImPlot::CreateContext();
+	
 	atexit(_atexit_);
 }
 
@@ -637,6 +637,34 @@ ImFont* App_SDL::load_font(std::string fontname, float size)
 	return font;
 }
 
+ImFont* App_SDL::load_font_from_memory(const char* data, int memsize, float size)
+{
+	assert(&ImGui::GetIO());
+	ImVector<ImWchar> ranges;
+	ImFontGlyphRangesBuilder builder;
+	builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesDefault());
+	builder.AddChar(0x221E);
+	builder.BuildRanges(&ranges); 
+	ImFont* font = ImGui::GetIO().Fonts->AddFontFromMemoryTTF((void*)data, memsize, size, NULL, ranges.Data, false);
+	assert(font);
+	unsigned char* pixels;
+	int width, height;
+	ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+
+	// Upload texture to graphics system
+	GLuint tex_font;
+	glGenTextures(1, &tex_font);
+	glBindTexture(GL_TEXTURE_2D, tex_font);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+	// Store our identifier
+	//ImGui::GetIO().Fonts->TexID = (void *)(size_t)tex_font;
+
+	return font;
+}
+
 bool App_SDL::handle_timer_events()
 {
 	bool event = false;
@@ -657,7 +685,6 @@ App_SDL* App_SDL::get()
 {
 	if (_APP_INSTANCE_ == 0L){
 		_APP_INSTANCE_ = new App_SDL;
-		_implotcontext = ImPlot::CreateContext();
 	}
 	return _APP_INSTANCE_;
 }
@@ -758,10 +785,11 @@ void App_SDL::run()
         // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
         // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-        SDL_Event event;
 
-        while (SDL_PollEvent(&event))
-        {
+		// Try to lower CPU usage by waiting for events before drawing
+        SDL_Event event;
+		SDL_WaitEventTimeout(NULL, 500);
+        while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_QUIT){
                 goto end;
             }

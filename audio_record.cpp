@@ -137,6 +137,10 @@ void audioRecorder::read_callback(SoundIoInStream *instream, int frame_count_min
 
     int advance_bytes = written_frames * instream->bytes_per_frame;
     ar->m_ring_buffer->advance_write_ptr(advance_bytes);
+    // Pushing this even will awake the main event loop when buffer is full
+    if (ar->m_ring_buffer->free_count() == 0){
+        ar->m_buffer_full_event.push();
+    }
 }
 
 bool audioRecorder::start()

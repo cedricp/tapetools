@@ -8,6 +8,9 @@
 #include <complex>
 #include <thread.h>
 
+extern "C" const char _binary____resources_Hack_Regular_ttf_start[], _binary____resources_Hack_Regular_ttf_end[];
+size_t font_data_size = _binary____resources_Hack_Regular_ttf_end - _binary____resources_Hack_Regular_ttf_start;
+
 uint32_t lcd_fg = IM_COL32(255,0,0,255);
 uint32_t lcd_bg = IM_COL32(0,0,0,255);
 
@@ -105,7 +108,7 @@ class MainWindow2 : public Window_SDL
     }
 };
 
-class AudioToolWindow : public Event, Widget
+class AudioToolWindow : public Widget
 {
     audioManager m_audiomanager;
     audioSineGenerator m_sine_generator;
@@ -114,7 +117,7 @@ class AudioToolWindow : public Event, Widget
     int  m_uitheme = 0;
     
     bool m_sine_generator_switch = false;
-    int  m_pitch = 440;
+    int  m_pitch = 1000;
     float m_sinegen_latency_s = 0.1f;
     int m_recorder_latency_ms = 100;
     int m_sine_volume_db = 0.f;
@@ -253,7 +256,7 @@ public:
         m_sweep_timer.connect_event(STATIC_METHOD(on_timer_event), this);
 
         ThreadTest* t = new ThreadTest;
-        CONNECT_CALLBACK(&t->thread_ev, on_thread_event);
+        t->thread_ev.connect_event(STATIC_METHOD(on_thread_event), this);
         t->start();
     }
 
@@ -834,6 +837,7 @@ public:
 
             ImPlot::EndPlot();
         }
+        
         ImGui::SameLine();
         if (m_show_xy && ImPlot::BeginPlot("X-Y Diagram", ImVec2(plotheight, -1)))
         {
@@ -969,7 +973,6 @@ public:
             if (channelcount>0 && m_fftfreqs)
             {
                 ImPlot::PlotLine("Audio left FFT", m_fftfreqs, m_fftdraw, m_sound_data_x.size()/2);
-
             }
 
             ImPlot::EndPlot();
@@ -1310,6 +1313,7 @@ int main(int argc, char *argv[])
 {
     App_SDL *app = App_SDL::get();
     app->set_app_name("TapeTools");
+    app->load_font_from_memory(_binary____resources_Hack_Regular_ttf_start, font_data_size, 16);
     Window_SDL *window = new MainWindow;
 
     window->set_minimum_window_size(1400, 800);

@@ -1,10 +1,12 @@
 #pragma once
 
 #include "audio_manager.h"
+#include "callback.h"
 
 
 class audioRecorder
 {
+    UserEvent m_buffer_full_event;
     SoundIoInStream *m_instream = nullptr;
     ringBuffer *m_ring_buffer = nullptr;
     bool m_32bits_sampling = true;

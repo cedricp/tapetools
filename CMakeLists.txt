@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.5.0)
-
-
 project(tapetools_project C CXX)
 
 set(CMAKE_MODULE_PATH ${tapetools_project_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 set(CMAKE_INSTALL_PREFIX ${tapetools_project_SOURCE_DIR}/INSTALL_${CMAKE_BUILD_TYPE})
 
+if(UNIX)
 set(OpenGL_GL_PREFERENCE "GLVND")
+endif(UNIX)
 
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
@@ -15,6 +15,7 @@ find_package(FFTW REQUIRED)
 
 message(STATUS "FFTW3 libs ${FFTW_DOUBLE_LIB}")
 message(STATUS "FFTW3 includes ${FFTW_INCLUDE_DIRS}")
+message(STATUS "SLD2 libraries ${SDL2_LIBRARIES}")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-DDEBUG)
@@ -23,10 +24,23 @@ endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 add_subdirectory(libsoundio)
 add_subdirectory(libimgui)
 
-add_executable(tapetools audio_manager.cpp audio_sine_gen.cpp audio_record.cpp utils.cpp main.cpp)
+SET(RESOURCES_FONT_OBJ font.o)
+
+add_custom_command(OUTPUT ${RESOURCES_FONT_OBJ} COMMAND objcopy --input binary --output elf64-x86-64 
+    --rename-section .data=.rodata,CONTENTS,ALLOC,LOAD,READONLY,DATA --binary-architecture i386:x86-64 ../resources/Hack-Regular.ttf font.o)
+
+SET_SOURCE_FILES_PROPERTIES(
+  ${RESOURCES_FONT_OBJ}
+  PROPERTIES
+  EXTERNAL_OBJECT true
+  GENERATED true
+)
+
+add_executable(tapetools ${RESOURCES_FONT_OBJ} audio_manager.cpp audio_sine_gen.cpp audio_record.cpp utils.cpp main.cpp)
 add_compile_definitions(tapetools "SOUNDIO_STATIC_LIBRARY")
 target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libsoundio/include")
-target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} libsoundio_static imgui_static)
+target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} libsoundio_static imgui_static )
+
 if(MINGW)
     set(LINKFLAGS "-static-libgcc -static-libstdc++")
     if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -73,3 +87,4 @@ if(MINGW)
     install(CODE "set(CMAKELIBPATH \"${CMAKE_SYSTEM_LIBRARY_PATH};${CMAKE_MINGW_SYSTEM_LIBRARY_PATH};${MINGWLIBPATH}\")")
     install(SCRIPT ${CONFIG_FILE})
 endif(MINGW)
+

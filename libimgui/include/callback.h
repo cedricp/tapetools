@@ -60,6 +60,8 @@ public:
 	void* get_data2(){
 		return m_userdata2;
 	}
+
+	void connect_event(event_cb_t ev, void* cb_data){set_callback(ev, cb_data);}
 };
 
 class UserEvent : public Event

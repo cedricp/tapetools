@@ -4,7 +4,7 @@
 
 class audioSineGenerator{
     double m_seconds_offset = 0;
-    double m_pitch;
+    double m_pitch, m_oldpitch;
     double m_volume = 1.f;
     SoundIoOutStream *m_outstream = nullptr;
 
