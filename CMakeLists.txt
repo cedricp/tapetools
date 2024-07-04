@@ -26,13 +26,21 @@ endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 add_subdirectory(libsoundio)
 add_subdirectory(libimgui)
 
+# Generate embedded fonts resource
+
 SET(RESOURCES_FONT_OBJ font.o)
 
 add_custom_command(
-    OUTPUT ${RESOURCES_FONT_OBJ} COMMAND objcopy 
-    --input binary --output ${ARCH}
+    OUTPUT ${RESOURCES_FONT_OBJ} 
+    COMMAND ${CMAKE_OBJCOPY}
+    --input-target binary --output-target ${ARCH}
     --rename-section .data=.rodata,CONTENTS,ALLOC,LOAD,READONLY,DATA
     ../resources/Hack-Regular.ttf font.o
+    COMMAND objcopy
+    --redefine-sym _binary____resources_Hack_Regular_ttf_start=_Hack_Regular_ttf_start
+    --redefine-sym _binary____resources_Hack_Regular_ttf_end=_Hack_Regular_ttf_end
+    font.o font.o
+    DEPENDS ../resources/Hack-Regular.ttf
 )
 
 SET_SOURCE_FILES_PROPERTIES(
@@ -42,9 +50,14 @@ SET_SOURCE_FILES_PROPERTIES(
   GENERATED true
 )
 
+# Executable rules
+
 add_executable(tapetools ${RESOURCES_FONT_OBJ} audio_manager.cpp audio_sine_gen.cpp audio_record.cpp utils.cpp main.cpp)
 add_compile_definitions(tapetools "SOUNDIO_STATIC_LIBRARY")
 target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libsoundio/include")
+
+# Link rules
+
 target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} libsoundio_static imgui_static )
 
 if(MINGW)
@@ -55,6 +68,7 @@ if(MINGW)
     set_target_properties(tapetools PROPERTIES LINK_FLAGS "${LINKFLAGS}")
 endif(MINGW)
 
+# Install rules
 
 install (TARGETS tapetools RUNTIME DESTINATION bin)
 

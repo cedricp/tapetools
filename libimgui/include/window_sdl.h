@@ -119,6 +119,8 @@ public:
 	void set_lazy_mode(bool lazy);
 	bool lazy();
 
+	ImFont* load_font_from_memory(const char* data, int memsize, float size);
+
 private:
 	impl *_impl;
 	int _width, _height;

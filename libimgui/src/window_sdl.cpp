@@ -223,6 +223,8 @@ void Window_SDL::show(bool show)
 
 		// Setup Platform/Renderer backends
 		const char* glsl_version = "#version 130";
+		// ImFontAtlas* atlas = NULL;
+		// atlas = ImGui::GetIO().Fonts;
 
 		ImGuiContext* current_context = ImGui::GetCurrentContext();
 		_impl->_imguicontext = ImGui::CreateContext();
@@ -303,6 +305,34 @@ void
 Window_SDL::set_imgui_context()
 {
 	ImGui::SetCurrentContext(_impl->_imguicontext);;
+}
+
+ImFont* Window_SDL::load_font_from_memory(const char* data, int memsize, float size)
+{
+	set_imgui_context();
+	assert(&ImGui::GetIO());
+	ImVector<ImWchar> ranges;
+	ImFontGlyphRangesBuilder builder;
+	builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesDefault());
+	builder.AddChar(0x221E);
+	builder.BuildRanges(&ranges); 
+	ImFont* font = ImGui::GetIO().Fonts->AddFontFromMemoryTTF((void*)data, memsize, size, NULL, ranges.Data, false);
+	assert(font);
+	unsigned char* pixels;
+	int width, height;
+	ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+
+	// Upload texture to graphics system
+	GLuint tex_font;
+	glGenTextures(1, &tex_font);
+	glBindTexture(GL_TEXTURE_2D, tex_font);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+	ImGui::SetCurrentFont(font);
+
+	return font;
 }
 
 void Window_SDL::draw(bool compute_only)

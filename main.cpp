@@ -8,8 +8,8 @@
 #include <complex>
 #include <thread.h>
 
-extern "C" const char _binary____resources_Hack_Regular_ttf_start[], _binary____resources_Hack_Regular_ttf_end[];
-size_t font_data_size = _binary____resources_Hack_Regular_ttf_end - _binary____resources_Hack_Regular_ttf_start;
+extern "C" const char _Hack_Regular_ttf_start[], _Hack_Regular_ttf_end[];
+size_t font_data_size = _Hack_Regular_ttf_end - _Hack_Regular_ttf_start;
 
 uint32_t lcd_fg = IM_COL32(255,0,0,255);
 uint32_t lcd_bg = IM_COL32(0,0,0,255);
@@ -1274,6 +1274,7 @@ public:
     MainWindow() : Window_SDL("TapeTools", 1200, 900)
     {
         m_audiotool = new AudioToolWindow(this);
+        load_font_from_memory(_Hack_Regular_ttf_start, font_data_size, 16);
     }
 
     virtual ~MainWindow()
@@ -1291,7 +1292,6 @@ int main(int argc, char *argv[])
 {
     App_SDL *app = App_SDL::get();
     app->set_app_name("TapeTools");
-    app->load_font_from_memory(_binary____resources_Hack_Regular_ttf_start, font_data_size, 16);
     Window_SDL *window = new MainWindow;
 
     window->set_minimum_window_size(1400, 800);
