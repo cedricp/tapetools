@@ -56,9 +56,9 @@ void *Thread::run_posix(void* userdata)
 }
 #endif
 
-Thread::Thread(std::string name, bool loop) : m_running(false), m_loop(loop), m_thread_id(0), m_name(name)
+Thread::Thread(std::string name, bool loop, bool managed) : m_running(false), m_loop(loop), m_thread_id(0), m_name(name), m_pause(false)
 {
-    App_SDL::get()->add_thread(this);
+    if (managed) App_SDL::get()->add_thread(this);
 }
 
 Thread::~Thread()
@@ -66,7 +66,6 @@ Thread::~Thread()
     m_loop = false;
     stop();
     join();
-    m_running = false;
 }
 
 void Thread::start()

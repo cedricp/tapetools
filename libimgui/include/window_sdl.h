@@ -56,6 +56,8 @@ public:
 	int width(), height();
 	ImVec2 size();
 
+	void update_ui();
+
 	void set_maximized(bool m){_maximized = m;}
 	void set_position(int x, int y){_posx = x; _posy = y;}
 	void set_size(int x, int y){_sizex= x; _sizey = y;}
@@ -112,7 +114,10 @@ public:
 	void get_configuration_float(std::map<std::string, float>& );
 	void set_configuration_float(std::string, float);
 
-	void update_ui(){m_update_event.push();}
+	void update_ui(){m_update_event.push(this,0,UserEvent::CODE_UPDATEUI);}
+
+	void set_lazy_mode(bool lazy);
+	bool lazy();
 
 private:
 	impl *_impl;
@@ -124,7 +129,6 @@ class Thread;
 class App_SDL
 {
 	app_impl* _impl;
-	bool handle_timer_events();
 	void* get_ref_imgui_context();
 	std::string m_appname = "unnamed";
 	App_SDL();

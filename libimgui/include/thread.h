@@ -68,6 +68,7 @@ public:
 
 class Thread
 {
+    volatile bool m_running;
 protected:
     std::string m_name;
 #ifdef WIN32
@@ -78,12 +79,11 @@ protected:
     pthread_t m_thread_id;
     static void* run_posix(void* userdata);
 #endif
-    volatile bool m_running;
     volatile bool m_pause;
     bool m_loop;
 
 public:
-    Thread(std::string name = "default", bool loop = false);
+    Thread(std::string name = "default", bool loop = false, bool managed = true);
     virtual ~Thread();
     void start();
     bool join();
@@ -122,14 +122,14 @@ public:
 class ASyncTask : public Thread
 {
 public:
-    ASyncTask(std::string name = "default") : Thread(name, false){};
+    ASyncTask(std::string name = "defaultasync") : Thread(name, false){};
     virtual ~ASyncTask() {}
 };
 
 class ASyncLoopTask : public Thread
 {
 public:
-    ASyncLoopTask(std::string name = "default") : Thread(name, true){};
+    ASyncLoopTask(std::string name = "defaultasyncloop") : Thread(name, true){};
     virtual ~ASyncLoopTask() {}
     void pause(bool p)
     {

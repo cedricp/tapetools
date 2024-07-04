@@ -68,10 +68,14 @@ class UserEvent : public Event
 {
 	int m_event_idx;
 public:
+	enum UserCode{
+		CODE_NONE = 0,
+		CODE_UPDATEUI = 1000,
+	};
 	UserEvent();
 	~UserEvent();
 
-	void push(int code = 0, void* data1 = 0L, void* data2 = 0L);
+	void push(void* data1 = 0L, void* data2 = 0L, UserCode code = CODE_NONE);
 	void on_callback(void* data1 = 0L, void* data2 = 0L);
 	int get_evt_idx(){return m_event_idx;}
 };

@@ -8,6 +8,8 @@ if(UNIX)
 set(OpenGL_GL_PREFERENCE "GLVND")
 endif(UNIX)
 
+set(ARCH elf64-x86-64)
+
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(SDL2 REQUIRED)
@@ -26,8 +28,12 @@ add_subdirectory(libimgui)
 
 SET(RESOURCES_FONT_OBJ font.o)
 
-add_custom_command(OUTPUT ${RESOURCES_FONT_OBJ} COMMAND objcopy --input binary --output elf64-x86-64 
-    --rename-section .data=.rodata,CONTENTS,ALLOC,LOAD,READONLY,DATA --binary-architecture i386:x86-64 ../resources/Hack-Regular.ttf font.o)
+add_custom_command(
+    OUTPUT ${RESOURCES_FONT_OBJ} COMMAND objcopy 
+    --input binary --output ${ARCH}
+    --rename-section .data=.rodata,CONTENTS,ALLOC,LOAD,READONLY,DATA
+    ../resources/Hack-Regular.ttf font.o
+)
 
 SET_SOURCE_FILES_PROPERTIES(
   ${RESOURCES_FONT_OBJ}

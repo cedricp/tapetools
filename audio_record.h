@@ -30,4 +30,6 @@ public:
     int  get_channel_count();
 
     int get_buffer_size(float time, bool channels_mult = true);
+
+    UserEvent& get_buffer_full_event(){return m_buffer_full_event;}
 };

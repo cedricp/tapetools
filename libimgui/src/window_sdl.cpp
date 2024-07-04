@@ -32,6 +32,7 @@ struct impl
 	bool _is_shown = false;
 	std::string _name;
 	std::string _inifilename;
+	bool lazy_mode = true;
 };
 
 struct app_impl
@@ -170,6 +171,16 @@ void Window_SDL::set_configuration_int(std::string s, int i)
 	}
 }
 
+void Window_SDL::set_lazy_mode(bool lazy)
+{
+	_impl->lazy_mode = lazy;
+}
+
+bool Window_SDL::lazy()
+{
+	return _impl->lazy_mode;
+}
+
 void Window_SDL::get_configuration_float(std::map<std::string, float> &cnf)
 {
 	for (auto win : _impl->widgets)
@@ -212,13 +223,9 @@ void Window_SDL::show(bool show)
 
 		// Setup Platform/Renderer backends
 		const char* glsl_version = "#version 130";
-		// ImFont* font = NULL;
-		// ImGuiContext *ref_ctx = (ImGuiContext*)App_SDL::get()->get_ref_imgui_context();
-		ImFontAtlas* atlas = NULL;
-		atlas = ImGui::GetIO().Fonts;
 
 		ImGuiContext* current_context = ImGui::GetCurrentContext();
-		_impl->_imguicontext = ImGui::CreateContext(atlas);
+		_impl->_imguicontext = ImGui::CreateContext();
 		ImGui::SetCurrentContext(_impl->_imguicontext);
 
 		ImGuiSettingsHandler ui_ini_handler;
@@ -242,7 +249,7 @@ void Window_SDL::show(bool show)
 		if (current_context) ImGui::SetCurrentContext(current_context);
 	}
 	if (!show && _impl->_is_shown){
-		ImGui::SetCurrentContext(_impl->_imguicontext);
+		set_imgui_context();
 		ImGui_ImplOpenGL3_Shutdown();
 		ImGui_ImplSDL2_Shutdown();
 		ImGui::DestroyContext(_impl->_imguicontext);
@@ -363,7 +370,7 @@ UserEvent::~UserEvent()
 		App_SDL::get()->unregister_user_event(this);
 }
 
-void UserEvent::push(int code, void* data1, void* data2)
+void UserEvent::push(void* data1, void* data2, UserCode code)
 {
 	if (m_event_idx != -1){
 		SDL_Event event;
@@ -428,6 +435,11 @@ ImVec2
 Widget::size()
 {
 	return ImGui::GetContentRegionAvail();
+}
+
+void Widget::update_ui()
+{
+	get_underlying_window()->update_ui();
 }
 
 void Widget::draw_widget()
@@ -665,22 +677,6 @@ ImFont* App_SDL::load_font_from_memory(const char* data, int memsize, float size
 	return font;
 }
 
-bool App_SDL::handle_timer_events()
-{
-	bool event = false;
-	auto it_timer = _impl->m_timers.begin();
-	long timestamp = this->timestamp();
-	for (; it_timer < _impl->m_timers.end(); ++it_timer){
-		if ((*it_timer)->is_active()){
-			if (timestamp - (*it_timer)->get_start_time()  >= (*it_timer)->get_time()){
-				(*it_timer)->on_timer_event();
-				event = true;
-			}
-		}
-	}
-	return event;
-}
-
 App_SDL* App_SDL::get()
 {
 	if (_APP_INSTANCE_ == 0L){
@@ -780,15 +776,11 @@ void App_SDL::run()
 
     while (!done)
     {
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
+		std::vector<bool> should_draw(_impl->_windows.size(), false);
 
-		// Try to lower CPU usage by waiting for events before drawing
         SDL_Event event;
 		SDL_WaitEventTimeout(NULL, 500);
+
         while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_QUIT){
                 goto end;
@@ -805,9 +797,9 @@ void App_SDL::run()
 					}
 					if (found >= 0){
 						auto it = _impl->_windows.begin() + found;
-						(*it)->show(false);
 						delete (*it);
 						_impl->_windows.erase(it);
+						should_draw.resize(_impl->_windows.size());
 					}
 					if (_impl->_windows.empty()){
 						goto end;
@@ -815,29 +807,35 @@ void App_SDL::run()
 				}
 			}
 
-        	for(auto window: _impl->_windows){
-        		window->do_event(&event);
-        	}
-
 			// Events handler
 			for (auto user_event: _impl->m_user_events){
 				int idx = user_event->get_evt_idx();
 				if (event.type == idx){
 					user_event->on_callback(event.user.data1, event.user.data2);
+					if (event.user.code == UserEvent::CODE_UPDATEUI){
+						for (int i = 0; i < _impl->_windows.size(); ++i){
+							if (_impl->_windows[i] == event.user.data1){
+								should_draw[i] = true;
+							}
+						}
+					}
 				}
 			}
+
+			int i = 0;
+        	for(auto window: _impl->_windows){
+        		if (window->get_windid() == event.window.windowID) should_draw[i] = should_draw[i] | window->do_event(&event);
+				i++;
+        	}
         }
 		
-		handle_timer_events();
-
-		auto windows = _impl->_windows;
-		for(auto window: windows){
-			window->draw(false);
-		}
-
 		App_SDL::get()->release_finished_threads();
 
-        usleep(5000);
+		auto windows = _impl->_windows;
+		int i = 0;
+		for(auto window: windows){
+			if (should_draw[i++] || !window->lazy()) window->draw(false);
+		}
     }
 	end:;
 }

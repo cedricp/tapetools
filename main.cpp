@@ -53,34 +53,13 @@ void digit(ImDrawList*d,int n,ImVec2 e,ImVec2 p)
 #undef v
 #undef draw_poly
 
-class ThreadTest : public ASyncLoopTask{
-public:
-    UserEvent thread_ev;
-    ThreadTest() : ASyncLoopTask("testthread"){
-
-    }
-
-    void entry() override {
-        usleep(100000);
-        static int num = 0;
-        thread_ev.push(0, (void*)num);
-        num++;
-        if (num > 5){
-            stop();
-        }
-    }
-
-    void on_finished() override {
-        printf("Thread finished!\n");
-    }
-};
-
 class MainWindow2 : public Window_SDL
 {
     class Test : public Widget {
         public:
         Test(Window_SDL *win) : Widget(win, "Test")
         {
+            
         }
         ~Test(){
 
@@ -96,6 +75,7 @@ class MainWindow2 : public Window_SDL
     MainWindow2() : Window_SDL("Test2", 1200, 900)
     {
         test = new Test(this);
+        set_lazy_mode(false);
     }
 
     virtual ~MainWindow2()
@@ -211,8 +191,6 @@ class AudioToolWindow : public Widget
             return;
         }
 
-        compute();
-
         int min_freq_idx = std::max(int((m_sweep_current_frequency-500)*fft_step), 0);
         int max_freq_idx = std::min(int((m_sweep_current_frequency+500)*fft_step), m_capture_size / 2);
 
@@ -230,6 +208,17 @@ class AudioToolWindow : public Widget
         m_sweep_current_frequency += m_sweep_span;
         m_sine_generator.set_pitch(m_sweep_current_frequency);
         m_sweep_timer.start();
+        update_ui();
+    }
+
+    CALLBACK_METHOD(on_recorder_data_ready, AudioToolWindow)
+    {
+        if (!m_pause_compute && compute() && m_compute_thd)
+        {
+            compute_thd();
+            compute_thdn();
+        }
+        update_ui();
     }
 
 public:
@@ -240,6 +229,10 @@ public:
         set_resizable(false);
         set_titlebar(false);
         compute_fft_window_corrections();
+
+        //get_underlying_window()->set_lazy_mode(false);
+
+        m_audiorecorder.get_buffer_full_event().connect_event(STATIC_METHOD(on_recorder_data_ready), this);
 
         m_audiomanager.flush();
 
@@ -254,10 +247,6 @@ public:
         reinit_recorder();
 
         m_sweep_timer.connect_event(STATIC_METHOD(on_timer_event), this);
-
-        ThreadTest* t = new ThreadTest;
-        t->thread_ev.connect_event(STATIC_METHOD(on_thread_event), this);
-        t->start();
     }
 
     virtual ~AudioToolWindow()
@@ -435,7 +424,6 @@ public:
         reset_sine_generator();
         m_sine_generator.set_pitch(m_sweep_current_frequency);
         m_sweep_timer.start();
-        //m_pause_compute = true;
     }
 
     void stop_sweep_gen()
@@ -444,7 +432,6 @@ public:
         m_sine_generator_switch = false;
         m_sine_generator.pause();
         m_sweep_timer.stop();
-        //m_pause_compute = false;
     }
 
     void set_window_fn(bool compute_cache = true)
@@ -485,8 +472,6 @@ public:
 
     void draw_sweep_tab()
     {
-        if(!m_pause_compute) compute();
-
         int channelcount = m_audiorecorder.get_channel_count(); 
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
         float frameh = ImGui::GetFrameHeightWithSpacing();
@@ -604,13 +589,6 @@ public:
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
         bool must_reinit_recorder = false;
 
-        if (!m_pause_compute && compute() && m_compute_thd)
-        {
-            compute_thd();
-            compute_thdn();
-        }
-
-
         float frameh = ImGui::GetFrameHeightWithSpacing();
         float padh = 3.0f * ImGui::GetStyle().FramePadding.y + ImGui::GetStyle().ItemSpacing.y;
 
@@ -643,11 +621,11 @@ public:
         ImGui::EndChild();
 
 
-        // ImGui::SameLine();
-        // if(ImGui::Button("test")){
-        //     MainWindow2* win = new MainWindow2;
-        //     App_SDL::get()->add_window(win);
-        // }
+        ImGui::SameLine();
+        if(ImGui::Button("test")){
+            MainWindow2* win = new MainWindow2;
+            App_SDL::get()->add_window(win);
+        }
 
         ImGui::EndChild();
 
