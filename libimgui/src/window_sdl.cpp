@@ -197,6 +197,11 @@ void Window_SDL::set_configuration_float(std::string s, float f)
 	}
 }
 
+unsigned long Window_SDL::timestamp()
+{
+	return App_SDL::get()->timestamp();
+}
+
 void Window_SDL::show(bool show)
 {
 	if (show && !_impl->_is_shown){
@@ -554,7 +559,7 @@ static void _atexit_(){
 }
 
 App_SDL::App_SDL() {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0)
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
     {
         printf("Error: %s\n", SDL_GetError());
         exit(-1);
@@ -623,31 +628,35 @@ void App_SDL::add_window(Window_SDL* win) {
 
 void App_SDL::register_user_event(UserEvent* ev) {
 	auto it = std::find(_impl->m_user_events.begin(), _impl->m_user_events.end(), ev);
-	if (it != _impl->m_user_events.end())
+	if (it != _impl->m_user_events.end()){
 		return;
+	}
 	_impl->m_user_events.push_back(ev);
 }
 
 void App_SDL::unregister_user_event(UserEvent* ev) {
 	auto it = std::find(_impl->m_user_events.begin(),_impl->m_user_events.end(), ev);
-	if (it == _impl->m_user_events.end())
+	if (it == _impl->m_user_events.end()){
 		return;
+	}
 	_impl->m_user_events.erase(it);
 }
 
 void App_SDL::register_timer(Timer* t)
 {
 	auto it = std::find(_impl->m_timers.begin(), _impl->m_timers.end(), t);
-	if (it != _impl->m_timers.end())
+	if (it != _impl->m_timers.end()){
 		return;
+	}
 	_impl->m_timers.push_back(t);
 }
 
 void App_SDL::unregister_timer(Timer* t)
 {
 	auto it = std::find(_impl->m_timers.begin(), _impl->m_timers.end(), t);
-	if (it == _impl->m_timers.end())
+	if (it == _impl->m_timers.end()){
 		return;
+	}
 	_impl->m_timers.erase(it);
 }
 
@@ -798,18 +807,16 @@ void App_SDL::release_finished_threads()
 
 void App_SDL::run()
 {
-    bool done = false;
-
     for(auto window: _impl->_windows){
 		window->draw();
 	}
 
+    bool done = false;
+	bool sleep_mode = false;
     while (!done)
     {
-		std::vector<bool> should_draw(_impl->_windows.size(), false);
-
         SDL_Event event;
-		SDL_WaitEventTimeout(NULL, 500);
+		if (sleep_mode) SDL_WaitEventTimeout(NULL, 500);
 
         while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_QUIT){
@@ -829,7 +836,6 @@ void App_SDL::run()
 						auto it = _impl->_windows.begin() + found;
 						delete (*it);
 						_impl->_windows.erase(it);
-						should_draw.resize(_impl->_windows.size());
 					}
 					if (_impl->_windows.empty()){
 						goto end;
@@ -843,28 +849,36 @@ void App_SDL::run()
 				if (event.type == idx){
 					user_event->on_callback(event.user.data1, event.user.data2);
 					if (event.user.code == UserEvent::CODE_UPDATEUI){
-						for (int i = 0; i < _impl->_windows.size(); ++i){
-							if (_impl->_windows[i] == event.user.data1){
-								should_draw[i] = true;
+						for (auto window : _impl->_windows){
+							if (window == event.user.data1){
+								window->set_last_event_time();
 							}
 						}
 					}
 				}
 			}
 
-			int i = 0;
         	for(auto window: _impl->_windows){
-        		if (window->get_windid() == event.window.windowID) should_draw[i] = should_draw[i] | window->do_event(&event);
-				i++;
+				bool win_event = window->do_event(&event);
+				if (win_event){
+					window->set_last_event_time();
+				}
         	}
         }
 		
 		App_SDL::get()->release_finished_threads();
 
+		sleep_mode = true;
+		unsigned long current_time = App_SDL::get()->timestamp();
+
 		auto windows = _impl->_windows;
-		int i = 0;
 		for(auto window: windows){
-			if (should_draw[i++] || !window->lazy()) window->draw(false);
+			unsigned long event_time = current_time - window->last_event_time();
+			bool force_draw = event_time < 100;
+			if (!window->lazy() || force_draw){
+				window->draw(false);
+				sleep_mode = false;
+			} 
 		}
     }
 	end:;

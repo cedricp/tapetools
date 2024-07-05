@@ -8,8 +8,8 @@
 #include <complex>
 #include <thread.h>
 
-extern "C" const char _Hack_Regular_ttf_start[], _Hack_Regular_ttf_end[];
-size_t font_data_size = _Hack_Regular_ttf_end - _Hack_Regular_ttf_start;
+extern "C" const unsigned char _Hack_Regular_ttf_start[];
+extern "C" const unsigned char _Hack_Regular_ttf_end[];
 
 uint32_t lcd_fg = IM_COL32(255,0,0,255);
 uint32_t lcd_bg = IM_COL32(0,0,0,255);
@@ -151,7 +151,7 @@ class AudioToolWindow : public Widget
     double  m_thdn = 0;
     double  m_thddb = 0;
 
-    double   m_rms_left, m_rms_right;
+    double  m_rms_left = 0, m_rms_right = 0;
     bool    m_show_rms_voltage = false;
 
     bool    m_sweep_started = false;
@@ -1274,7 +1274,8 @@ public:
     MainWindow() : Window_SDL("TapeTools", 1200, 900)
     {
         m_audiotool = new AudioToolWindow(this);
-        load_font_from_memory(_Hack_Regular_ttf_start, font_data_size, 16);
+        size_t font_data_size = _Hack_Regular_ttf_end - _Hack_Regular_ttf_start;
+        load_font_from_memory((const char*)_Hack_Regular_ttf_start, font_data_size, 16);
     }
 
     virtual ~MainWindow()

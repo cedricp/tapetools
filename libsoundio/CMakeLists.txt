@@ -171,9 +171,9 @@ set(LIBSOUNDIO_LIBS
 
 set(LIB_CFLAGS "-std=c11 -fvisibility=hidden -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_REENTRANT -D_POSIX_C_SOURCE=200809L -Wno-missing-braces")
 
-add_library(libsoundio_static STATIC ${LIBSOUNDIO_SOURCES})
-target_link_libraries(libsoundio_static LINK_PUBLIC ${LIBSOUNDIO_LIBS} m)
-set_target_properties(libsoundio_static PROPERTIES
+add_library(soundio_static STATIC ${LIBSOUNDIO_SOURCES})
+target_link_libraries(soundio_static LINK_PUBLIC ${LIBSOUNDIO_LIBS} m)
+set_target_properties(soundio_static PROPERTIES
         COMPILE_FLAGS ${LIB_CFLAGS}
         LINKER_LANGUAGE C
     )

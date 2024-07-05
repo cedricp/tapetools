@@ -1,6 +1,8 @@
 #pragma once
 
+extern "C"{
 #include <soundio.h>
+}
 #include <iostream>
 #include <map>
 #include <vector>

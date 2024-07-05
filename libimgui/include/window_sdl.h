@@ -92,6 +92,7 @@ public:
 class Window_SDL
 {
 	UserEvent m_update_event;
+	unsigned long m_last_event_time = 0;
 public:
 	Window_SDL(std::string name, int width = 800, int height=600, bool fullscreen = false);
 	virtual ~Window_SDL();
@@ -113,6 +114,7 @@ public:
 
 	void get_configuration_float(std::map<std::string, float>& );
 	void set_configuration_float(std::string, float);
+	unsigned long timestamp();
 
 	void update_ui(){m_update_event.push(this,0,UserEvent::CODE_UPDATEUI);}
 
@@ -120,6 +122,8 @@ public:
 	bool lazy();
 
 	ImFont* load_font_from_memory(const char* data, int memsize, float size);
+	void set_last_event_time(){m_last_event_time = timestamp();}
+	unsigned long last_event_time(){return m_last_event_time;}
 
 private:
 	impl *_impl;
