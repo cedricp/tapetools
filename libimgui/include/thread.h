@@ -9,7 +9,7 @@
 #include <pthread.h>
 #endif
 
-#include "callback.h"
+#include "string"
 
 class ThreadMutex
 {
@@ -55,28 +55,40 @@ public:
     }
 };
 
+class ScopedMutex {
+    ThreadMutex &m_mutex;
+public:
+    ScopedMutex(ThreadMutex& mutex) : m_mutex(mutex){
+        m_mutex.lock();
+    }
+    ~ScopedMutex(){
+        m_mutex.unlock();
+    }
+};
+
 class Thread
 {
+    volatile bool m_running;
 protected:
-    UserEvent m_thread_exit_event;
+    std::string m_name;
 #ifdef WIN32
     DWORD m_thread_id;
     HANDLE m_thread_handle = NULL;
     static DWORD WINAPI run_win32(LPVOID userdata);
 #else
     pthread_t m_thread_id;
-    void* run_posix();
+    static void* run_posix(void* userdata);
 #endif
-    volatile bool m_running;
     volatile bool m_pause;
     bool m_loop;
 
 public:
-    Thread(bool loop);
+    Thread(std::string name = "default", bool loop = false, bool managed = true);
     virtual ~Thread();
     void start();
     bool join();
     void usleep(unsigned long us);
+    const std::string& name(){return m_name;}
 
     /*
      * Main thread code
@@ -84,7 +96,7 @@ public:
      */
     virtual void entry() = 0;
 
-    virtual void on_exit_event(Event* sender_object, void* data){}
+    virtual void on_finished(){}
 
     void stop()
     {
@@ -96,20 +108,28 @@ public:
         return m_running;
     }
 
-    DECLARE_STATIC_CALLBACK_METHOD(on_exit_event)
+    void pause(bool p = true)
+    {
+        m_pause = p;
+    }
+
+    bool is_paused()
+    {
+        return m_pause;
+    }
 };
 
 class ASyncTask : public Thread
 {
 public:
-    ASyncTask() : Thread(false){};
+    ASyncTask(std::string name = "defaultasync") : Thread(name, false){};
     virtual ~ASyncTask() {}
 };
 
 class ASyncLoopTask : public Thread
 {
 public:
-    ASyncLoopTask() : Thread(true){};
+    ASyncLoopTask(std::string name = "defaultasyncloop") : Thread(name, true){};
     virtual ~ASyncLoopTask() {}
     void pause(bool p)
     {

@@ -40,11 +40,17 @@ bool audioRecorder::init(float latency, int device_idx, int samplerate)
         return false;
     }
 
-    m_instream = m_manager.get_in_stream(latency, samplerate, SoundIoFormatS16NE, device_idx);
-    fprintf(stderr, "audioRecorder::init : new stream %d\n", samplerate);
+    m_32bits_sampling = true;
+    m_instream = m_manager.get_in_stream(latency, samplerate, SoundIoFormatFloat32LE, device_idx);
+
+    if (m_instream == nullptr){
+        m_instream = m_manager.get_in_stream(latency, samplerate, SoundIoFormatS16NE, device_idx);
+        m_32bits_sampling = false;
+    }
     if (m_instream == nullptr){
         return false;
     }
+    fprintf(stderr, "audioRecorder::init [%s] : new stream %d\n", m_32bits_sampling ? "32 bits float" : "16 bits",  samplerate);
 
     m_instream->userdata = (void*)this; 
     m_instream->read_callback = this->read_callback;
@@ -55,7 +61,7 @@ bool audioRecorder::init(float latency, int device_idx, int samplerate)
         return false;
     }
 
-    int capacity = get_buffer_size(latency) * sizeof(short);
+    int capacity = get_buffer_size(latency) * m_instream->bytes_per_sample;
     m_ring_buffer = m_manager.get_new_ringbuffer(capacity);
 
     return true;
@@ -131,6 +137,11 @@ void audioRecorder::read_callback(SoundIoInStream *instream, int frame_count_min
 
     int advance_bytes = written_frames * instream->bytes_per_frame;
     ar->m_ring_buffer->advance_write_ptr(advance_bytes);
+    
+    // Pushing this even will awake the main event loop when buffer is full
+    if (ar->m_ring_buffer->free_count() == 0){
+        ar->m_buffer_full_event.push();
+    }
 }
 
 bool audioRecorder::start()
@@ -160,14 +171,22 @@ void audioRecorder::get_data(std::vector<double>& data, size_t size)
     }
 
     size_t fill_bytes = m_ring_buffer->fill_count();
-    int16_t *read_buf = (int16_t*)m_ring_buffer->read_ptr();
 
     if (data.size() != size) data.resize(size, 0);
 
-    constexpr double inv16 = 1.0 / double(INT16_MAX);
-    for (int i = 0; i < size; ++i){
-        data[i] = read_buf[i] * inv16;
+    if (!m_32bits_sampling){
+        int16_t *read_buf = (int16_t*)m_ring_buffer->read_ptr();
+        constexpr double inv16 = 1.0 / double(INT16_MAX);
+        for (int i = 0; i < size; ++i){
+            data[i] = read_buf[i] * inv16;
+        }
+    } else {
+        float *read_buf = (float*)m_ring_buffer->read_ptr();
+        for (int i = 0; i < size; ++i){
+            data[i] = read_buf[i];
+        }
     }
+
     m_ring_buffer->advance_read_ptr(fill_bytes);
 }
 

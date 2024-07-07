@@ -7,6 +7,7 @@
 
 #include "imgui.h"
 #include "implot.h"
+#include "callback.h"
 
 class Timer;
 class UserEvent;
@@ -55,6 +56,8 @@ public:
 	int width(), height();
 	ImVec2 size();
 
+	void update_ui();
+
 	void set_maximized(bool m){_maximized = m;}
 	void set_position(int x, int y){_posx = x; _posy = y;}
 	void set_size(int x, int y){_sizex= x; _sizey = y;}
@@ -88,6 +91,8 @@ public:
 
 class Window_SDL
 {
+	UserEvent m_update_event;
+	unsigned long m_last_event_time = 0;
 public:
 	Window_SDL(std::string name, int width = 800, int height=600, bool fullscreen = false);
 	virtual ~Window_SDL();
@@ -109,17 +114,29 @@ public:
 
 	void get_configuration_float(std::map<std::string, float>& );
 	void set_configuration_float(std::string, float);
+	unsigned long timestamp();
+
+	void update_ui(){m_update_event.push(this,0,UserEvent::CODE_UPDATEUI);}
+
+	void set_lazy_mode(bool lazy);
+	bool lazy();
+
+	ImFont* load_font_from_memory(const char* data, int memsize, float size);
+	void set_last_event_time(){m_last_event_time = timestamp();}
+	unsigned long last_event_time(){return m_last_event_time;}
 
 private:
 	impl *_impl;
 	int _width, _height;
 };
 
+class Thread;
+
 class App_SDL
 {
 	app_impl* _impl;
-	bool handle_timer_events();
 	void* get_ref_imgui_context();
+	std::string m_appname = "unnamed";
 	App_SDL();
 	~App_SDL();
 public:
@@ -127,13 +144,20 @@ public:
 #ifdef IMP_METHOD
 	void destroy();
 #endif
+	void set_app_name(std::string name){ m_appname = name; }
 	ImFont* load_font(std::string fontname, float size);
+	ImFont* load_font_from_memory(const char* data, int memsize, float size);
 	void register_user_event(UserEvent* ev);
 	void unregister_user_event(UserEvent* ev);
 	void register_timer(Timer* t);
 	void unregister_timer(Timer* t);
 	unsigned long timestamp(void);
 	std::string get_app_path();
+	void add_thread(Thread*);
+	Thread* get_thread(std::string name);
+	bool abort_thread(std::string name);
+	void release_finished_threads();
+	void pause_thread(std::string name, bool pause = true);
 
 	void set_str_config(std::string key, std::string val);
 	std::string get_str_config(std::string key);

@@ -3,39 +3,39 @@
 
 class Event;
 
-typedef void (*event_cb_t)(Event*, void*, void*);
+typedef void (*event_cb_t)(Event*, void*);
+
+
+
+#define STATIC_METHOD(methname) static_method_##methname
 
 #define STATIC_CALLBACK_METHOD(methname, ClassType) \
-	static void static_method_##methname(Event* base, void* data, void* class_instance) \
+	static void STATIC_METHOD(methname)(Event* base, void* class_instance) \
 	{ \
-		((ClassType *)class_instance)->methname(base, data); \
+		((ClassType *)class_instance)->methname(base); \
 	}
 
 #define DECLARE_STATIC_CALLBACK_METHOD(methname) \
-	static void static_method_##methname(Event* base, void* data, void* class_instance);
+	static void STATIC_METHOD(methname)(Event* base, void* class_instance);
 
 #define IMPLEMENT_STATIC_CALLBACK_METHOD(methname, ClassType) \
-	void ClassType::static_method_##methname(Event* base, void* data, void* class_instance) \
+	void ClassType::STATIC_METHOD(methname)(Event* base, void* class_instance) \
 	{ \
-		((ClassType *)class_instance)->methname(base, data); \
+		((ClassType *)class_instance)->methname(base); \
 	}
-#define DECLARE_CALLBACK_METHOD(methname) void methname(Event* sender_object, void* data);
-#define DECLARE_VIRTUAL_CALLBACK_METHOD(methname) virtual void methname(Event* sender_object, void* data);
+
+#define DECLARE_CALLBACK_METHOD(methname) void methname(Event* sender_object);
+#define DECLARE_VIRTUAL_CALLBACK_METHOD(methname) virtual void methname(Event* sender_object);
 #define DECLARE_METHODS(methname) DECLARE_STATIC_CALLBACK_METHOD(methname) DECLARE_CALLBACK_METHOD(methname)
+#define IMPLEMENT_CALLBACK_METHOD(methname, classname) IMPLEMENT_STATIC_CALLBACK_METHOD(methname, classname) void classname::methname(Event* sender_object)
 
-#define IMPLEMENT_CALLBACK_METHOD(methname, classname) IMPLEMENT_STATIC_CALLBACK_METHOD(methname, classname) void classname::methname(Event* sender_object, void* data)
-
-/*
- * Callback method macro
- */
-#define CALLBACK_METHOD(methname) void methname(Event* sender_object, void* data)
-
+#define CALLBACK_METHOD(methname, ClassType) STATIC_CALLBACK_METHOD(methname, ClassType) void methname(Event* sender_object)
 
 /*
  * Callback connection macros
  */
-#define CONNECT_CALLBACK(base, methname) base->set_callback(static_method_##methname, (void*)this);
-#define CONNECT_CALLBACK2(base, methname, class_instance) base->set_callback(static_method_##methname, (void*)class_instance);
+#define CONNECT_CALLBACK(base, methname) (base)->set_callback(STATIC_METHOD(methname), (void*)this);
+#define CONNECT_CALLBACK2(base, methname, class_instance) base->set_callback(STATIC_METHOD(methname), (void*)class_instance);
 #define RESET_CALLBACK(base) base->set_callback(NULL, NULL);
 
 class Event {
@@ -60,16 +60,22 @@ public:
 	void* get_data2(){
 		return m_userdata2;
 	}
+
+	void connect_event(event_cb_t ev, void* cb_data){set_callback(ev, cb_data);}
 };
 
 class UserEvent : public Event
 {
 	int m_event_idx;
 public:
+	enum UserCode{
+		CODE_NONE = 0,
+		CODE_UPDATEUI = 1000,
+	};
 	UserEvent();
 	~UserEvent();
 
-	void push(int code = 0, void* data1 = 0L, void* data2 = 0L);
+	void push(void* data1 = 0L, void* data2 = 0L, UserCode code = CODE_NONE);
 	void on_callback(void* data1 = 0L, void* data2 = 0L);
 	int get_evt_idx(){return m_event_idx;}
 };

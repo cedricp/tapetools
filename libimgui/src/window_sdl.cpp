@@ -7,6 +7,7 @@
 #include <GL/glew.h>
 #include <SDL.h>
 #include <SDL_opengl.h>
+#include <thread.h>
 
 #include <time.h>
 #include <sys/time.h>
@@ -31,6 +32,7 @@ struct impl
 	bool _is_shown = false;
 	std::string _name;
 	std::string _inifilename;
+	bool lazy_mode = true;
 };
 
 struct app_impl
@@ -40,6 +42,7 @@ struct app_impl
 	std::vector<Timer*> m_timers;
 	ImGuiContext* _refimguicontext = 0L;
 	std::map< std::string, std::string > _str_configs;
+	std::vector<Thread*> _threadpool;
 };
 
 
@@ -88,17 +91,18 @@ static void UISettingsHandler_WriteAll(ImGuiContext *ctx, ImGuiSettingsHandler *
 	wsdl->get_configuration_int(mapint);
 	wsdl->get_configuration_float(mapfloat);
 
-	if (mapint.size() == 0){
-		return;
+	if (!mapint.empty()){
+		buf->appendf("[%s][SettingsI]\n", handler->TypeName);
+		for (std::pair<std::string, int> cnf: mapint){
+			buf->appendf("%s=%i\n", cnf.first.c_str(), cnf.second);
+		}
 	}
 
-	buf->appendf("[%s][SettingsI]\n", handler->TypeName);
-	for (std::pair<std::string, int> cnf: mapint){
-		buf->appendf("%s=%i\n", cnf.first.c_str(), cnf.second);
-	}
-	buf->appendf("[%s][SettingsF]\n", handler->TypeName);
-	for (std::pair<std::string, float> cnf: mapfloat){
-		buf->appendf("%s=%f\n", cnf.first.c_str(), cnf.second);
+	if (!mapfloat.empty()){
+		buf->appendf("[%s][SettingsF]\n", handler->TypeName);
+		for (std::pair<std::string, float> cnf: mapfloat){
+			buf->appendf("%s=%f\n", cnf.first.c_str(), cnf.second);
+		}
 	}
 }
 
@@ -146,7 +150,6 @@ Window_SDL::Window_SDL(std::string name, int width, int height, bool fullscreen)
 Window_SDL::~Window_SDL()
 {
 	show(false);
-	//ImGui::DestroyContext(_impl->_imguicontext);
 	for (auto win: _impl->widgets){
 		delete win;
 	}
@@ -168,6 +171,16 @@ void Window_SDL::set_configuration_int(std::string s, int i)
 	}
 }
 
+void Window_SDL::set_lazy_mode(bool lazy)
+{
+	_impl->lazy_mode = lazy;
+}
+
+bool Window_SDL::lazy()
+{
+	return _impl->lazy_mode;
+}
+
 void Window_SDL::get_configuration_float(std::map<std::string, float> &cnf)
 {
 	for (auto win : _impl->widgets)
@@ -182,6 +195,11 @@ void Window_SDL::set_configuration_float(std::string s, float f)
 	{
 		win->set_configuration_float(s, f);
 	}
+}
+
+unsigned long Window_SDL::timestamp()
+{
+	return App_SDL::get()->timestamp();
 }
 
 void Window_SDL::show(bool show)
@@ -210,18 +228,17 @@ void Window_SDL::show(bool show)
 
 		// Setup Platform/Renderer backends
 		const char* glsl_version = "#version 130";
-		// ImFont* font = NULL;
-		// ImGuiContext *ref_ctx = (ImGuiContext*)App_SDL::get()->get_ref_imgui_context();
-		ImFontAtlas* atlas = NULL;
+		// ImFontAtlas* atlas = NULL;
 		// atlas = ImGui::GetIO().Fonts;
 
-		_impl->_imguicontext = ImGui::CreateContext(atlas);
+		ImGuiContext* current_context = ImGui::GetCurrentContext();
+		_impl->_imguicontext = ImGui::CreateContext();
 		ImGui::SetCurrentContext(_impl->_imguicontext);
 
 		ImGuiSettingsHandler ui_ini_handler;
 		ui_ini_handler.UserData = this;
-		ui_ini_handler.TypeName = "TapeTools";
-		ui_ini_handler.TypeHash = ImHashStr("TapeTools");
+		ui_ini_handler.TypeName = _impl->_name.c_str();
+		ui_ini_handler.TypeHash = ImHashStr(_impl->_name.c_str());
 		ui_ini_handler.ReadOpenFn = UISettingsHandler_ReadOpen;
 		ui_ini_handler.ReadLineFn = UISettingsHandler_ReadLine;
 		ui_ini_handler.WriteAllFn = UISettingsHandler_WriteAll;
@@ -232,14 +249,14 @@ void Window_SDL::show(bool show)
 
 		// Setup Dear ImGui style
 		ImGui::StyleColorsDark();
-		//ImGui::StyleColorsClassic();
 		_impl->_is_shown = true;
 
 		_impl->_inifilename = _impl->_name + ".ini";
 		ImGui::GetIO().IniFilename = _impl ->_inifilename.c_str();
+		if (current_context) ImGui::SetCurrentContext(current_context);
 	}
 	if (!show && _impl->_is_shown){
-		ImGui::SetCurrentContext(_impl->_imguicontext);
+		set_imgui_context();
 		ImGui_ImplOpenGL3_Shutdown();
 		ImGui_ImplSDL2_Shutdown();
 		ImGui::DestroyContext(_impl->_imguicontext);
@@ -295,13 +312,40 @@ Window_SDL::set_imgui_context()
 	ImGui::SetCurrentContext(_impl->_imguicontext);;
 }
 
+ImFont* Window_SDL::load_font_from_memory(const char* data, int memsize, float size)
+{
+	set_imgui_context();
+	assert(&ImGui::GetIO());
+	ImVector<ImWchar> ranges;
+	ImFontGlyphRangesBuilder builder;
+	builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesDefault());
+	builder.AddChar(0x221E);
+	builder.BuildRanges(&ranges); 
+	ImFont* font = ImGui::GetIO().Fonts->AddFontFromMemoryTTF((void*)data, memsize, size, NULL, ranges.Data, false);
+	assert(font);
+	unsigned char* pixels;
+	int width, height;
+	ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+
+	// Upload texture to graphics system
+	GLuint tex_font;
+	glGenTextures(1, &tex_font);
+	glBindTexture(GL_TEXTURE_2D, tex_font);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+	ImGui::SetCurrentFont(font);
+
+	return font;
+}
+
 void Window_SDL::draw(bool compute_only)
 {
 	if (!_impl->_is_shown)
 		return;
 	set_imgui_context();
 	SDL_GL_MakeCurrent(_impl->_window, _impl->_gl_context);
-	//ImGui_ImplSDL2_Set_Window(_impl->_window);
 	static bool show_demo = true;
     ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.00f);
     ImGuiIO& io = ImGui::GetIO();
@@ -340,24 +384,19 @@ bool Window_SDL::do_event(void* ev)
 	if (!_impl->_is_shown)
 		return false;
 	SDL_Event* event = (SDL_Event*)ev;
-	if (event->window.windowID != get_windid())
-		return false;
 	set_imgui_context();
 	bool evok = ImGui_ImplSDL2_ProcessEvent(event);
-	if (event->type == SDL_WINDOWEVENT && event->window.event == SDL_WINDOWEVENT_CLOSE && event->window.windowID == get_windid()){
-		show(false);
-		evok = true;
-	}
 	return evok;
 }
 
 UserEvent::UserEvent()
 {
 	m_event_idx = SDL_RegisterEvents(1);
-	if (m_event_idx != -1)
+	if (m_event_idx != -1){
 		App_SDL::get()->register_user_event(this);
-	else
+	} else {
 		fprintf(stderr, "Cannot register user event\n");
+	}
 }
 
 UserEvent::~UserEvent()
@@ -366,7 +405,7 @@ UserEvent::~UserEvent()
 		App_SDL::get()->unregister_user_event(this);
 }
 
-void UserEvent::push(int code, void* data1, void* data2)
+void UserEvent::push(void* data1, void* data2, UserCode code)
 {
 	if (m_event_idx != -1){
 		SDL_Event event;
@@ -375,9 +414,11 @@ void UserEvent::push(int code, void* data1, void* data2)
 		event.user.code = code;
 		event.user.data1 = data1;
 		event.user.data2 = data2;
-		SDL_PushEvent(&event);
+		if (!SDL_PushEvent(&event)){
+			fprintf(stderr, "UserEvent::push : Cannot push user event [1]\n");
+		}
 	} else {
-		fprintf(stderr, "Cannot push user event\n");
+		fprintf(stderr, "UserEvent::push : Cannot push user event [2]\n");
 	}
 }
 
@@ -388,7 +429,7 @@ UserEvent::on_callback(void* data1, void* data2)
 	if (m_callback){
 		m_userdata1 = data1;
 		m_userdata2 = data2;
-		m_callback(this, (void*)this, m_callback_data);
+		m_callback(this, m_callback_data);
 	}
 }
 
@@ -416,21 +457,24 @@ Widget::draw()
 int
 Widget::width()
 {
-	ImVec2 winsize = ImGui::GetContentRegionAvail();
-	return winsize.x;
+	return ImGui::GetContentRegionAvail().x;
 }
 
 int
 Widget::height()
 {
-	ImVec2 winsize = ImGui::GetContentRegionAvail();
-	return winsize.y;
+	return ImGui::GetContentRegionAvail().y;
 }
 
 ImVec2
 Widget::size()
 {
 	return ImGui::GetContentRegionAvail();
+}
+
+void Widget::update_ui()
+{
+	get_underlying_window()->update_ui();
 }
 
 void Widget::draw_widget()
@@ -515,7 +559,7 @@ static void _atexit_(){
 }
 
 App_SDL::App_SDL() {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0)
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
     {
         printf("Error: %s\n", SDL_GetError());
         exit(-1);
@@ -535,14 +579,18 @@ App_SDL::App_SDL() {
     _impl->_refimguicontext = ImGui::CreateContext();
 
 	_impl->_str_configs["APP_PATH"] = get_app_path();
-
+	_implotcontext = ImPlot::CreateContext();
+	
 	atexit(_atexit_);
 }
 
 
 App_SDL::~App_SDL() {
+	for (auto thread: _impl->_threadpool){
+		delete thread;
+	}
+
 	ImGui::SetCurrentContext(_impl->_refimguicontext);
-    // Cleanup
     ImPlot::DestroyContext(_implotcontext);
 	ImGui::DestroyContext(_impl->_refimguicontext);
 
@@ -579,32 +627,36 @@ void App_SDL::add_window(Window_SDL* win) {
 }
 
 void App_SDL::register_user_event(UserEvent* ev) {
-	std::vector<UserEvent*>::iterator it = std::find(_impl->m_user_events.begin(), _impl->m_user_events.end(), ev);
-	if (it != _impl->m_user_events.end())
+	auto it = std::find(_impl->m_user_events.begin(), _impl->m_user_events.end(), ev);
+	if (it != _impl->m_user_events.end()){
 		return;
+	}
 	_impl->m_user_events.push_back(ev);
 }
 
 void App_SDL::unregister_user_event(UserEvent* ev) {
-	std::vector<UserEvent*>::iterator it = std::find(_impl->m_user_events.begin(),_impl->m_user_events.end(), ev);
-	if (it == _impl->m_user_events.end())
+	auto it = std::find(_impl->m_user_events.begin(),_impl->m_user_events.end(), ev);
+	if (it == _impl->m_user_events.end()){
 		return;
+	}
 	_impl->m_user_events.erase(it);
 }
 
 void App_SDL::register_timer(Timer* t)
 {
-	std::vector<Timer*>::iterator it = std::find(_impl->m_timers.begin(), _impl->m_timers.end(), t);
-	if (it != _impl->m_timers.end())
+	auto it = std::find(_impl->m_timers.begin(), _impl->m_timers.end(), t);
+	if (it != _impl->m_timers.end()){
 		return;
+	}
 	_impl->m_timers.push_back(t);
 }
 
 void App_SDL::unregister_timer(Timer* t)
 {
-	std::vector<Timer*>::iterator it = std::find(_impl->m_timers.begin(), _impl->m_timers.end(), t);
-	if (it == _impl->m_timers.end())
+	auto it = std::find(_impl->m_timers.begin(), _impl->m_timers.end(), t);
+	if (it == _impl->m_timers.end()){
 		return;
+	}
 	_impl->m_timers.erase(it);
 }
 
@@ -614,7 +666,7 @@ ImFont* App_SDL::load_font(std::string fontname, float size)
 	ImVector<ImWchar> ranges;
 	ImFontGlyphRangesBuilder builder;
 	builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesDefault());
-	builder.AddChar(0x221E);                               // Add a specific character
+	builder.AddChar(0x221E);
 	builder.BuildRanges(&ranges); 
 	ImFont* font = ImGui::GetIO().Fonts->AddFontFromFileTTF(fontname.c_str(), size, NULL, ranges.Data);
 	assert(font);
@@ -636,26 +688,36 @@ ImFont* App_SDL::load_font(std::string fontname, float size)
 	return font;
 }
 
-bool App_SDL::handle_timer_events()
+ImFont* App_SDL::load_font_from_memory(const char* data, int memsize, float size)
 {
-	bool event = false;
-	std::vector<Timer*>::iterator it_timer = _impl->m_timers.begin();
-	long timestamp = this->timestamp();
-	for (; it_timer < _impl->m_timers.end(); ++it_timer){
-		if ((*it_timer)->is_active()){
-			if (timestamp - (*it_timer)->get_start_time()  >= (*it_timer)->get_time()){
-				(*it_timer)->on_timer_event();
-				event = true;
-			}
-		}
-	}
-	return event;
+	assert(&ImGui::GetIO());
+	ImVector<ImWchar> ranges;
+	ImFontGlyphRangesBuilder builder;
+	builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesDefault());
+	builder.AddChar(0x221E);
+	builder.BuildRanges(&ranges); 
+	ImFont* font = ImGui::GetIO().Fonts->AddFontFromMemoryTTF((void*)data, memsize, size, NULL, ranges.Data, false);
+	assert(font);
+	unsigned char* pixels;
+	int width, height;
+	ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+
+	// Upload texture to graphics system
+	GLuint tex_font;
+	glGenTextures(1, &tex_font);
+	glBindTexture(GL_TEXTURE_2D, tex_font);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+	// Store our identifier
+	//ImGui::GetIO().Fonts->TexID = (void *)(size_t)tex_font;
+
+	return font;
 }
 
 App_SDL* App_SDL::get()
 {
-	_implotcontext = ImPlot::CreateContext();
-
 	if (_APP_INSTANCE_ == 0L){
 		_APP_INSTANCE_ = new App_SDL;
 	}
@@ -680,25 +742,83 @@ std::string App_SDL::get_app_path()
 	return SDL_GetBasePath();
 }
 
+void App_SDL::add_thread(Thread* thread)
+{
+	for (auto t: _impl->_threadpool){
+		if (t->name() == thread->name()){
+			std::cout << "App_SDL::add_thread : Cannot insert multiple threads with the same name" << std::endl;
+			delete t;
+			return;
+		}
+	}
+	_impl->_threadpool.push_back(thread);
+}
+
+Thread* App_SDL::get_thread(std::string name)
+{
+	for (auto thread: _impl->_threadpool){
+		if (name == thread->name()){
+			return thread;
+		}
+	}
+	return NULL;
+}
+
+bool App_SDL::abort_thread(std::string name)
+{
+	int threadnum = 0;
+	for (auto thread: _impl->_threadpool){
+		if (thread->name() == name){
+			thread->stop();
+			thread->join();
+			#ifdef DEBUG
+			std::cout << "Deleted thread " << thread->name() << std::endl;
+			#endif
+			delete thread;
+			_impl->_threadpool.erase(_impl->_threadpool.begin() + threadnum);
+			return true;
+		}
+		threadnum++;
+	}
+	return false;
+}
+
+void App_SDL::pause_thread(std::string name, bool pause)
+{
+	for (auto thread: _impl->_threadpool){
+		if (thread->name() == name){
+			thread->pause(pause);
+		}
+	}
+}
+
+void App_SDL::release_finished_threads()
+{
+	std::vector<std::string> del_list;
+	for (auto thread: _impl->_threadpool){
+		if (!thread->is_running()){
+			del_list.push_back(thread->name());
+		}
+	}
+	for(auto del: del_list){
+		abort_thread(del);
+	}
+}
+
 void App_SDL::run()
 {
-    bool done = false;
-
     for(auto window: _impl->_windows){
 		window->draw();
 	}
 
+    bool done = false;
+	bool sleep_mode = false;
     while (!done)
     {
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         SDL_Event event;
+		if (sleep_mode) SDL_WaitEventTimeout(NULL, 500);
 
-        while (SDL_PollEvent(&event))
-        {
+        while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_QUIT){
                 goto end;
             }
@@ -712,9 +832,8 @@ void App_SDL::run()
 						}
 						++i;
 					}
-					if (found >=0){
-						std::vector<Window_SDL *>::iterator it = _impl->_windows.begin() + found;
-						(*it)->show(false);
+					if (found >= 0){
+						auto it = _impl->_windows.begin() + found;
 						delete (*it);
 						_impl->_windows.erase(it);
 					}
@@ -724,28 +843,43 @@ void App_SDL::run()
 				}
 			}
 
-        	bool event_flag = false;
-        	for(auto window: _impl->_windows){
-        		window->do_event(&event);
-				//window->draw(true);
-        	}
-
-        }
-		// Events handler
-		handle_timer_events();
-		std::vector<UserEvent*>::iterator it = _impl->m_user_events.begin();
-		for (; it < _impl->m_user_events.end(); ++it){
-			if (event.type == (*it)->get_evt_idx()){
-				(*it)->on_callback(event.user.data1, event.user.data2);
+			// Events handler
+			for (auto user_event: _impl->m_user_events){
+				int idx = user_event->get_evt_idx();
+				if (event.type == idx){
+					user_event->on_callback(event.user.data1, event.user.data2);
+					if (event.user.code == UserEvent::CODE_UPDATEUI){
+						for (auto window : _impl->_windows){
+							if (window == event.user.data1){
+								window->set_last_event_time();
+							}
+						}
+					}
+				}
 			}
-		}
 
-		//ImPlot::SetCurrentContext(_implotcontext);
-		for(auto window: _impl->_windows){
-			window->draw(false);
-		}
+        	for(auto window: _impl->_windows){
+				bool win_event = window->do_event(&event);
+				if (win_event){
+					window->set_last_event_time();
+				}
+        	}
+        }
+		
+		App_SDL::get()->release_finished_threads();
 
-        usleep(5000);
+		sleep_mode = true;
+		unsigned long current_time = App_SDL::get()->timestamp();
+
+		auto windows = _impl->_windows;
+		for(auto window: windows){
+			unsigned long event_time = current_time - window->last_event_time();
+			bool force_draw = event_time < 100;
+			if (!window->lazy() || force_draw){
+				window->draw(false);
+				sleep_mode = false;
+			} 
+		}
     }
 	end:;
 }

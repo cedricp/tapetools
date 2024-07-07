@@ -1,12 +1,15 @@
 #pragma once
 
 #include "audio_manager.h"
+#include "callback.h"
 
 
 class audioRecorder
 {
+    UserEvent m_buffer_full_event;
     SoundIoInStream *m_instream = nullptr;
     ringBuffer *m_ring_buffer = nullptr;
+    bool m_32bits_sampling = true;
     static void read_callback(SoundIoInStream *instream, int frame_count_min, int frame_count_max);
     static void overflow_callback(SoundIoInStream *instream);
     static void error_callback(SoundIoInStream *instream, int err);
@@ -27,4 +30,6 @@ public:
     int  get_channel_count();
 
     int get_buffer_size(float time, bool channels_mult = true);
+
+    UserEvent& get_buffer_full_event(){return m_buffer_full_event;}
 };

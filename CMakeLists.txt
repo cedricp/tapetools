@@ -1,12 +1,14 @@
 cmake_minimum_required(VERSION 3.5.0)
-
-
 project(tapetools_project C CXX)
 
 set(CMAKE_MODULE_PATH ${tapetools_project_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 set(CMAKE_INSTALL_PREFIX ${tapetools_project_SOURCE_DIR}/INSTALL_${CMAKE_BUILD_TYPE})
 
+if(UNIX)
 set(OpenGL_GL_PREFERENCE "GLVND")
+endif(UNIX)
+
+set(ARCH elf64-x86-64)
 
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
@@ -15,14 +17,27 @@ find_package(FFTW REQUIRED)
 
 message(STATUS "FFTW3 libs ${FFTW_DOUBLE_LIB}")
 message(STATUS "FFTW3 includes ${FFTW_INCLUDE_DIRS}")
+message(STATUS "SLD2 libraries ${SDL2_LIBRARIES}")
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_definitions(-DDEBUG)
+endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 add_subdirectory(libsoundio)
+add_subdirectory(libaudio)
 add_subdirectory(libimgui)
+add_subdirectory(libutils)
+add_subdirectory(resources)
 
-add_executable(tapetools audio_manager.cpp audio_sine_gen.cpp audio_record.cpp utils.cpp main.cpp)
-add_compile_definitions(tapetools "SOUNDIO_STATIC_LIBRARY")
-target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libsoundio/include")
-target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} libsoundio_static imgui_static)
+# Executable rules
+
+add_executable(tapetools main.cpp)
+target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libsoundio/include" "libaudio/include" "libutils/include")
+
+# Link rules
+
+target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} audio_static imgui_static utils_static $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> )
+
 if(MINGW)
     set(LINKFLAGS "-static-libgcc -static-libstdc++")
     if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -30,6 +45,8 @@ if(MINGW)
     endif()
     set_target_properties(tapetools PROPERTIES LINK_FLAGS "${LINKFLAGS}")
 endif(MINGW)
+
+# Install rules
 
 install (TARGETS tapetools RUNTIME DESTINATION bin)
 
@@ -68,3 +85,4 @@ if(MINGW)
     install(CODE "set(CMAKELIBPATH \"${CMAKE_SYSTEM_LIBRARY_PATH};${CMAKE_MINGW_SYSTEM_LIBRARY_PATH};${MINGWLIBPATH}\")")
     install(SCRIPT ${CONFIG_FILE})
 endif(MINGW)
+

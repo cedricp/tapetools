@@ -6,6 +6,10 @@
 #include "timer.h"
 #include <fftw3.h>
 #include <complex>
+#include <thread.h>
+
+extern "C" const unsigned char _Hack_Regular_ttf_start[];
+extern "C" const unsigned char _Hack_Regular_ttf_end[];
 
 uint32_t lcd_fg = IM_COL32(255,0,0,255);
 uint32_t lcd_bg = IM_COL32(0,0,0,255);
@@ -49,7 +53,42 @@ void digit(ImDrawList*d,int n,ImVec2 e,ImVec2 p)
 #undef v
 #undef draw_poly
 
-class AudioToolWindow : public Event, Widget
+class MainWindow2 : public Window_SDL
+{
+    class Test : public Widget {
+        public:
+        Test(Window_SDL *win) : Widget(win, "Test")
+        {
+            
+        }
+        ~Test(){
+
+        }
+
+        void draw() override {
+            ImGui::ShowDemoWindow();
+        }
+    };
+
+    Test* test;
+    public:
+    MainWindow2() : Window_SDL("Test2", 1200, 900)
+    {
+        test = new Test(this);
+        set_lazy_mode(false);
+    }
+
+    virtual ~MainWindow2()
+    {
+    }
+
+    void draw(bool c) override
+    {
+        Window_SDL::draw(c);
+    }
+};
+
+class AudioToolWindow : public Widget
 {
     audioManager m_audiomanager;
     audioSineGenerator m_sine_generator;
@@ -58,9 +97,9 @@ class AudioToolWindow : public Event, Widget
     int  m_uitheme = 0;
     
     bool m_sine_generator_switch = false;
-    int  m_pitch = 440;
-    float m_sinegen_latency = 0.01f;
-    int m_recorder_latency = 100;
+    int  m_pitch = 1000;
+    float m_sinegen_latency_s = 0.1f;
+    int m_recorder_latency_ms = 100;
     int m_sine_volume_db = 0.f;
     
     int m_audio_out_idx = -1;
@@ -112,7 +151,7 @@ class AudioToolWindow : public Event, Widget
     double  m_thdn = 0;
     double  m_thddb = 0;
 
-    double   m_rms_left, m_rms_right;
+    double  m_rms_left = 0, m_rms_right = 0;
     bool    m_show_rms_voltage = false;
 
     bool    m_sweep_started = false;
@@ -135,7 +174,52 @@ class AudioToolWindow : public Event, Widget
     float   m_zscore_threshold = 3.5;
     bool    m_show_zscore_settings = false;
 
-    STATIC_CALLBACK_METHOD(on_timer_event, AudioToolWindow)
+    CALLBACK_METHOD(on_thread_event, AudioToolWindow)
+    {
+        void* num = sender_object->get_data1();
+        printf("Test %x\n", num);
+    }
+    
+    CALLBACK_METHOD(on_timer_event, AudioToolWindow)
+    {
+        float current_sample_rate = m_audiorecorder.get_current_samplerate();
+        float fft_step = m_capture_size / current_sample_rate;
+        
+        if (m_sweep_current_frequency >= 20000){
+            // We reached the end of the measure
+            stop_sweep_gen();
+            return;
+        }
+
+        int min_freq_idx = std::max(int((m_sweep_current_frequency-500)*fft_step), 0);
+        int max_freq_idx = std::min(int((m_sweep_current_frequency+500)*fft_step), m_capture_size / 2);
+
+        float max_val = m_noise_foor;
+        for (int i = min_freq_idx; i < max_freq_idx; ++i){
+            if (m_fftdraw[i] > max_val){
+                max_val = m_fftdraw[i];
+            }
+        }
+
+        m_sweep_values.push_back(max_val);
+        m_sweep_freqs.push_back(m_sweep_current_frequency);
+
+
+        m_sweep_current_frequency += m_sweep_span;
+        m_sine_generator.set_pitch(m_sweep_current_frequency);
+        m_sweep_timer.start();
+        update_ui();
+    }
+
+    CALLBACK_METHOD(on_recorder_data_ready, AudioToolWindow)
+    {
+        if (!m_pause_compute && compute() && m_compute_thd)
+        {
+            compute_thd();
+            compute_thdn();
+        }
+        update_ui();
+    }
 
 public:
     AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_sweep_timer(m_measure_delay, true)
@@ -146,6 +230,10 @@ public:
         set_titlebar(false);
         compute_fft_window_corrections();
 
+        //get_underlying_window()->set_lazy_mode(false);
+
+        m_audiorecorder.get_buffer_full_event().connect_event(STATIC_METHOD(on_recorder_data_ready), this);
+
         m_audiomanager.flush();
 
         m_audio_out_idx = m_audiomanager.get_default_output_device_id();
@@ -154,12 +242,11 @@ public:
         m_combo_in = m_audiomanager.get_input_device_reverse_map(m_audio_in_idx);
         m_combo_out = m_audiomanager.get_output_device_reverse_map(m_audio_out_idx);
 
-        m_sine_generator.init(m_audiomanager, m_audio_out_idx, -1, m_sinegen_latency);
+        m_sine_generator.init(m_audiomanager, m_audio_out_idx, -1, m_sinegen_latency_s);
 
         reinit_recorder();
 
-        CONNECT_CALLBACK((&m_sweep_timer), on_timer_event);
-
+        m_sweep_timer.connect_event(STATIC_METHOD(on_timer_event), this);
     }
 
     virtual ~AudioToolWindow()
@@ -192,7 +279,7 @@ public:
 
     void init_capture()
     {
-        int capture_size = m_audiorecorder.get_buffer_size(float(m_recorder_latency) / 1000.f, false);
+        int capture_size = m_audiorecorder.get_buffer_size(float(m_recorder_latency_ms) / 1000.f, false);
         if (capture_size == 0){
             return;
         }
@@ -216,7 +303,7 @@ public:
             return;
         }
 
-        if (m_audiorecorder.init(float(m_recorder_latency) / 1000.f, m_audio_in_idx, m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate]))
+        if (m_audiorecorder.init(float(m_recorder_latency_ms) / 1000.f, m_audio_in_idx, m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate]))
         {
             m_audiorecorder.start();
         }
@@ -227,7 +314,7 @@ public:
     {
         int current_sine_samplerate = m_audiomanager.get_output_sample_rates(m_audio_out_idx)[m_out_sample_rate];
         m_sine_generator.destroy();
-        m_sine_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, m_sinegen_latency);
+        m_sine_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, m_sinegen_latency_s);
         m_sine_generator.set_pitch(m_pitch);
         m_sine_generator.start();
         m_sine_generator.pause(!m_sine_generator_switch);
@@ -264,38 +351,6 @@ public:
         m_fft_window_fn_index = tmp;
     }
 
-    CALLBACK_METHOD(on_timer_event)
-    {
-        float current_sample_rate = m_audiorecorder.get_current_samplerate();
-        float fft_step = m_capture_size / current_sample_rate;
-        
-        if (m_sweep_current_frequency >= 20000){
-            // We reached the end of the measure
-            stop_sweep_gen();
-            return;
-        }
-
-        compute();
-
-        int min_freq_idx = std::max(int((m_sweep_current_frequency-500)*fft_step), 0);
-        int max_freq_idx = std::min(int((m_sweep_current_frequency+500)*fft_step), m_capture_size / 2);
-
-        float max_val = m_noise_foor;
-        for (int i = min_freq_idx; i < max_freq_idx; ++i){
-            if (m_fftdraw[i] > max_val){
-                max_val = m_fftdraw[i];
-            }
-        }
-
-        m_sweep_values.push_back(max_val);
-        m_sweep_freqs.push_back(m_sweep_current_frequency);
-
-
-        m_sweep_current_frequency += m_sweep_span;
-        m_sine_generator.set_pitch(m_sweep_current_frequency);
-        m_sweep_timer.start();
-    }
-
     void set_theme()
     {
         if (m_uitheme == 0){
@@ -307,6 +362,11 @@ public:
         if (m_uitheme == 2){
             ImGui::StyleColorsClassic();   
         }
+        ImGui::GetStyle().FrameRounding = 5.0;
+        ImGui::GetStyle().ChildRounding = 5.0;
+        ImGui::GetStyle().WindowRounding = 4.0;
+        ImGui::GetStyle().GrabRounding = 4.0;
+        ImGui::GetStyle().GrabMinSize = 4.0;
     }
 
     void draw() override 
@@ -364,7 +424,6 @@ public:
         reset_sine_generator();
         m_sine_generator.set_pitch(m_sweep_current_frequency);
         m_sweep_timer.start();
-        //m_pause_compute = true;
     }
 
     void stop_sweep_gen()
@@ -373,7 +432,6 @@ public:
         m_sine_generator_switch = false;
         m_sine_generator.pause();
         m_sweep_timer.stop();
-        //m_pause_compute = false;
     }
 
     void set_window_fn(bool compute_cache = true)
@@ -414,8 +472,6 @@ public:
 
     void draw_sweep_tab()
     {
-        if(!m_pause_compute) compute();
-
         int channelcount = m_audiorecorder.get_channel_count(); 
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
         float frameh = ImGui::GetFrameHeightWithSpacing();
@@ -451,7 +507,7 @@ public:
 
         ImGui::BeginChild("ScopesChild4", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(70);
-        if(ImGui::DragInt("Delay (ms)", &m_measure_delay, 1.f, m_recorder_latency * 2, 3000)){
+        if(ImGui::DragInt("Delay (ms)", &m_measure_delay, 1.f, m_recorder_latency_ms * 2, 3000)){
             // Set a comfortable time amount to let the FFT settle (at leat 400ms for 200ms latency)
             m_sweep_timer.set(m_measure_delay);
         }
@@ -533,13 +589,6 @@ public:
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
         bool must_reinit_recorder = false;
 
-        if (!m_pause_compute && compute() && m_compute_thd)
-        {
-            compute_thd();
-            compute_thdn();
-        }
-
-
         float frameh = ImGui::GetFrameHeightWithSpacing();
         float padh = 3.0f * ImGui::GetStyle().FramePadding.y + ImGui::GetStyle().ItemSpacing.y;
 
@@ -570,6 +619,13 @@ public:
         }
         ImGui::SetItemTooltip("Set the generator intensity");
         ImGui::EndChild();
+
+
+        ImGui::SameLine();
+        if(ImGui::Button("test")){
+            MainWindow2* win = new MainWindow2;
+            App_SDL::get()->add_window(win);
+        }
 
         ImGui::EndChild();
 
@@ -683,32 +739,30 @@ public:
             } else {
                 lcd_fg = IM_COL32(0,200,0,255);
             }
-            ImGui::BeginChild("ScopesChildVoltageLcd", ImVec2(-1, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiWindowFlags_None);
-            
+            ImGui::BeginChild("ScopesChildVoltageLcd", ImVec2(0, -1), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeX  | ImGuiWindowFlags_None);
+             
             ImGui::BeginChild("ScopesChildVoltageLcd1", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
-            draw_lcd(m_rms_left * m_rms_calibration_scale, ImVec2(200, 70));
-            ImGui::SameLine();
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Volts RMS Left");
+            draw_lcd(m_rms_left * m_rms_calibration_scale, ImVec2(200, 70));
             if (m_lockdb && m_current_db_target_channel == 0){
-                float target_val_left = 1.f - fabsf( m_locked_db_value - m_rms_left * m_rms_calibration_scale ) * 10.f;
+                float target_val_left = 1.f - fabs( m_locked_db_value - m_rms_left * m_rms_calibration_scale ) * 10.f;
                 ImGui::ProgressBar(target_val_left);
             }
             ImGui::EndChild();
 
-            ImGui::SameLine();
-            ImGui::SetCursorPosX(width());
+            //ImGui::SetCursorPosY(height());
             ImGui::BeginChild("ScopesChildVoltageLcd2", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
-            draw_lcd(m_rms_right * m_rms_calibration_scale, ImVec2(200, 70));
-            ImGui::SameLine();
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Volts RMS Right");
+            draw_lcd(m_rms_right * m_rms_calibration_scale, ImVec2(200, 70));
             if (m_lockdb && m_current_db_target_channel == 1){
-                float target_val_right = 1.f - fabsf( m_locked_db_value - m_rms_right * m_rms_calibration_scale ) *10.f;
+                float target_val_right = 1.f - fabs( m_locked_db_value - m_rms_right * m_rms_calibration_scale ) *10.f;
                 ImGui::ProgressBar(target_val_right);
             }
             ImGui::EndChild();
             ImGui::EndChild();
+            ImGui::SameLine();
         }
 
         if (ImPlot::BeginPlot("Audio", ImVec2(m_show_xy ? width()-plotheight-10 : -1, -1)))
@@ -761,6 +815,7 @@ public:
 
             ImPlot::EndPlot();
         }
+        
         ImGui::SameLine();
         if (m_show_xy && ImPlot::BeginPlot("X-Y Diagram", ImVec2(plotheight, -1)))
         {
@@ -816,9 +871,9 @@ public:
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild8", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(100);
-        if(ImGui::InputInt("Capture size (ms)", &m_recorder_latency, 50, 200, ImGuiInputTextFlags_EnterReturnsTrue)){
-            if(m_recorder_latency < 50) m_recorder_latency = 50;
-            if(m_recorder_latency > 1000) m_recorder_latency = 1000;
+        if(ImGui::InputInt("Capture size (ms)", &m_recorder_latency_ms, 50, 200, ImGuiInputTextFlags_EnterReturnsTrue)){
+            if(m_recorder_latency_ms < 50) m_recorder_latency_ms = 50;
+            if(m_recorder_latency_ms > 1000) m_recorder_latency_ms = 1000;
             must_reinit_recorder = true;
         }
         ImGui::SetItemTooltip("Audio sampling time in millisecond");
@@ -883,9 +938,9 @@ public:
                 }
 
                 // THD+N clipping info
-                // double range_min[4] = {m_fftfreqs[m_fft_fund_idx_range_min], m_fftfreqs[m_fft_fund_idx_range_min], 40, -200};
+                // double range_min[4] = {m_fftfreqs[m_fft_fund_idx_range_min], m_fftfreqs[m_fft_fund_idx_range_min], 4200, -200};
                 // ImPlot::PlotLine("Cut min", range_min, range_min+2, 2);
-                // double range_max[4] = {m_fftfreqs[m_fft_fund_idx_range_max], m_fftfreqs[m_fft_fund_idx_range_max], 40, -200};
+                // double range_max[4] = {m_fftfreqs[m_fft_fund_idx_range_max], m_fftfreqs[m_fft_fund_idx_range_max], 4200, -200};
                 // ImPlot::PlotLine("Cut max", range_max, range_max+2, 2);
                 ImPlot::PlotShaded("Fundamental detection", (double*)&m_fftfreqs[m_fft_fund_idx_range_min+1], (double*)&m_fftdraw[m_fft_fund_idx_range_min+1], m_fft_fund_idx_range_max - m_fft_fund_idx_range_min, -200.0);
             }
@@ -897,7 +952,6 @@ public:
             if (channelcount>0 && m_fftfreqs)
             {
                 ImPlot::PlotLine("Audio left FFT", m_fftfreqs, m_fftdraw, m_sound_data_x.size()/2);
-
             }
 
             ImPlot::EndPlot();
@@ -907,8 +961,8 @@ public:
         ImGui::EndChild();
 
         if (must_reinit_recorder){
-            if (m_measure_delay < m_recorder_latency * 2){
-                m_measure_delay = m_recorder_latency * 2;
+            if (m_measure_delay < m_recorder_latency_ms * 2){
+                m_measure_delay = m_recorder_latency_ms * 2;
                 m_sweep_timer.set(m_measure_delay);
             }
             reinit_recorder();
@@ -1116,22 +1170,6 @@ public:
             }
         }
 
-        // int valid_idx = fundamental_index+1;
-        // int numskip = 0;
-        // // Keep harmonics only
-        // double fundamental_freq = m_fftfreqs[m_fft_highest_idx[fundamental_index]];
-        // for(int i = fundamental_index+1; i < m_fft_found_peaks; ++i){
-        //     double mod = fmod(m_fftfreqs[m_fft_highest_idx[i]], fundamental_freq);
-        //     if ( fundamental_freq - mod < 50 || mod < 50){
-        //         m_fft_highest_idx[valid_idx] = m_fft_highest_idx[i];
-        //         m_fft_highest_pos[valid_idx++] = m_fft_highest_pos[i];
-        //     } else {
-        //         numskip++;
-        //     }
-        // }
-// 
-        // m_fft_found_peaks -= numskip;
-
         // Compute Total Harmonic Distortion
         // Source http://www.r-type.org/addtext/add183.htm
         if (m_fft_found_peaks){
@@ -1151,32 +1189,38 @@ public:
 
     void draw_tools_windows()
     {
-        if (m_sound_setup_open && !m_sweep_started){
+        if (m_sound_setup_open && !m_sweep_started)
+        {
             ImGui::SetNextWindowSize(ImVec2(600, 150));
-            if(ImGui::Begin("Sound card setup", &m_sound_setup_open)){
+            if(ImGui::Begin("Sound card setup", &m_sound_setup_open))
+            {
                 ImVec2 winsize = ImGui::GetWindowSize();
                 ImGui::PushItemWidth(winsize.x / 3);
                 const std::vector<std::string>& out_devices = m_audiomanager.get_output_devices();
                 ImGui::SeparatorText("Output device");
-                if (ImGui::Combo("Ouput", &m_combo_out, vector_getter, (void*)&out_devices, out_devices.size())){
+                if (ImGui::Combo("Ouput", &m_combo_out, vector_getter, (void*)&out_devices, out_devices.size()))
+                {
                     m_audio_out_idx = m_audiomanager.get_output_device_map(m_combo_out);
                     reset_sine_generator();
                 }
                 ImGui::SameLine();
                 const std::vector<std::string> out_samplerate = m_audio_out_idx >= 0 ? m_audiomanager.get_output_sample_rates_str(m_audio_out_idx) : std::vector<std::string>();
-                if (ImGui::Combo("Samplerate##1", &m_out_sample_rate, vector_getter, (void*)&out_samplerate, out_samplerate.size())){
+                if (ImGui::Combo("Samplerate##1", &m_out_sample_rate, vector_getter, (void*)&out_samplerate, out_samplerate.size()))
+                {
                     reset_sine_generator();
                 }
                 
                 ImGui::SeparatorText("Input device");
                 const std::vector<std::string>& in_devices = m_audiomanager.get_input_devices();
-                if (ImGui::Combo("Input", &m_combo_in, vector_getter, (void*)&in_devices, in_devices.size())){
+                if (ImGui::Combo("Input", &m_combo_in, vector_getter, (void*)&in_devices, in_devices.size()))
+                {
                     m_audio_in_idx = m_audiomanager.get_input_device_map(m_combo_in);
                     reinit_recorder();
                 }
                 ImGui::SameLine();
                 const std::vector<std::string> in_samplerate = m_audio_in_idx >= 0 ? m_audiomanager.get_input_sample_rates_str(m_audio_in_idx) : std::vector<std::string>();
-                if (ImGui::Combo("Samplerate##2", &m_in_sample_rate, vector_getter, (void*)&in_samplerate, in_samplerate.size())){
+                if (ImGui::Combo("Samplerate##2", &m_in_sample_rate, vector_getter, (void*)&in_samplerate, in_samplerate.size()))
+                {
                     reinit_recorder();
                 }
                 ImGui::PopItemWidth();
@@ -1231,6 +1275,8 @@ public:
     MainWindow() : Window_SDL("TapeTools", 1200, 900)
     {
         m_audiotool = new AudioToolWindow(this);
+        size_t font_data_size = _Hack_Regular_ttf_end - _Hack_Regular_ttf_start;
+        load_font_from_memory((const char*)_Hack_Regular_ttf_start, font_data_size, 16);
     }
 
     virtual ~MainWindow()
@@ -1244,55 +1290,15 @@ public:
     }
 };
 
-class MainWindow2 : public Window_SDL
-{
-    class Test : public Widget {
-        public:
-        Test(Window_SDL *win) : Widget(win, "Test")
-        {
-        }
-        ~Test(){
-
-        }
-
-        void draw() override {
-            ImGui::ShowDemoWindow();
-        }
-    };
-
-    Test* test;
-
-    public:
-    MainWindow2() : Window_SDL("Test2", 1200, 900)
-    {
-        test = new Test(this);
-    }
-
-    virtual ~MainWindow2()
-    {
-    }
-
-    void draw(bool c) override
-    {
-        Window_SDL::draw(c);
-    }
-};
-
 int main(int argc, char *argv[])
 {
     App_SDL *app = App_SDL::get();
+    app->set_app_name("TapeTools");
     Window_SDL *window = new MainWindow;
-    //Window_SDL *window2 = new MainWindow2;
 
-    ImGui::GetStyle().FrameRounding = 5.0;
-    ImGui::GetStyle().ChildRounding = 5.0;
-    ImGui::GetStyle().WindowRounding = 4.0;
-    ImGui::GetStyle().GrabRounding = 4.0;
-    ImGui::GetStyle().GrabMinSize = 4.0;
     window->set_minimum_window_size(1400, 800);
 
     app->add_window(window);
-    //app->add_window(window2);
     app->run();
     return 0;
 }
