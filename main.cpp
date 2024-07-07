@@ -872,7 +872,7 @@ public:
                 ImPlot::PlotText(thdtext, pnt.x, pnt.y);
 
                 for (int i = m_fundamental_index; i < m_fft_found_peaks; ++i){
-                    double fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 0.0, -200.0};
+                    double fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 40.0, -200.0};
                     ImPlot::PlotLine("Peaks", fund, fund+2, 2);
                     double y_pos = m_fftdraw[m_fft_highest_idx[i]];
                     snprintf(thdtext, 16, "%.4fdB", y_pos);
@@ -883,10 +883,11 @@ public:
                 }
 
                 // THD+N clipping info
-                double range_min[4] = {m_fftfreqs[m_fft_fund_idx_range_min], m_fftfreqs[m_fft_fund_idx_range_min], 0, -200};
-                ImPlot::PlotLine("Cut min", range_min, range_min+2, 2);
-                double range_max[4] = {m_fftfreqs[m_fft_fund_idx_range_max], m_fftfreqs[m_fft_fund_idx_range_max], 0, -200};
-                ImPlot::PlotLine("Cut max", range_max, range_max+2, 2);
+                // double range_min[4] = {m_fftfreqs[m_fft_fund_idx_range_min], m_fftfreqs[m_fft_fund_idx_range_min], 40, -200};
+                // ImPlot::PlotLine("Cut min", range_min, range_min+2, 2);
+                // double range_max[4] = {m_fftfreqs[m_fft_fund_idx_range_max], m_fftfreqs[m_fft_fund_idx_range_max], 40, -200};
+                // ImPlot::PlotLine("Cut max", range_max, range_max+2, 2);
+                ImPlot::PlotShaded("Fundamental detection", (double*)&m_fftfreqs[m_fft_fund_idx_range_min+1], (double*)&m_fftdraw[m_fft_fund_idx_range_min+1], m_fft_fund_idx_range_max - m_fft_fund_idx_range_min, -200.0);
             }
 
 
