@@ -35,6 +35,9 @@ public:
     int fill_count(){
         return soundio_ring_buffer_fill_count(rb);
     }
+    int capacity(){
+        return soundio_ring_buffer_capacity(rb);
+    }
 };                    
 
 

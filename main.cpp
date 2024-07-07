@@ -213,12 +213,16 @@ class AudioToolWindow : public Widget
 
     CALLBACK_METHOD(on_recorder_data_ready, AudioToolWindow)
     {
-        if (!m_pause_compute && compute() && m_compute_thd)
+        if (m_pause_compute){
+            return;
+        }
+        bool computed = compute();
+        if (computed && m_compute_thd)
         {
             compute_thd();
             compute_thdn();
         }
-        update_ui();
+        if (computed) update_ui();
     }
 
 public:
@@ -972,7 +976,6 @@ public:
     bool compute(bool compute_fft = true, bool compute_noise_floor = true)
     {
         const int channelcount = m_audiorecorder.get_channel_count();
-
         if (channelcount == 0 || m_audiorecorder.get_available_samples() < m_capture_size * channelcount){
             return false;
         }

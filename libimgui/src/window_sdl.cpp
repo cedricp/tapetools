@@ -815,6 +815,7 @@ void App_SDL::run()
 	bool sleep_mode = false;
     while (!done)
     {
+		sleep_mode = true;
         SDL_Event event;
 		if (sleep_mode) SDL_WaitEventTimeout(NULL, 500);
 
@@ -868,7 +869,6 @@ void App_SDL::run()
 		
 		App_SDL::get()->release_finished_threads();
 
-		sleep_mode = true;
 		unsigned long current_time = App_SDL::get()->timestamp();
 
 		auto windows = _impl->_windows;
