@@ -63,6 +63,7 @@ bool audioRecorder::init(float latency, int device_idx, int samplerate)
 
     int capacity = get_buffer_size(latency) * m_instream->bytes_per_sample;
     m_ring_buffer = m_manager.get_new_ringbuffer(capacity);
+    m_actual_capacity = capacity;
 
     return true;
 }
@@ -131,18 +132,18 @@ void audioRecorder::read_callback(SoundIoInStream *instream, int frame_count_min
         }
 
         frames_left -= frame_count;
-        if (frames_left <= 0)
+        if (frames_left <= 0){
             break;
+        }
     }
 
     int advance_bytes = written_frames * instream->bytes_per_frame;
     ar->m_ring_buffer->advance_write_ptr(advance_bytes);
     
     // Pushing this even will awake the main event loop when buffer is full
-    int fc = ar->m_ring_buffer->fill_count() / 4.;
-    //if (ar->m_ring_buffer->free_count() == 0){
+    if (ar->m_ring_buffer->fill_count() >= ar->m_actual_capacity){
         ar->m_buffer_full_event.push();
-    //}
+    }
 }
 
 bool audioRecorder::start()

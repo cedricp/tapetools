@@ -173,12 +173,6 @@ class AudioToolWindow : public Widget
     float   m_zscore_influence = 0.5;
     float   m_zscore_threshold = 3.5;
     bool    m_show_zscore_settings = false;
-
-    CALLBACK_METHOD(on_thread_event, AudioToolWindow)
-    {
-        void* num = sender_object->get_data1();
-        printf("Test %x\n", num);
-    }
     
     CALLBACK_METHOD(on_timer_event, AudioToolWindow)
     {
@@ -225,6 +219,27 @@ class AudioToolWindow : public Widget
         if (computed) update_ui();
     }
 
+    CALLBACK_METHOD(on_device_changed, AudioToolWindow)
+    {
+        reset_audiomanager();
+    }
+
+    CALLBACK_METHOD(on_backend_disconnected, AudioToolWindow)
+    {
+        reset_audiomanager();
+    }
+
+    void reset_audiomanager()
+    {
+        m_audio_out_idx = m_audiomanager.get_default_output_device_id();
+        m_audio_in_idx = m_audiomanager.get_default_input_device_id();
+
+        m_combo_in = m_audiomanager.get_input_device_reverse_map(m_audio_in_idx);
+        m_combo_out = m_audiomanager.get_output_device_reverse_map(m_audio_out_idx);
+        reinit_recorder();
+        reset_sine_generator();
+    }
+
 public:
     AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_sweep_timer(m_measure_delay, true)
     {
@@ -234,22 +249,13 @@ public:
         set_titlebar(false);
         compute_fft_window_corrections();
 
-        //get_underlying_window()->set_lazy_mode(false);
+        on_device_changed();
+        m_audiomanager.device_changed_event.connect_event(STATIC_METHOD(on_device_changed), this);
+        m_audiomanager.backend_disconnected_event.connect_event(STATIC_METHOD(on_backend_disconnected), this);
 
         m_audiorecorder.get_buffer_full_event().connect_event(STATIC_METHOD(on_recorder_data_ready), this);
 
         m_audiomanager.flush();
-
-        m_audio_out_idx = m_audiomanager.get_default_output_device_id();
-        m_audio_in_idx = m_audiomanager.get_default_input_device_id();
-
-        m_combo_in = m_audiomanager.get_input_device_reverse_map(m_audio_in_idx);
-        m_combo_out = m_audiomanager.get_output_device_reverse_map(m_audio_out_idx);
-
-        m_sine_generator.init(m_audiomanager, m_audio_out_idx, -1, m_sinegen_latency_s);
-
-        reinit_recorder();
-
         m_sweep_timer.connect_event(STATIC_METHOD(on_timer_event), this);
     }
 

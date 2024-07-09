@@ -13,12 +13,9 @@ macro(binarize RESOURCE_FILE RESOURCES_OBJ)
       ${CMAKE_OBJCOPY}
       --input-target binary --output-target ${ARCH}
       --rename-section .data=.rodata,alloc,load,readonly,data,contents
-      ${CMAKE_CURRENT_SOURCE_DIR}/${RESOURCE_FILE} ${RESOURCES_OBJ}
-      COMMAND 
-      ${CMAKE_OBJCOPY}
       --redefine-sym ${SYM_NAME}${BINARY_START}=${BINARY_START}
       --redefine-sym ${SYM_NAME}${BINARY_END}=${BINARY_END}
-      ${RESOURCES_OBJ} ${RESOURCES_OBJ}
+      ${CMAKE_CURRENT_SOURCE_DIR}/${RESOURCE_FILE} ${RESOURCES_OBJ}
       DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${RESOURCE_FILE}
   )
 

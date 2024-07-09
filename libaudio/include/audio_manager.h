@@ -6,6 +6,7 @@ extern "C"{
 #include <iostream>
 #include <map>
 #include <vector>
+#include "callback.h"
 
 class ringBuffer
 {
@@ -58,6 +59,8 @@ class audioManager
     static void on_device_change(struct SoundIo *soundio);
     void scan_devices();
 public:
+    UserEvent device_changed_event, backend_disconnected_event;
+    
     audioManager(SoundIoBackend backend = SoundIoBackendNone);
     ~audioManager();
 
