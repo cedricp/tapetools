@@ -29,8 +29,8 @@ audioManager::audioManager(SoundIoBackend backend)
     m_out_device = nullptr;
     m_soundio = soundio_create();
     if (!m_soundio) {
-        fprintf(stderr, "out of memory\n");
-        return;
+        fprintf(stderr, "Cannot create soundio, aborting\n");
+        abort();
     }
 
     m_soundio->userdata = this;
@@ -67,7 +67,6 @@ audioManager::~audioManager()
 void audioManager::on_backend_disconnect(struct SoundIo *soundio, int err)
 {
     audioManager* am = (audioManager*)soundio->userdata;
-    fprintf(stderr, "OK backend disconnected with '%s'.\n", soundio_strerror(err));
     am->m_valid = false;
     am->backend_disconnected_event.push();
 }
@@ -75,7 +74,6 @@ void audioManager::on_backend_disconnect(struct SoundIo *soundio, int err)
 void audioManager::on_device_change(struct SoundIo *soundio)
 {
     audioManager* am = (audioManager*)soundio->userdata;
-    fprintf(stderr, "OK backend device change.\n");
     am->scan_devices();
     am->device_changed_event.push();
 }

@@ -6,7 +6,6 @@
 
 class audioRecorder
 {
-    UserEvent m_buffer_full_event;
     SoundIoInStream *m_instream = nullptr;
     ringBuffer *m_ring_buffer = nullptr;
     bool m_32bits_sampling = true;
@@ -17,6 +16,7 @@ class audioRecorder
     audioManager& m_manager;
     void destroy();
 public:
+    UserEvent buffer_full_event;
     audioRecorder(audioManager& audioManager);
     ~audioRecorder();
 
@@ -31,6 +31,4 @@ public:
     int  get_channel_count();
 
     int get_buffer_size(float time, bool channels_mult = true);
-
-    UserEvent& get_buffer_full_event(){return m_buffer_full_event;}
 };
