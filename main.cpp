@@ -219,7 +219,8 @@ class AudioToolWindow : public Widget
 
     CALLBACK_METHOD(on_device_changed, AudioToolWindow)
     {
-        reset_audiomanager();
+        //reset_audiomanager();
+        printf("Device changed\n");
     }
 
     CALLBACK_METHOD(on_backend_disconnected, AudioToolWindow)
@@ -246,7 +247,7 @@ public:
         set_resizable(false);
         set_titlebar(false);
         compute_fft_window_corrections();
-        on_device_changed();
+        reset_audiomanager();
 
         m_audiomanager.device_changed_event.connect_event(STATIC_METHOD(on_device_changed), this);
         m_audiomanager.backend_disconnected_event.connect_event(STATIC_METHOD(on_backend_disconnected), this);

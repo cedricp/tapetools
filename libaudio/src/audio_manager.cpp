@@ -74,7 +74,7 @@ void audioManager::on_backend_disconnect(struct SoundIo *soundio, int err)
 void audioManager::on_device_change(struct SoundIo *soundio)
 {
     audioManager* am = (audioManager*)soundio->userdata;
-    am->scan_devices();
+    //am->scan_devices();
     am->device_changed_event.push();
 }
 
