@@ -6,6 +6,7 @@ macro(binarize RESOURCE_FILE RESOURCES_OBJ)
 
   set(BINARY_START ${BINARY_NAME}_start)
   set(BINARY_END ${BINARY_NAME}_end)
+  set(BINARY_SIZE ${BINARY_NAME}_size)
 
   add_custom_command(
       OUTPUT ${RESOURCES_OBJ} 
@@ -15,6 +16,7 @@ macro(binarize RESOURCE_FILE RESOURCES_OBJ)
       --rename-section .data=.rodata,alloc,load,readonly,data,contents
       --redefine-sym ${SYM_NAME}${BINARY_START}=${BINARY_START}
       --redefine-sym ${SYM_NAME}${BINARY_END}=${BINARY_END}
+      --redefine-sym ${SYM_NAME}${BINARY_SIZE}=${BINARY_SIZE}
       ${CMAKE_CURRENT_SOURCE_DIR}/${RESOURCE_FILE} ${RESOURCES_OBJ}
       DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${RESOURCE_FILE}
   )
