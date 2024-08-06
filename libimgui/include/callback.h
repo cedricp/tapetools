@@ -62,6 +62,14 @@ public:
 	}
 
 	void connect_event(event_cb_t ev, void* cb_data){set_callback(ev, cb_data);}
+
+	void execute(void* data1, void* data2){
+		if(m_callback){
+			m_userdata1 = data1;
+			m_userdata2 = data2;
+			m_callback(this, m_callback_data);
+		}
+	}
 };
 
 class UserEvent : public Event
@@ -75,8 +83,7 @@ public:
 	UserEvent();
 	~UserEvent();
 
-	void push(void* data1 = 0L, void* data2 = 0L, UserCode code = CODE_STD);
-	void on_callback(void* data1 = 0L, void* data2 = 0L);
+	void push_delayed(void* data1 = 0L, void* data2 = 0L, UserCode code = CODE_STD);
 	int get_evt_idx(){return m_event_idx;}
 };
 

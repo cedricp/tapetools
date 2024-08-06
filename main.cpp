@@ -10,8 +10,8 @@
 #include <thread.h>
 
 extern "C" {
-    extern unsigned char _Hack_Regular_ttf_end[];
-    extern unsigned char _Hack_Regular_ttf_start[];
+    extern unsigned char _font_blob_end[];
+    extern unsigned char _font_blob_start[];
 }
 
 
@@ -96,7 +96,7 @@ class AudioToolWindow : public Widget
     double m_window_energy_correction[8] = {0.0};
     std::vector<std::string> m_fftchannels = {"Left", "Right"};
 
-    double   (*m_window_fn)(int, int) = hann_fft_window;
+    double  (*m_window_fn)(int, int) = hann_fft_window;
     int     m_fft_window_fn_index = 5;
     double  *m_current_window_cache = nullptr;
     int     m_fft_channel = 0;
@@ -129,7 +129,7 @@ class AudioToolWindow : public Widget
     bool    m_use_targetdb = false;
     bool    m_lockdb = false;
     float   m_target_db = 0.0;
-    double   m_locked_db_value = 0.0;
+    double  m_locked_db_value = 0.0;
     int     m_current_db_target_channel = 0;
 
     int     m_zscore_lag = 40;
@@ -959,7 +959,13 @@ public:
             
             if (channelcount>0 && m_fftfreqs)
             {
-                ImPlot::PlotLine("Audio left FFT", m_fftfreqs, m_fftdraw, m_sound_data_x.size()/2);
+                const char* buffer = NULL;
+                if (m_fft_channel == 0){
+                    buffer = "Audio left FFT";
+                } else {
+                    buffer = "Audio right FFT";
+                }
+                ImPlot::PlotLine(buffer, m_fftfreqs, m_fftdraw, m_sound_data_x.size()/2);
             }
 
             ImPlot::EndPlot();
@@ -1050,7 +1056,7 @@ public:
             }
 
             if (compute_noise_floor){
-                double mean = sum / fft_capture_size;
+                double mean = sum * inv_fft_capture_size;
                 double stddev = 0;
                 for (int i = 0; i < fft_capture_size; ++i){
                     double a = (m_fftdraw[i] - mean);
@@ -1281,8 +1287,8 @@ class MainWindow : public Window_SDL
 public:
     MainWindow() : Window_SDL("TapeTools", 1200, 900)
     {
-        size_t font_data_size = _Hack_Regular_ttf_end - _Hack_Regular_ttf_start;
-        load_font_from_memory((const char*)_Hack_Regular_ttf_start, font_data_size, 16);
+        size_t font_data_size = _font_blob_end - _font_blob_start;
+        load_font_from_memory((const char*)_font_blob_start, font_data_size, 16);
         m_audiotool = new AudioToolWindow(this);
     }
 

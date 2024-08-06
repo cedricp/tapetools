@@ -405,7 +405,7 @@ UserEvent::~UserEvent()
 		App_SDL::get()->unregister_user_event(this);
 }
 
-void UserEvent::push(void* data1, void* data2, UserCode code)
+void UserEvent::push_delayed(void* data1, void* data2, UserCode code)
 {
 	if (m_event_idx != -1){
 		SDL_Event event;
@@ -422,16 +422,6 @@ void UserEvent::push(void* data1, void* data2, UserCode code)
 	}
 }
 
-
-void
-UserEvent::on_callback(void* data1, void* data2)
-{
-	if (m_callback){
-		m_userdata1 = data1;
-		m_userdata2 = data2;
-		m_callback(this, m_callback_data);
-	}
-}
 
 Widget::Widget(Window_SDL* win, std::string name, bool managed)
 {
@@ -848,7 +838,7 @@ void App_SDL::run()
 			for (auto user_event: _impl->m_user_events){
 				int idx = user_event->get_evt_idx();
 				if (event.type == idx){
-					user_event->on_callback(event.user.data1, event.user.data2);
+					user_event->execute(event.user.data1, event.user.data2);
 					if (event.user.code == UserEvent::CODE_UPDATEUI){
 						for (auto window : _impl->_windows){
 							if (window == event.user.data1){

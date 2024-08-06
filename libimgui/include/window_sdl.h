@@ -116,7 +116,7 @@ public:
 	void set_configuration_float(std::string, float);
 	unsigned long timestamp();
 
-	void update_ui(){m_update_event.push(this,0,UserEvent::CODE_UPDATEUI);}
+	void update_ui(){m_update_event.push_delayed(this,0,UserEvent::CODE_UPDATEUI);}
 
 	void set_lazy_mode(bool lazy);
 	bool lazy();

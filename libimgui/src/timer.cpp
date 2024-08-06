@@ -23,7 +23,7 @@ public:
 				break;
 			}
 		}
-		timer_event.push((void*)10UL);
+		timer_event.push_delayed((void*)10UL);
 	}
 };
 

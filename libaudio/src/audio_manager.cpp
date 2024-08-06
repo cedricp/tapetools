@@ -68,14 +68,14 @@ void audioManager::on_backend_disconnect(struct SoundIo *soundio, int err)
 {
     audioManager* am = (audioManager*)soundio->userdata;
     am->m_valid = false;
-    am->backend_disconnected_event.push();
+    am->backend_disconnected_event.push_delayed();
 }
 
 void audioManager::on_device_change(struct SoundIo *soundio)
 {
     audioManager* am = (audioManager*)soundio->userdata;
-    //am->scan_devices();
-    am->device_changed_event.push();
+    am->scan_devices();
+    am->device_changed_event.push_delayed();
 }
 
 void audioManager::release_output_stream(SoundIoOutStream* ostream)

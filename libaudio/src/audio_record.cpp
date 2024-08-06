@@ -141,7 +141,7 @@ void audioRecorder::read_callback(SoundIoInStream *instream, int frame_count_min
     
     // Pushing this even will awake the main event loop when buffer is full
     if (ar->m_ring_buffer->fill_count() >= ar->m_actual_capacity){
-        ar->buffer_full_event.push();
+        ar->buffer_full_event.push_delayed();
     }
 }
 
