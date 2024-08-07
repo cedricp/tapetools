@@ -1,6 +1,8 @@
 #ifndef CALLBACK_H
 #define CALLBACK_H
 
+#include <string>
+
 class Event;
 
 typedef void (*event_cb_t)(Event*, void*);
@@ -42,10 +44,12 @@ class Event {
 protected:
 	event_cb_t m_callback;
 	void *m_callback_data, *m_userdata1, *m_userdata2;
+	std::string m_name;
 public:
-	Event(){
+	Event(std::string name){
 		m_callback = 0L;
 		m_callback_data = m_userdata1 = m_userdata2 = 0L;
+		m_name = name;
 	}
 
 	void set_callback(event_cb_t cb, void* callback_data){
@@ -68,6 +72,8 @@ public:
 			m_userdata1 = data1;
 			m_userdata2 = data2;
 			m_callback(this, m_callback_data);
+		} else {
+			printf("Cannot exercute callback [%s]\n", m_name.c_str());
 		}
 	}
 };
@@ -80,7 +86,7 @@ public:
 		CODE_STD = 0,
 		CODE_UPDATEUI = 1000,
 	};
-	UserEvent();
+	UserEvent(std::string name);
 	~UserEvent();
 
 	void push_delayed(void* data1 = 0L, void* data2 = 0L, UserCode code = CODE_STD);

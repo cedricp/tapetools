@@ -9,7 +9,8 @@ class TimerThread : public Thread
 	bool m_oneshot;
 public:
 	UserEvent timer_event;
-	TimerThread(unsigned long time, bool oneshot) : Thread("timer_thread", !oneshot, false), m_time (time) , m_oneshot(oneshot){
+	TimerThread(unsigned long time, bool oneshot) : Thread("timer_thread", !oneshot, false), m_time (time) , m_oneshot(oneshot), timer_event("timer_thread_event")
+	{
 
 	}
 
@@ -27,7 +28,7 @@ public:
 	}
 };
 
-Timer::Timer(unsigned long time, bool one_shot) : m_time(time), m_oneshot(one_shot)
+Timer::Timer(unsigned long time, bool one_shot) : m_time(time), m_oneshot(one_shot), Event("timer")
 {
 }
 

@@ -7,7 +7,7 @@
 #include "audio_record.h"
 
 
-audioRecorder::audioRecorder(audioManager& manager) : m_manager(manager)
+audioRecorder::audioRecorder(audioManager& manager) : m_manager(manager), buffer_full_event("buffer_full_event")
 {
 
 }

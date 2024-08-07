@@ -538,10 +538,19 @@ public:
         }
         ImGui::EndChild();
         ImGui::SameLine();
-        ImGui::BeginChild("ScopesChild6", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::SetNextItemWidth(100);
-        ImGui::Combo("Channel", &m_fft_channel, vector_getter, (void *)&m_fftchannels, m_fftchannels.size());
-        ImGui::EndChild();
+        if (channelcount > 1){
+            ImGui::BeginChild("ScopesChild6", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            bool left = m_fft_channel == 0;
+            bool right = m_fft_channel == 1;
+            if (ImGui::Checkbox("Left", &left) ){
+                m_fft_channel = 0;
+            }
+            ImGui::SameLine();
+            if (ImGui::Checkbox("right", &right) ){
+                m_fft_channel = 1;
+            }
+            ImGui::EndChild();
+        }
 
         if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1))){
             float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
@@ -702,12 +711,12 @@ public:
         ImGui::EndChild();
 
         /*
-        *   0dBm Ref section 
+        *   0dBu Ref section 
         */
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildShow0db", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::ToggleButton("Show 0dBm Ref", &m_show0db);
+        ImGui::ToggleButton("Show 0dBu Ref", &m_show0db);
         ImGui::SetItemTooltip("Shows the 0dB (775mV or 1mW/600ohms) on the graph");
         ImGui::EndChild();
 
@@ -870,11 +879,21 @@ public:
         ImGui::SetItemTooltip("Set the FFT windowing mode");
         ImGui::EndChild();
         ImGui::SameLine();
-        ImGui::BeginChild("ScopesChild7", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::SetNextItemWidth(100);
-        ImGui::Combo("Channel", &m_fft_channel, vector_getter, (void *)&m_fftchannels, m_fftchannels.size());
-        ImGui::SetItemTooltip("Which audio channel to analyse");
-        ImGui::EndChild();
+        if (channelcount > 1){
+            ImGui::BeginChild("ScopesChild7", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            bool left = m_fft_channel == 0;
+            bool right = m_fft_channel == 1;
+            if (ImGui::Checkbox("Left", &left) ){
+                m_fft_channel = 0;
+            }
+            ImGui::SetItemTooltip("Analyse left channel");
+            ImGui::SameLine();
+            if (ImGui::Checkbox("Right", &right) ){
+                m_fft_channel = 1;
+            }
+            ImGui::SetItemTooltip("Analyse right channel");
+            ImGui::EndChild();
+        }
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild8", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);

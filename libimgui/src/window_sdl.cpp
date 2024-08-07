@@ -140,7 +140,7 @@ static void UISettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *han
 
 static App_SDL* _APP_INSTANCE_ = 0L;
 
-Window_SDL::Window_SDL(std::string name, int width, int height, bool fullscreen) : _width(width), _height(height)
+Window_SDL::Window_SDL(std::string name, int width, int height, bool fullscreen) : _width(width), _height(height), m_update_event("window_sdl_update_ui")
 {
 	_impl = new impl;
 	_impl->_name = name;
@@ -389,7 +389,7 @@ bool Window_SDL::do_event(void* ev)
 	return evok;
 }
 
-UserEvent::UserEvent()
+UserEvent::UserEvent(std::string name) : Event(name)
 {
 	m_event_idx = SDL_RegisterEvents(1);
 	if (m_event_idx != -1){
@@ -838,13 +838,14 @@ void App_SDL::run()
 			for (auto user_event: _impl->m_user_events){
 				int idx = user_event->get_evt_idx();
 				if (event.type == idx){
-					user_event->execute(event.user.data1, event.user.data2);
 					if (event.user.code == UserEvent::CODE_UPDATEUI){
 						for (auto window : _impl->_windows){
 							if (window == event.user.data1){
 								window->set_last_event_time();
 							}
 						}
+					} else {
+						user_event->execute(event.user.data1, event.user.data2);
 					}
 				}
 			}

@@ -23,7 +23,7 @@ static int g_samplerates[] = {
     8000
 };
 
-audioManager::audioManager(SoundIoBackend backend)
+audioManager::audioManager(SoundIoBackend backend) : device_changed_event("audio_device_changed"), backend_disconnected_event("audio_backend_changed")
 {
     m_backend = backend;
     m_out_device = nullptr;
