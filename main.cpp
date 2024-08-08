@@ -537,8 +537,8 @@ public:
             set_window_fn();
         }
         ImGui::EndChild();
-        ImGui::SameLine();
         if (channelcount > 1){
+            ImGui::SameLine();
             ImGui::BeginChild("ScopesChild6", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
             bool left = m_fft_channel == 0;
             bool right = m_fft_channel == 1;
@@ -637,11 +637,11 @@ public:
             ImGui::SetItemTooltip("Set the generator intensity");
             ImGui::EndChild();
 
-            ImGui::SameLine();
-            if(ImGui::Button("test")){
-                MainWindow2* win = new MainWindow2;
-                App_SDL::get()->add_window(win);
-            }
+            // ImGui::SameLine();
+            // if(ImGui::Button("test")){
+            //     MainWindow2* win = new MainWindow2;
+            //     App_SDL::get()->add_window(win);
+            // }
 
             ImGui::EndChild();
         }
