@@ -80,6 +80,9 @@ static void *UISettingsHandler_ReadOpen(ImGuiContext *ctx, ImGuiSettingsHandler 
 	if (strcmp("SettingsI", line) == 0){
 		return (void*)2;
 	}
+	if (strcmp("SettingsS", line) == 0){
+		return (void*)3;
+	}
 	return NULL;
 }
 
@@ -88,8 +91,10 @@ static void UISettingsHandler_WriteAll(ImGuiContext *ctx, ImGuiSettingsHandler *
 	Window_SDL *wsdl = (Window_SDL*)handler->UserData;
 	std::map<std::string, int> mapint;
 	std::map<std::string, float> mapfloat;
+	std::map<std::string, std::string> mapstring;
 	wsdl->get_configuration_int(mapint);
 	wsdl->get_configuration_float(mapfloat);
+	wsdl->get_configuration_string(mapstring);
 
 	if (!mapint.empty()){
 		buf->appendf("[%s][SettingsI]\n", handler->TypeName);
@@ -104,6 +109,13 @@ static void UISettingsHandler_WriteAll(ImGuiContext *ctx, ImGuiSettingsHandler *
 			buf->appendf("%s=%f\n", cnf.first.c_str(), cnf.second);
 		}
 	}
+
+	if (!mapstring.empty()){
+		buf->appendf("[%s][SettingsS]\n", handler->TypeName);
+		for (std::pair<std::string, std::string> cnf: mapstring){
+			buf->appendf("%s=\"%s\"\n", cnf.first.c_str(), cnf.second.c_str());
+		}
+	}
 }
 
 static void UISettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *handler, void *entry, const char *line)
@@ -113,7 +125,7 @@ static void UISettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *han
 	std::map<std::string, int> map;
 	int i = 0;
 	char buffer[64];
-	char intbuffer[64];
+	char inbuffer[64];
 
 	while(!(*line == '=' || *line == 0)){
 		buffer[i++] = *line++;
@@ -122,18 +134,24 @@ static void UISettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *han
 	line++;i = 0;
 	while (*line != 0)
 	{
-		intbuffer[i++] = *line++;
+		inbuffer[i++] = *line++;
 	}
-	intbuffer[i] = 0;
+	inbuffer[i] = 0;
 	if (entry == (void*)2){
-		if (sscanf(intbuffer, "%d", &i) == 1){
+		if (sscanf(inbuffer, "%d", &i) == 1){
 			wsdl->set_configuration_int(buffer, i);
 		}
 	}
 	if (entry == (void*)1){
 		float f;
-		if (sscanf(intbuffer, "%f", &f) == 1){
+		if (sscanf(inbuffer, "%f", &f) == 1){
 			wsdl->set_configuration_float(buffer, f);
+		}
+	}
+	if (entry == (void*)3){
+		char bufferstr[64];
+		if (sscanf(inbuffer, "\"%[^\"]\"", &bufferstr) == 1){
+			wsdl->set_configuration_string(buffer, bufferstr);
 		}
 	}
 }
@@ -194,6 +212,22 @@ void Window_SDL::set_configuration_float(std::string s, float f)
 	for (auto win : _impl->widgets)
 	{
 		win->set_configuration_float(s, f);
+	}
+}
+
+void Window_SDL::get_configuration_string(std::map<std::string, std::string> &cnf)
+{
+	for (auto win : _impl->widgets)
+	{
+		win->get_configuration_string(cnf);
+	}
+}
+
+void Window_SDL::set_configuration_string(std::string s, std::string str)
+{
+	for (auto win : _impl->widgets)
+	{
+		win->set_configuration_string(s, str);
 	}
 }
 

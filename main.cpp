@@ -8,6 +8,7 @@
 #include <fftw3.h>
 #include <complex>
 #include <thread.h>
+#include <algorithm>
 
 extern "C" {
     extern unsigned char _font_blob_end[];
@@ -119,7 +120,7 @@ class AudioToolWindow : public Widget
     bool    m_sweep_started = false;
     bool    m_async_sweep = false;
     int     m_sweep_current_frequency;
-    int     m_sweep_span = 250;
+    int     m_sweep_capture_num = 30;
     int     m_measure_delay = 400;
     std::vector<double> m_sweep_values;
     std::vector<double> m_sweep_freqs;
@@ -142,13 +143,6 @@ class AudioToolWindow : public Widget
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
         float fft_step = m_capture_size / current_sample_rate;
         if (!m_async_sweep){
-            
-            if (m_sweep_current_frequency >= 20000){
-                // We reached the end of the measure
-                stop_sweep_gen();
-                return;
-            }
-
             int min_freq_idx = std::max(int((m_sweep_current_frequency-500)*fft_step), 0);
             int max_freq_idx = std::min(int((m_sweep_current_frequency+500)*fft_step), m_capture_size / 2);
 
@@ -162,8 +156,13 @@ class AudioToolWindow : public Widget
             m_sweep_values.push_back(max_val);
             m_sweep_freqs.push_back(m_sweep_current_frequency);
 
+            double logfreq_min = log10(20.);
+            double logfreq_max = log10(20000.);
+            double step = (logfreq_max-logfreq_min) / m_sweep_capture_num;
 
-            m_sweep_current_frequency += m_sweep_span;
+            double newlogfreq = log10(m_sweep_current_frequency) + step;
+
+            m_sweep_current_frequency = pow(10., newlogfreq);
             m_sine_generator.set_pitch(m_sweep_current_frequency);
         } else {
             double max_val = m_noise_foor;
@@ -199,6 +198,13 @@ class AudioToolWindow : public Widget
                 m_sweep_freqs.push_back(frequency);
             }
         }
+        
+        if (m_sweep_current_frequency >= 20000){
+            // We reached the end of the measure
+            stop_sweep_gen();
+            return;
+        }
+
         m_sweep_timer.start();
         update_ui();
     }
@@ -499,6 +505,7 @@ public:
                 stop_sweep_gen();
             }
         }
+        ImGui::SetItemTooltip("Switch between synchronous and asynchronous capture");
         ImGui::EndChild();
 
         ImGui::SameLine();
@@ -507,11 +514,13 @@ public:
         if (ImGui::SliderInt("Tone power", &m_sine_volume_db, -100, 0, "%d dB")){
             m_sine_generator.set_volume(m_sine_volume_db);
         }
+        ImGui::SetItemTooltip("Set audio tone power");
         ImGui::EndChild();
         
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild3", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("Log scale frequency", &m_logscale_frequency);
+        ImGui::SetItemTooltip("Set log scale frequency axis");
         ImGui::EndChild();
         ImGui::SameLine();
 
@@ -521,12 +530,14 @@ public:
             // Set a comfortable time amount to let the FFT settle (at leat 400ms for 200ms latency)
             m_sweep_timer.set(m_measure_delay);
         }
+        ImGui::SetItemTooltip("Delay between tone change and capture, not set too low");
         ImGui::EndChild();
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildSpan", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(70);
-        ImGui::DragInt("Sweep span (Hz)", &m_sweep_span, 10.f, 50, 2000);
+        ImGui::DragInt("Sweep capture #", &m_sweep_capture_num, 10.f, 10, 500);
+        ImGui::SetItemTooltip("Number of measurement points");
         ImGui::EndChild();
 
         ImGui::SameLine();
@@ -536,6 +547,7 @@ public:
         {
             set_window_fn();
         }
+        ImGui::SetItemTooltip("Set the FFT window mode");
         ImGui::EndChild();
         if (channelcount > 1){
             ImGui::SameLine();
@@ -1258,6 +1270,46 @@ public:
                 ImGui::PopItemWidth();
             }
             ImGui::End();
+        }
+    }
+
+    void save_soundcard_setup(std::map<std::string, std::string> &cnf)
+    {
+        const std::vector<std::string>& out_devices = m_audiomanager.get_output_devices();
+        std::string out_device = out_devices[m_combo_out];
+        const std::vector<std::string>& in_devices = m_audiomanager.get_input_devices();
+        std::string in_device = in_devices[m_combo_out];
+
+
+        cnf["output_device"] = out_device;
+        cnf["input_device"] = in_device;
+    }
+
+    void get_configuration_string(std::map<std::string, std::string> &cnf) override
+    {
+        save_soundcard_setup(cnf);
+    }
+
+    void set_configuration_string(std::string s, std::string str) override
+    {
+        if (s == "input_device")
+        {
+            const std::vector<std::string>& in_devices = m_audiomanager.get_input_devices();
+            std::vector<std::string>::const_iterator it = std::find(in_devices.begin(), in_devices.end(), str);
+            if (it != in_devices.end()){
+                m_audio_in_idx = m_audiomanager.get_input_device_map(std::distance(in_devices.begin(), it));
+                printf("Input dev found [%s] [%i]\n", str.c_str(), m_audio_in_idx);
+            }
+        }
+
+        if (s == "output_device")
+        {
+            const std::vector<std::string>& out_devices = m_audiomanager.get_output_devices();
+            std::vector<std::string>::const_iterator it = std::find(out_devices.begin(), out_devices.end(), str);
+            if (it != out_devices.end()){
+                m_audio_out_idx = m_audiomanager.get_input_device_map(std::distance(out_devices.begin(), it));
+                printf("Output dev found [%s] [%i]\n", str.c_str(), m_audio_out_idx);
+            }
         }
     }
 

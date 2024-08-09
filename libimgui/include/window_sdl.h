@@ -53,6 +53,9 @@ public:
 	virtual void get_configuration_float(std::map<std::string, float> &){}
 	virtual void set_configuration_float(std::string, float) {}
 
+	virtual void get_configuration_string(std::map<std::string, std::string> &){}
+	virtual void set_configuration_string(std::string, std::string) {}
+
 	int width(), height();
 	ImVec2 size();
 
@@ -114,6 +117,8 @@ public:
 
 	void get_configuration_float(std::map<std::string, float>& );
 	void set_configuration_float(std::string, float);
+	void get_configuration_string(std::map<std::string, std::string> &cnf);
+	void set_configuration_string(std::string s, std::string str);
 	unsigned long timestamp();
 
 	void update_ui(){m_update_event.push_delayed(this,0,UserEvent::CODE_UPDATEUI);}
