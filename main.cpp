@@ -24,7 +24,8 @@ class MainWindow2 : public Window_SDL
         {
             
         }
-        ~Test(){
+        ~Test()
+        {
 
         }
 
@@ -72,8 +73,12 @@ class AudioToolWindow : public Widget
     std::vector<double> m_sound_data_x;
     std::vector<double> m_raw_buffer;
     fftw_plan m_fftplan = NULL;
-    double *m_fftin = nullptr;
-    fftw_complex *m_fftout = nullptr;
+    double *m_fftinl = nullptr;
+    fftw_complex *m_fftoutl = nullptr;
+    double *m_fftinr = nullptr;
+    fftw_complex *m_fftoutr = nullptr;
+    double *m_fftin_plan = nullptr;
+    fftw_complex *m_fftout_plan = nullptr;
     double *m_rms_fft = nullptr;
     double *m_fftdraw = nullptr;
     double *m_fftfreqs = nullptr;
@@ -142,15 +147,15 @@ class AudioToolWindow : public Widget
     {
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
         float fft_step = m_capture_size / current_sample_rate;
-        if (!m_async_sweep){
+        if (!m_async_sweep)
+        {
             int min_freq_idx = std::max(int((m_sweep_current_frequency-500)*fft_step), 0);
             int max_freq_idx = std::min(int((m_sweep_current_frequency+500)*fft_step), m_capture_size / 2);
 
             double max_val = m_noise_foor;
-            for (int i = min_freq_idx; i < max_freq_idx; ++i){
-                if (m_fftdraw[i] > max_val){
-                    max_val = m_fftdraw[i];
-                }
+            for (int i = min_freq_idx; i < max_freq_idx; ++i)
+            {
+                if (m_fftdraw[i] > max_val) max_val = m_fftdraw[i];
             }
 
             m_sweep_values.push_back(max_val);
@@ -167,25 +172,31 @@ class AudioToolWindow : public Widget
         } else {
             double max_val = m_noise_foor;
             double frequency = -1;
-            for (int i = 0; i < m_capture_size / 2; ++i){
-                if (m_fftdraw[i] > max_val){
+            for (int i = 0; i < m_capture_size / 2; ++i)
+            {
+                if (m_fftdraw[i] > max_val)
+                {
                     max_val = m_fftdraw[i];
                     frequency = double(i) / fft_step;
                 }
             }
-            if (frequency < 0){
+            if (frequency < 0)
+            {
                 return;
             }
             int index = 0;
             bool found = false;
-            for (auto freq : m_sweep_freqs){
-                if (freq == frequency){
+            for (auto freq : m_sweep_freqs)
+            {
+                if (freq == frequency)
+                {
                     if (m_sweep_values[index] < max_val)
                     m_sweep_values[index] = max_val;
                     found = true;
                     break;
                 }
-                if (freq > frequency && index > -1){
+                if (freq > frequency && index > -1)
+                {
                     m_sweep_values.insert(m_sweep_values.begin() + index, max_val);
                     m_sweep_freqs.insert(m_sweep_freqs.begin() + index, frequency);
                     found = true;
@@ -193,13 +204,15 @@ class AudioToolWindow : public Widget
                 }
                 index++;
             }
-            if (!found){
+            if (!found)
+            {
                 m_sweep_values.push_back(max_val);
                 m_sweep_freqs.push_back(frequency);
             }
         }
         
-        if (m_sweep_current_frequency >= 20000){
+        if (m_sweep_current_frequency >= 20000)
+        {
             // We reached the end of the measure
             stop_sweep_gen();
             return;
@@ -211,9 +224,8 @@ class AudioToolWindow : public Widget
 
     CALLBACK_METHOD(on_recorder_data_ready, AudioToolWindow)
     {
-        if (m_pause_compute){
-            return;
-        }
+        if (m_pause_compute) return;
+        
         bool computed = compute();
         if (computed && m_compute_thd)
         {
@@ -273,8 +285,10 @@ public:
     {
         if (m_fftplan) fftw_destroy_plan(m_fftplan);
 
-        delete[] m_fftin;
-        delete[] m_fftout;
+        delete[] m_fftinl;
+        delete[] m_fftoutl;
+        delete[] m_fftinr;
+        delete[] m_fftoutr;
         delete[] m_fftdraw;
         delete[] m_fftfreqs;
         delete[] m_fftfiltered;
@@ -282,8 +296,10 @@ public:
         delete[] m_current_window_cache;
         m_sound_data_x.clear();
 
-        m_fftin = nullptr;
-        m_fftout = nullptr;
+        m_fftinl = nullptr;
+        m_fftoutl = nullptr;
+        m_fftinr = nullptr;
+        m_fftoutr = nullptr;
         m_fftdraw = nullptr;
         m_fftfreqs = nullptr;
         m_fftfiltered = nullptr;
@@ -294,28 +310,27 @@ public:
     void init_capture()
     {
         int capture_size = m_audiorecorder.get_buffer_size(float(m_recorder_latency_ms) / 1000.f, false);
-        if (capture_size == 0){
-            return;
-        }
+        if (capture_size == 0) return;
+        
         destroy_capture(); 
         m_capture_size = capture_size;
-        m_fftin = new double[capture_size];
-        m_fftout = new fftw_complex[capture_size];
+        m_fftinl = new double[capture_size];
+        m_fftoutl = new fftw_complex[capture_size];
+        m_fftinr = new double[capture_size];
+        m_fftoutr = new fftw_complex[capture_size];
         m_fftdraw = new double[capture_size/2];
         m_fftfreqs = new double[capture_size/2];   
         m_fftfiltered = new double[capture_size/2];   
         m_rms_fft = new double[capture_size/2];
         m_current_window_cache = new double[capture_size];
-        m_fftplan = fftw_plan_dft_r2c_1d(capture_size, m_fftin, m_fftout, FFTW_MEASURE | FFTW_PRESERVE_INPUT);
+        m_fftplan = fftw_plan_dft_r2c_1d(capture_size, m_fftin_plan, m_fftout_plan, FFTW_MEASURE | FFTW_PRESERVE_INPUT);
         m_fft_channel = 0;
         compute_fft_window_cache();
     }
 
     void reinit_recorder()
     {
-        if (m_audio_in_idx < 0){
-            return;
-        }
+        if (m_audio_in_idx < 0) return;
 
         if (m_audiorecorder.init(float(m_recorder_latency_ms) / 1000.f, m_audio_in_idx, m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate]))
         {
@@ -334,24 +349,25 @@ public:
         m_sine_generator.pause(!m_sine_generator_switch);
     }
 
-    void compute_fft_window_cache(){
-        if (m_current_window_cache == nullptr){
-            delete m_current_window_cache;
-        }
+    void compute_fft_window_cache()
+    {
+        if (m_current_window_cache == nullptr) delete m_current_window_cache;
         m_current_window_cache = new double[m_capture_size];
-        for(int i = 0; i < m_capture_size; ++i){
-            m_current_window_cache[i] = m_window_fn(i, m_capture_size);
-        }
+
+        for(int i = 0; i < m_capture_size; ++i) m_current_window_cache[i] = m_window_fn(i, m_capture_size);
     }
 
-    void compute_fft_window_corrections(){
+    void compute_fft_window_corrections()
+    {
         int tmp = m_fft_window_fn_index;
-        for (int j = 0; j < 8; ++j){
+        for (int j = 0; j < 8; ++j)
+        {
             m_fft_window_fn_index = j;
             set_window_fn(false);
             double sum = 0;
             double rms = 0;
-            for (int i = 0; i < 1000; i++){
+            for (int i = 0; i < 1000; i++)
+            {
                 double val = m_window_fn(i, 1000);
                 sum += val;
                 rms += val*val;
@@ -367,15 +383,10 @@ public:
 
     void set_theme()
     {
-        if (m_uitheme == 0){
-            ImGui::StyleColorsDark();   
-        }
-        if (m_uitheme == 1){
-            ImGui::StyleColorsLight();   
-        }
-        if (m_uitheme == 2){
-            ImGui::StyleColorsClassic();   
-        }
+        if (m_uitheme == 0) ImGui::StyleColorsDark();   
+        else if (m_uitheme == 1) ImGui::StyleColorsLight();   
+        else if (m_uitheme == 2) ImGui::StyleColorsClassic();   
+        
         ImGui::GetStyle().FrameRounding = 5.0;
         ImGui::GetStyle().ChildRounding = 5.0;
         ImGui::GetStyle().WindowRounding = 4.0;
@@ -389,37 +400,44 @@ public:
         int channelcount = m_audiorecorder.get_channel_count();
     
         if (ImGui::BeginMainMenuBar()) {
-            if (ImGui::BeginMenu("Preferences")){
-                if (ImGui::BeginMenu("Theme")){
-                    if (ImGui::MenuItem("Dark", nullptr, nullptr)){
+            if (ImGui::BeginMenu("Preferences"))
+            {
+                if (ImGui::BeginMenu("Theme"))
+                {
+                    if (ImGui::MenuItem("Dark", nullptr, nullptr))
+                    {
                         m_uitheme = 0;
                         set_theme();
                     }
-                    if (ImGui::MenuItem("Light", nullptr, nullptr)){
+                    if (ImGui::MenuItem("Light", nullptr, nullptr))
+                    {
                         m_uitheme = 1;
                         set_theme();
                     }
-                    if (ImGui::MenuItem("Classic", nullptr, nullptr)){
+                    if (ImGui::MenuItem("Classic", nullptr, nullptr))
+                    {
                         m_uitheme = 2;
                         set_theme();
                     }
                     ImGui::EndMenu();
                 }
                 ImGui::MenuItem("Sound card setup", nullptr, &m_sound_setup_open);
-                if(ImGui::MenuItem("Show Zscore settings", nullptr, nullptr)){
-                    m_show_zscore_settings = !m_show_zscore_settings;
-                }
+                
+                if(ImGui::MenuItem("Show Zscore settings", nullptr, nullptr))  m_show_zscore_settings = !m_show_zscore_settings;
+                
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();
         }
 
         ImGui::BeginTabBar("MaintabBar");
-        if (ImGui::BeginTabItem("Realtime analysis")){
+        if (ImGui::BeginTabItem("Realtime analysis"))
+        {
             draw_rt_analysis_tab();
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("Sweep measurement")){
+        if (ImGui::BeginTabItem("Sweep measurement"))
+        {
             draw_sweep_tab();
             ImGui::EndTabItem();
         }
@@ -450,7 +468,8 @@ public:
 
     void set_window_fn(bool compute_cache = true)
     {
-        switch (m_fft_window_fn_index){
+        switch (m_fft_window_fn_index)
+        {
             case 0:
                 m_window_fn = rectangle_fft_window;
                 break;
@@ -479,9 +498,8 @@ public:
                 m_window_fn = rectangle_fft_window;
                 break;
         }
-        if (compute_cache){
-            compute_fft_window_cache();
-        }
+
+        if (compute_cache) compute_fft_window_cache();
     }
 
     void draw_sweep_tab()
@@ -494,14 +512,17 @@ public:
         ImGui::BeginChild("ScopesChild1", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
 
         ImGui::BeginChild("ScopesChild2", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        if (!m_sweep_started){
+        if (!m_sweep_started)
+        {
             ImGui::ToggleButton("Async", &m_async_sweep);
             ImGui::SameLine();
-            if (ImGui::Button("Start")){
+            if (ImGui::Button("Start"))
+            {
                 start_sweep_gen();
             }
         } else {
-            if (ImGui::Button("Stop")){
+            if (ImGui::Button("Stop"))
+            {
                 stop_sweep_gen();
             }
         }
@@ -511,7 +532,8 @@ public:
         ImGui::SameLine();
         ImGui::BeginChild("FFTChildToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(70);
-        if (ImGui::SliderInt("Tone power", &m_sine_volume_db, -100, 0, "%d dB")){
+        if (ImGui::SliderInt("Tone power", &m_sine_volume_db, -100, 0, "%d dB"))
+        {
             m_sine_generator.set_volume(m_sine_volume_db);
         }
         ImGui::SetItemTooltip("Set audio tone power");
@@ -526,7 +548,8 @@ public:
 
         ImGui::BeginChild("ScopesChild4", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(70);
-        if(ImGui::DragInt("Delay (ms)", &m_measure_delay, 1.f, m_recorder_latency_ms * 2, 3000)){
+        if(ImGui::DragInt("Delay (ms)", &m_measure_delay, 1.f, m_recorder_latency_ms * 2, 3000))
+        {
             // Set a comfortable time amount to let the FFT settle (at leat 400ms for 200ms latency)
             m_sweep_timer.set(m_measure_delay);
         }
@@ -549,22 +572,26 @@ public:
         }
         ImGui::SetItemTooltip("Set the FFT window mode");
         ImGui::EndChild();
-        if (channelcount > 1){
+        if (channelcount > 1)
+        {
             ImGui::SameLine();
             ImGui::BeginChild("ScopesChild6", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
             bool left = m_fft_channel == 0;
             bool right = m_fft_channel == 1;
-            if (ImGui::Checkbox("Left", &left) ){
+            if (ImGui::Checkbox("Left", &left) )
+            {
                 m_fft_channel = 0;
             }
             ImGui::SameLine();
-            if (ImGui::Checkbox("right", &right) ){
+            if (ImGui::Checkbox("right", &right) )
+            {
                 m_fft_channel = 1;
             }
             ImGui::EndChild();
         }
 
-        if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1))){
+        if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1)))
+        {
             float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
             ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock);
             if (m_logscale_frequency){
@@ -601,8 +628,10 @@ public:
         int textsize = strlen(voltmeter);
         const int lcd_digits_size = 6;
         float p=0.02*size.x,s=size.x/lcd_digits_size-p,x=s*.5,y=size.y*.5;
-        for(int i=(textsize-1) - (textsize - lcd_digits_size);i>=0;i--){
-            if (voltmeter[i] >= '0' && voltmeter[i] <= '9'){
+        for(int i=(textsize-1) - (textsize - lcd_digits_size);i>=0;i--)
+        {
+            if (voltmeter[i] >= '0' && voltmeter[i] <= '9')
+            {
                 int _d = voltmeter[i] - '0';
                 digit(draw_list,_d,ImVec2(s*.5,y),ImVec2(p1.x-x,p0.y+y));
                 x+=s+p;
@@ -626,31 +655,36 @@ public:
         /*
         * Tone Generator
         */
-        if (!m_sweep_started){
+        if (!m_sweep_started)
+        {
             ImGui::BeginChild("ScopesChildToneGen", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_None);
 
             ImGui::BeginChild("ScopesChildTonGenSwitch", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-            if(ImGui::ToggleButton("Tone generator", &m_sine_generator_switch)){
+            if(ImGui::ToggleButton("Tone generator", &m_sine_generator_switch))
+            {
                 reset_sine_generator();
             }
             ImGui::SetItemTooltip("Sine generator ON/OFF");
 
             ImGui::SameLine();
-            if (ImGui::SliderInt("Pitch", &m_pitch, 20, 20000)){
+            if (ImGui::SliderInt("Pitch", &m_pitch, 20, 20000))
+            {
                 m_sine_generator.set_pitch(m_pitch);
             }
             ImGui::SetItemTooltip("Set the pitch of the sine generator");
             ImGui::EndChild();
             ImGui::SameLine();
             ImGui::BeginChild("ScopesChildToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-            if (ImGui::SliderInt("Intensity", &m_sine_volume_db, -100, 0, "%d dB")){
+            if (ImGui::SliderInt("Intensity", &m_sine_volume_db, -100, 0, "%d dB"))
+            {
                 m_sine_generator.set_volume(m_sine_volume_db);
             }
             ImGui::SetItemTooltip("Set the generator intensity");
             ImGui::EndChild();
 
             // ImGui::SameLine();
-            // if(ImGui::Button("test")){
+            // if(ImGui::Button("test"))
+            // {
             //     MainWindow2* win = new MainWindow2;
             //     App_SDL::get()->add_window(win);
             // }
@@ -668,7 +702,8 @@ public:
 
         ImGui::BeginChild("ScopesChild1", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
 
-        if (channelcount > 1){
+        if (channelcount > 1)
+        {
             ImGui::BeginChild("ScopesChildShowXY", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
             ImGui::ToggleButton("XY diagram", &m_show_xy);
             ImGui::SetItemTooltip("Shows the XY phase diagram panel");
@@ -691,29 +726,35 @@ public:
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildCalib", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         static double rms_calibration = 1.0;
-        if (m_rms_calibration_scale == 1.0){
+        if (m_rms_calibration_scale == 1.0)
+        {
             ImGui::SetNextItemWidth(70);
             ImGui::InputDouble("Measured RMS", &rms_calibration);
             ImGui::SetItemTooltip("Enter the measured RMS voltage here to calibrate the meters/graph");
             ImGui::SameLine();
             ImGui::SetNextItemWidth(70);
-            if (ImGui::Button("Calibrate from left")){
+            if (ImGui::Button("Calibrate from left"))
+            {
 
                 m_rms_calibration_scale = rms_calibration / m_rms_left;
             }
             ImGui::SetItemTooltip("Do the calibration from left channel");
-            if (channelcount > 1){
+            if (channelcount > 1)
+            {
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(70);
-                if (ImGui::Button("Calibrate from right")){
+                if (ImGui::Button("Calibrate from right"))
+                {
                     m_rms_calibration_scale = rms_calibration / m_rms_right;
                 }
                 ImGui::SetItemTooltip("Do the calibration from right channel");
             }
         }
-        if (m_rms_calibration_scale != 1.0){
+        if (m_rms_calibration_scale != 1.0)
+{
             ImGui::SameLine();
-            if (ImGui::Button("Clear calibration")){
+            if (ImGui::Button("Clear calibration"))
+            {
 
                 m_rms_calibration_scale = 1.0;
                 rms_calibration = 1.0;
@@ -741,8 +782,10 @@ public:
         const char* items[] = {"left", "right"};
         ImGui::ToggleButton("dB target", &m_use_targetdb);
         ImGui::SetItemTooltip("Set a target dB value relative to current measure");
-        if (m_use_targetdb){
-            if (!m_lockdb){
+        if (m_use_targetdb)
+        {
+            if (!m_lockdb)
+            {
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(60);
                 ImGui::Combo("Channel", &m_current_db_target_channel, items, 2);
@@ -762,8 +805,10 @@ public:
         *   LCD voltmeter
         */
 
-        if (m_show_rms_voltage){
-            if (m_rms_calibration_scale == 1.0){
+        if (m_show_rms_voltage)
+        {
+            if (m_rms_calibration_scale == 1.0)
+            {
                 lcd_fg = IM_COL32(200,0,0,255);
             } else {
                 lcd_fg = IM_COL32(0,200,0,255);
@@ -774,7 +819,8 @@ public:
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Volts RMS Left");
             draw_lcd(m_rms_left * m_rms_calibration_scale, ImVec2(200, 70));
-            if (m_lockdb && m_current_db_target_channel == 0){
+            if (m_lockdb && m_current_db_target_channel == 0)
+            {
                 float target_val_left = 1.f - fabs( m_locked_db_value - m_rms_left * m_rms_calibration_scale ) * 10.f;
                 ImGui::ProgressBar(target_val_left);
             }
@@ -785,7 +831,8 @@ public:
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Volts RMS Right");
             draw_lcd(m_rms_right * m_rms_calibration_scale, ImVec2(200, 70));
-            if (m_lockdb && m_current_db_target_channel == 1){
+            if (m_lockdb && m_current_db_target_channel == 1)
+            {
                 float target_val_right = 1.f - fabs( m_locked_db_value - m_rms_right * m_rms_calibration_scale ) *10.f;
                 ImGui::ProgressBar(target_val_right);
             }
@@ -801,42 +848,41 @@ public:
             ImPlot::SetupAxisLimits(ImAxis_X1, 0, xmax);
             ImPlot::SetupAxisLimits(ImAxis_Y1, -x_limit, x_limit, ImPlotCond_Always);
 
-            if (m_rms_calibration_scale != 1.0){
+            if (m_rms_calibration_scale != 1.0)
+            {
                 ImPlot::SetupAxis(ImAxis_Y2, "Volts", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
                 ImPlot::SetupAxisLimits(ImAxis_Y2, -m_rms_calibration_scale / m_scopezoom, m_rms_calibration_scale / m_scopezoom, ImPlotCond_Always);
             }
             ImPlot::SetupAxes("Time (ms)", "Amplitude", 0, ImPlotAxisFlags_Lock);
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xmax);
             
-            if (channelcount > 0){
-                ImPlot::PlotLine("Left channel", m_sound_data_x.data(), m_sound_data1.data(), m_sound_data_x.size());
-            }
-            if (channelcount > 1){
-                ImPlot::PlotLine("Right channel", m_sound_data_x.data(), m_sound_data2.data(), m_sound_data_x.size());
-            }
+            if (channelcount > 0) ImPlot::PlotLine("Left channel", m_sound_data_x.data(), m_sound_data1.data(), m_sound_data_x.size());
+            if (channelcount > 1) ImPlot::PlotLine("Right channel", m_sound_data_x.data(), m_sound_data2.data(), m_sound_data_x.size());
             
             char rmstext[20];
             ImVec2 plotpos = ImPlot::GetPlotPos();
             ImVec2 plotsize = ImPlot::GetPlotSize();
 
-            if (channelcount > 0){
+            if (channelcount > 0)
+            {
                 double rms[4] = {0., (current_sample_rate)/2.0, m_rms_left, m_rms_left};
                 ImPlot::PlotLine("signal RMS left", rms, rms+2, 2);
             }
-            if (channelcount > 1){
+            if (channelcount > 1)
+            {
                 double rms[4] = {0., (current_sample_rate)/2.0, m_rms_right, m_rms_right};
                 ImPlot::PlotLine("signal RMS right", rms, rms+2, 2);
             }
 
-            if(m_use_targetdb){
-                if (!m_lockdb){
-                    m_locked_db_value = ((m_current_db_target_channel == 0) ? m_rms_left : m_rms_right) * pow(10, m_target_db/20.0);
-                }
+            if(m_use_targetdb)
+            {
+                if (!m_lockdb) m_locked_db_value = ((m_current_db_target_channel == 0) ? m_rms_left : m_rms_right) * pow(10, m_target_db/20.0);
                 double tgtpnt[4] = {0., (current_sample_rate)/2.0, m_locked_db_value, m_locked_db_value};
                 ImPlot::PlotLine("target dB", tgtpnt, tgtpnt+2, 2);
             }
 
-            if (m_show0db){
+            if (m_show0db)
+            {
                 double zerodb = .775f / m_rms_calibration_scale;
                 double rms[4] = {0., (current_sample_rate)/2.0, zerodb, zerodb};
                 ImPlot::PlotLine("0 dB Reference", rms, rms+2, 2);
@@ -851,7 +897,8 @@ public:
             ImPlot::SetupAxes("X", "Y", ImPlotAxisFlags_Lock, ImPlotAxisFlags_Lock);
             float limit = 1.f / m_scopezoom;
             ImPlot::SetupAxesLimits(-limit, limit, -limit, limit, ImPlotCond_Always);
-            if (channelcount > 1){
+            if (channelcount > 1)
+            {
                 ImPlot::PlotLine("Channels phase", m_sound_data1.data(), m_sound_data2.data(), m_sound_data_x.size());
             }
             ImPlot::EndPlot();
@@ -891,16 +938,19 @@ public:
         ImGui::SetItemTooltip("Set the FFT windowing mode");
         ImGui::EndChild();
         ImGui::SameLine();
-        if (channelcount > 1){
+        if (channelcount > 1)
+        {
             ImGui::BeginChild("ScopesChild7", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
             bool left = m_fft_channel == 0;
             bool right = m_fft_channel == 1;
-            if (ImGui::Checkbox("Left", &left) ){
+            if (ImGui::Checkbox("Left", &left) )
+            {
                 m_fft_channel = 0;
             }
             ImGui::SetItemTooltip("Analyse left channel");
             ImGui::SameLine();
-            if (ImGui::Checkbox("Right", &right) ){
+            if (ImGui::Checkbox("Right", &right) )
+            {
                 m_fft_channel = 1;
             }
             ImGui::SetItemTooltip("Analyse right channel");
@@ -910,7 +960,8 @@ public:
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild8", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(100);
-        if(ImGui::InputInt("Capture size (ms)", &m_recorder_latency_ms, 50, 200, ImGuiInputTextFlags_EnterReturnsTrue)){
+        if(ImGui::InputInt("Capture size (ms)", &m_recorder_latency_ms, 50, 200, ImGuiInputTextFlags_EnterReturnsTrue))
+        {
             if(m_recorder_latency_ms < 50) m_recorder_latency_ms = 50;
             if(m_recorder_latency_ms > 1000) m_recorder_latency_ms = 1000;
             must_reinit_recorder = true;
@@ -918,7 +969,8 @@ public:
         ImGui::SetItemTooltip("Audio sampling time in millisecond");
         ImGui::EndChild();
 
-        if (m_show_zscore_settings && m_compute_thd){
+        if (m_show_zscore_settings && m_compute_thd)
+        {
             ImGui::SameLine();
             ImGui::BeginChild("ScopesChildZScore", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
             ImGui::SetNextItemWidth(50);
@@ -937,17 +989,20 @@ public:
 
         ImGui::EndChild();
 
-        if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1))){
+        if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1)))
+        {
             float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
             ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock);
-            if (m_logscale_frequency){
+            if (m_logscale_frequency)
+            {
                 ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
             }
             ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Linear);
             ImPlot::SetupAxesLimits(20.f, xfftmax, -120.0, 20.0);
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 20.f, 20000.f);
 
-            if (m_rms_calibration_scale != 1.0){
+            if (m_rms_calibration_scale != 1.0)
+            {
                 double diffdb = 20.0 * log10(m_rms_calibration_scale);
                 ImPlot::SetupAxis(ImAxis_Y2, "dBu", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
                 ImPlot::SetupAxisLimits(ImAxis_Y2, -120 + diffdb, 20 + diffdb, ImPlotCond_Always);
@@ -965,7 +1020,8 @@ public:
                 snprintf(thdtext, 32, "THD+N : %.3f %% (%.2f dB)", m_thdn, m_thddb);
                 ImPlot::PlotText(thdtext, pnt.x, pnt.y);
 
-                for (int i = m_fundamental_index; i < m_fft_found_peaks; ++i){
+                for (int i = m_fundamental_index; i < m_fft_found_peaks; ++i)
+                {
                     double fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 40.0, -200.0};
                     ImPlot::PlotLine("Peaks", fund, fund+2, 2);
                     double y_pos = m_fftdraw[m_fft_highest_idx[i]];
@@ -991,7 +1047,8 @@ public:
             if (channelcount>0 && m_fftfreqs)
             {
                 const char* buffer = NULL;
-                if (m_fft_channel == 0){
+                if (m_fft_channel == 0)
+                {
                     buffer = "Audio left FFT";
                 } else {
                     buffer = "Audio right FFT";
@@ -1005,8 +1062,10 @@ public:
 
         ImGui::EndChild();
 
-        if (must_reinit_recorder){
-            if (m_measure_delay < m_recorder_latency_ms * 2){
+        if (must_reinit_recorder)
+        {
+            if (m_measure_delay < m_recorder_latency_ms * 2)
+            {
                 m_measure_delay = m_recorder_latency_ms * 2;
                 m_sweep_timer.set(m_measure_delay);
             }
@@ -1014,10 +1073,24 @@ public:
         }
     }
 
+    void execute_fft(bool left)
+    {
+        if (left)
+        {
+            m_fftin_plan = m_fftinl;
+            m_fftout_plan = m_fftoutl;
+        } else {
+            m_fftin_plan = m_fftinr;
+            m_fftout_plan = m_fftoutr;
+        }
+        ::fftw_execute(m_fftplan);
+    }
+
     bool compute(bool compute_fft = true, bool compute_noise_floor = true)
     {
         const int channelcount = m_audiorecorder.get_channel_count();
-        if (channelcount == 0){
+        if (channelcount == 0)
+        {
             return false;
         }
 
@@ -1037,22 +1110,21 @@ public:
         m_rms_left = m_rms_right = 0.0;
 
         // Fill audio waveform
-        for (int i = 0; i < m_capture_size; i++){
+        for (int i = 0; i < m_capture_size; i++)
+        {
             m_sound_data1[i] = m_raw_buffer[i*channelcount] * m_audio_gain;
                 
             // THD test for non linear signal by applying small odd harmomics distortion
             // m_sound_data1[i] += 0.7f*sin(1000.*float(i) *2.f*3.14159*1./current_sample_rate);
             // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.4);
             // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.4f);
-            if (m_fft_channel == 0){
-                m_fftin[i] = m_sound_data1[i] * m_current_window_cache[i];
-            } else {
-                m_fftin[i] = m_sound_data2[i] * m_current_window_cache[i];
-            }
+            m_fftinl[i] = m_sound_data1[i] * m_current_window_cache[i];
+            if (channelcount > 1) m_fftinr[i] = m_sound_data2[i] * m_current_window_cache[i];
             m_sound_data_x[i] = float(i) * inv_current_sample_rate * 1000.0;
 
             m_rms_left += m_sound_data1[i] * m_sound_data1[i];
-            if(channelcount>1){
+            if(channelcount>1)
+            {
                 m_sound_data2[i] = m_raw_buffer[i*channelcount+1] * m_audio_gain;
                 m_rms_right += m_sound_data2[i] * m_sound_data2[i];
             }
@@ -1062,34 +1134,43 @@ public:
         m_rms_left = m_rms_left / m_capture_size;
         m_rms_left = sqrt(m_rms_left);
 
-        if (channelcount > 1){
+        if (channelcount > 1)
+        {
             m_rms_right = m_rms_right / m_capture_size;
             m_rms_right = sqrt(m_rms_right);
         }
         
-        if (compute_fft){
+        if (compute_fft)
+        {
             // Compute and fill audio FFT
-            fftw_execute(m_fftplan);
-            std::vector<double> fftdata(fft_capture_size);
+            execute_fft(true);
+            if (channelcount > 1) execute_fft(false);
+
+            std::vector<double> fftdatal(fft_capture_size);
             float sum = 0;
-            for (int i = 0; i < fft_capture_size; ++i){
+            fftw_complex* fftout_complex = m_fft_channel == 0 ? m_fftoutl : m_fftoutr;
+            for (int i = 0; i < fft_capture_size; ++i)
+            {
                 m_fftfreqs[i] = fft_step * (double)(i);
-                double fftout = sqrt(m_fftout[i][0] * m_fftout[i][0] + m_fftout[i][1] * m_fftout[i][1]) * inv_fft_capture_size;
+                double fftout = sqrt(fftout_complex[i][0] * fftout_complex[i][0] + fftout_complex[i][1] * fftout_complex[i][1]) * inv_fft_capture_size;
                 fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
                 fftout = std::max(20.0 * log10(fftout), -200.0);
                 m_fftdraw[i] = isnan(fftout) ? -200.f : fftout;
                 sum += fftout;
             }
 
-            if (m_smooth_fft){
-                sg_smooth(m_fftdraw, fftdata.data(), fft_capture_size, 5, 2);
-                memcpy(m_fftdraw, fftdata.data(), fftdata.size()*4);
+            if (m_smooth_fft)
+            {
+                sg_smooth(m_fftdraw, fftdatal.data(), fft_capture_size, 5, 2);
+                memcpy(m_fftdraw, fftdatal.data(), fftdatal.size()*4);
             }
 
-            if (compute_noise_floor){
+            if (compute_noise_floor)
+            {
                 double mean = sum * inv_fft_capture_size;
                 double stddev = 0;
-                for (int i = 0; i < fft_capture_size; ++i){
+                for (int i = 0; i < fft_capture_size; ++i)
+                {
                     double a = (m_fftdraw[i] - mean);
                     stddev += a * a;
                 }
@@ -1111,10 +1192,12 @@ public:
         double max_val = -200;
         int max_val_index = 0;
         // Find fundamental
-        for (int i = 0; i < m_capture_size/2; ++i){
-            double fft_rms_sample = sqrt(m_fftout[i][0] * m_fftout[i][0] + m_fftout[i][1] * m_fftout[i][1]) * inv_capture_size * invsqrt2;
+        for (int i = 0; i < m_capture_size/2; ++i)
+        {
+            double fft_rms_sample = sqrt(m_fftoutl[i][0] * m_fftoutl[i][0] + m_fftoutl[i][1] * m_fftoutl[i][1]) * inv_capture_size * invsqrt2;
             m_rms_fft[i] = fft_rms_sample;
-            if (fft_rms_sample > max_val){
+            if (fft_rms_sample > max_val)
+            {
                 max_val = fft_rms_sample;
                 max_val_index = i;
             }
@@ -1124,8 +1207,10 @@ public:
 
         // Find FFT fundamental range
         double tmp = max_val;
-        for (int i = max_val_index; i < m_capture_size/2; ++i){
-            if (m_rms_fft[i] > tmp){
+        for (int i = max_val_index; i < m_capture_size/2; ++i)
+        {
+            if (m_rms_fft[i] > tmp)
+            {
                 m_fft_fund_idx_range_max = i;
                 break;
             }
@@ -1133,15 +1218,18 @@ public:
         }
         
         tmp = max_val;
-        for (int i= max_val_index; i >= 0; --i){
-            if (m_rms_fft[i] > tmp){
+        for (int i= max_val_index; i >= 0; --i)
+        {
+            if (m_rms_fft[i] > tmp)
+            {
                 m_fft_fund_idx_range_min = i;
                 break;
             }
             tmp = m_rms_fft[i];
         }
 
-        if (m_fft_fund_idx_range_max - m_fft_fund_idx_range_min <=0){
+        if (m_fft_fund_idx_range_max - m_fft_fund_idx_range_min <=0)
+        {
             m_fft_fund_idx_range_max = m_fft_fund_idx_range_min = 0;
             return;
         }
@@ -1150,11 +1238,13 @@ public:
         double noise = 0;
 
         // Start at 1, we don't want DC value
-        for (int i = 1; i < m_fft_fund_idx_range_min; ++i){
+        for (int i = 1; i < m_fft_fund_idx_range_min; ++i)
+        {
             noise += (m_rms_fft[i] * m_rms_fft[i]);
         }
 
-        for (int i = m_fft_fund_idx_range_max; i < m_capture_size / 2; ++i){
+        for (int i = m_fft_fund_idx_range_max; i < m_capture_size / 2; ++i)
+        {
             noise += (m_rms_fft[i] * m_rms_fft[i]);
         }
         
@@ -1173,25 +1263,31 @@ public:
         int one_count = 0;
         int found = 0;
 
-        for(int i = m_zscore_lag; i < fft_capture_size; ++i){
+        for(int i = m_zscore_lag; i < fft_capture_size; ++i)
+        {
             double current_sample = m_fftfiltered[i];
-            if (one_count == 0 && current_sample > 0){
+            if (one_count == 0 && current_sample > 0)
+            {
                 one_count++;
                 continue;
             }
-            if (one_count && current_sample > 0){
+            if (one_count && current_sample > 0)
+            {
                 one_count++;
                 continue;
             }
             // We've found a valid range
             // Now let's find the max value inside
-            if(one_count && current_sample < 1.0){
+            if(one_count && current_sample < 1.0)
+            {
                 int freq_start = i - one_count;
                 double max = -130;
                 int freq_idx = freq_start;
                 // Find max value
-                for (int j = freq_start; j < i; ++j){
-                    if (m_fftdraw[j] > max){
+                for (int j = freq_start; j < i; ++j)
+                {
+                    if (m_fftdraw[j] > max)
+                    {
                         freq_idx = j;
                         max = m_fftdraw[j];
                     }
@@ -1207,8 +1303,10 @@ public:
         // Find max values of filtered signal
         int fundamental_index = 0;
         double max = -200.;
-        for(int i = 0; i < m_fft_found_peaks; ++i){
-            if (m_fftdraw[m_fft_highest_idx[i]] > max){
+        for(int i = 0; i < m_fft_found_peaks; ++i)
+        {
+            if (m_fftdraw[m_fft_highest_idx[i]] > max)
+            {
                 max = m_fftdraw[m_fft_highest_idx[i]];
                 fundamental_index = i; 
             }
@@ -1216,11 +1314,13 @@ public:
 
         // Compute Total Harmonic Distortion
         // Source http://www.r-type.org/addtext/add183.htm
-        if (m_fft_found_peaks){
+        if (m_fft_found_peaks)
+        {
             m_thd = 0;
             double fundamental_db = m_fftdraw[m_fft_highest_idx[fundamental_index]];
             double totdbc = 0;
-            for (int i = fundamental_index + 1; i < m_fft_found_peaks; ++i){
+            for (int i = fundamental_index + 1; i < m_fft_found_peaks; ++i)
+            {
                 double dBc = m_fftdraw[m_fft_highest_idx[i]] - fundamental_db;
                 totdbc += pow(10.0, dBc / 10.0);
             }
@@ -1296,7 +1396,8 @@ public:
         {
             const std::vector<std::string>& in_devices = m_audiomanager.get_input_devices();
             std::vector<std::string>::const_iterator it = std::find(in_devices.begin(), in_devices.end(), str);
-            if (it != in_devices.end()){
+            if (it != in_devices.end())
+            {
                 m_audio_in_idx = m_audiomanager.get_input_device_map(std::distance(in_devices.begin(), it));
                 printf("Input dev found [%s] [%i]\n", str.c_str(), m_audio_in_idx);
             }
@@ -1306,7 +1407,8 @@ public:
         {
             const std::vector<std::string>& out_devices = m_audiomanager.get_output_devices();
             std::vector<std::string>::const_iterator it = std::find(out_devices.begin(), out_devices.end(), str);
-            if (it != out_devices.end()){
+            if (it != out_devices.end())
+            {
                 m_audio_out_idx = m_audiomanager.get_input_device_map(std::distance(out_devices.begin(), it));
                 printf("Output dev found [%s] [%i]\n", str.c_str(), m_audio_out_idx);
             }
@@ -1328,13 +1430,15 @@ public:
             m_logscale_frequency = i;
         else if (s == "smoothFFT")
             m_smooth_fft = i;
-        else if (s == "FFTwindowType"){
+        else if (s == "FFTwindowType")
+        {
             m_fft_window_fn_index = i;
             set_window_fn();
         }
         else if (s == "showVoltmeter")
             m_show_rms_voltage = i;
-        else if (s == "theme"){
+        else if (s == "theme")
+        {
             m_uitheme = i;
             set_theme();
         }

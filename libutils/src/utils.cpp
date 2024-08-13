@@ -12,8 +12,6 @@ double mean(const double data[], int len) {
 
     mean = sum/len;
     return mean;
-
-
 }
 
 double stddev(const double data[], int len) {
@@ -184,7 +182,6 @@ static int partial_pivot(double_mat &A, const size_t row, const size_t col,
             piv_elem = tmp;
         }
     }
-
 #if 0
     if(piv_elem < tol) {
       //sgs_error("partial_pivot(): Zero pivot encountered.\n")

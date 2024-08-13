@@ -154,8 +154,6 @@ public:
 	ImFont* load_font_from_memory(const char* data, int memsize, float size);
 	void register_user_event(UserEvent* ev);
 	void unregister_user_event(UserEvent* ev);
-	void register_timer(Timer* t);
-	void unregister_timer(Timer* t);
 	unsigned long timestamp(void);
 	std::string get_app_path();
 	void add_thread(Thread*);

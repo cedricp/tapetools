@@ -39,7 +39,6 @@ struct app_impl
 {
 	std::vector<Window_SDL*> _windows;
 	std::vector<UserEvent*> m_user_events;
-	std::vector<Timer*> m_timers;
 	ImGuiContext* _refimguicontext = 0L;
 	std::map< std::string, std::string > _str_configs;
 	std::vector<Thread*> _threadpool;
@@ -253,10 +252,10 @@ void Window_SDL::show(bool show)
 	    	printf("GLEW init failed\n");
 	    	exit(0);
 	    }
-
+#ifdef DEBUG
 		glEnable(GL_DEBUG_OUTPUT);
 		glDebugMessageCallback( GLMessageCallback, 0 );
-
+#endif
 		// Setup Dear ImGui context
 		IMGUI_CHECKVERSION();
 
@@ -664,24 +663,6 @@ void App_SDL::unregister_user_event(UserEvent* ev) {
 		return;
 	}
 	_impl->m_user_events.erase(it);
-}
-
-void App_SDL::register_timer(Timer* t)
-{
-	auto it = std::find(_impl->m_timers.begin(), _impl->m_timers.end(), t);
-	if (it != _impl->m_timers.end()){
-		return;
-	}
-	_impl->m_timers.push_back(t);
-}
-
-void App_SDL::unregister_timer(Timer* t)
-{
-	auto it = std::find(_impl->m_timers.begin(), _impl->m_timers.end(), t);
-	if (it == _impl->m_timers.end()){
-		return;
-	}
-	_impl->m_timers.erase(it);
 }
 
 ImFont* App_SDL::load_font(std::string fontname, float size)
