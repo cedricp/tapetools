@@ -25,6 +25,15 @@ Install with pacman :
 * mingw64/mingw-w64-x86_64-SDL2
 * mingw64/mingw-w64-x86_64-glew
 
-# Linux
+# Linux (Ubuntu)
 
-TODO
+Install via apt-get :
+
+* libfftw3-dev
+* libsdl2-dev
+* libglew-dev
+* cmake
+
+with command : ```sudo apt install libfftw3-dev libsdl2-dev libglew-dev```
+
+Build with cmake.
