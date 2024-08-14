@@ -123,8 +123,8 @@ static void UISettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *han
 
 	std::map<std::string, int> map;
 	int i = 0;
-	char buffer[64];
-	char inbuffer[64];
+	char buffer[256];
+	char inbuffer[256];
 
 	while(!(*line == '=' || *line == 0)){
 		buffer[i++] = *line++;
@@ -148,7 +148,7 @@ static void UISettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *han
 		}
 	}
 	if (entry == (void*)3){
-		char bufferstr[64];
+		char bufferstr[256];
 		if (sscanf(inbuffer, "\"%[^\"]\"", &bufferstr) == 1){
 			wsdl->set_configuration_string(buffer, bufferstr);
 		}
