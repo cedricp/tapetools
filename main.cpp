@@ -634,7 +634,7 @@ public:
             }
             ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Linear);
             ImPlot::SetupAxesLimits(20.f, xfftmax, -130.0, 0.0);
-            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 20.0, 20000.0);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 20.0, 24000.0);
 
             if (channelcount>0 && m_fftfreqs)
             {
@@ -878,6 +878,15 @@ public:
                 ImGui::ProgressBar(target_val_right);
             }
             ImGui::EndChild();
+
+            if (m_compute_thd){
+                ImGui::BeginChild("ScopesChildFreqCounter", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
+                double freq = m_fftfreqs[m_fft_highest_idx[m_fundamental_index]] / 1000.;
+                TextCenter("Fundamental KHz");
+                draw_lcd(freq, ImVec2(200, 70));
+                ImGui::EndChild();
+            }
+
             ImGui::EndChild();
             ImGui::SameLine();
         }
@@ -1164,7 +1173,7 @@ public:
             m_sound_data1[i] = m_raw_buffer[i*channelcount] * m_audio_gain;
                 
             // THD test for non linear signal by applying small odd harmomics distortion
-            m_sound_data1[i] += 0.5*sin(1000.*float(i) *2.f*M_PI*1./current_sample_rate);
+            //m_sound_data1[i] += 0.5*sin(1000.*float(i) *2.f*M_PI*1./current_sample_rate);
             m_fftinl[i] = m_sound_data1[i] * m_current_window_cache[i];
             // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.4);
             // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.4f);
@@ -1174,7 +1183,7 @@ public:
             if(channelcount>1)
             {
                 m_sound_data2[i] = m_raw_buffer[i*channelcount+1] * m_audio_gain;
-                m_sound_data2[i] += 0.3*sin(1000.*float(i) *2.f*M_PI*1./current_sample_rate + (M_PI_4));
+                //m_sound_data2[i] += 0.3*sin(1000.*float(i) *2.f*M_PI*1./current_sample_rate + (M_PI_4));
                 m_fftinr[i] = m_sound_data2[i] * m_current_window_cache[i];
                 m_rms_right += m_sound_data2[i] * m_sound_data2[i];
             }
@@ -1589,7 +1598,7 @@ int main(int argc, char *argv[])
     app->set_app_name("TapeTools");
     Window_SDL *window = new MainWindow;
 
-    window->set_minimum_window_size(1400, 800);
+    window->set_minimum_window_size(1400, 1000);
 
     app->add_window(window);
     app->run();
