@@ -9,12 +9,26 @@
 #include <complex>
 #include <thread.h>
 #include <algorithm>
+#include <stdarg.h>
 
 extern "C" {
     extern unsigned char _font_blob_end[];
     extern unsigned char _font_blob_start[];
 }
 
+void TextCenter(const char* text, ...) {
+    char buffer[256];
+    va_list args;
+    va_start(args, text);
+    vsnprintf(buffer, 256, text, args);
+    va_end(args);
+
+
+    float font_size = ImGui::GetFontSize() * strlen(buffer) / 2;
+    ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2 - font_size + (font_size / 2));
+
+    ImGui::Text(buffer);
+}
 
 class MainWindow2 : public Window_SDL
 {
@@ -837,9 +851,12 @@ public:
             ImGui::BeginChild("ScopesChildVoltageLcd", ImVec2(0, -1), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeX  | ImGuiWindowFlags_None);
              
             ImGui::BeginChild("ScopesChildVoltageLcd1", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Volts RMS Left");
+            TextCenter("Volts RMS Left");
             draw_lcd(m_rms_left * m_rms_calibration_scale, ImVec2(200, 70));
+            if (m_rms_calibration_scale != 1.){
+                double db = 20. * log10(m_rms_left * m_rms_calibration_scale / .775);
+                TextCenter("[%.2f dBu]", db);
+            }
             if (m_lockdb && m_current_db_target_channel == 0)
             {
                 float target_val_left = 1.f - fabs( m_locked_db_value - m_rms_left * m_rms_calibration_scale ) * 10.f;
@@ -849,9 +866,12 @@ public:
 
             //ImGui::SetCursorPosY(height());
             ImGui::BeginChild("ScopesChildVoltageLcd2", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Volts RMS Right");
+            TextCenter("Volts RMS Right");
             draw_lcd(m_rms_right * m_rms_calibration_scale, ImVec2(200, 70));
+            if (m_rms_calibration_scale != 1.){
+                double db = 20. * log10(m_rms_right * m_rms_calibration_scale / .775);
+                TextCenter("[%.2f dBu]", db);
+            }
             if (m_lockdb && m_current_db_target_channel == 1)
             {
                 float target_val_right = 1.f - fabs( m_locked_db_value - m_rms_right * m_rms_calibration_scale ) *10.f;
@@ -1479,7 +1499,7 @@ public:
             {
                 m_combo_in = std::distance(in_devices.begin(), it);
                 m_audio_in_idx = m_audiomanager.get_input_device_map(m_combo_in);
-                printf("Input dev found [%s] [%i]\n", str.c_str(), m_audio_in_idx);
+                printf("Restoring saved input dev found [%s] [%i]\n", str.c_str(), m_audio_in_idx);
                 m_input_device = str;
                 reset_audiomanager();
             }
@@ -1493,7 +1513,7 @@ public:
             {
                 m_combo_out = std::distance(out_devices.begin(), it);
                 m_audio_out_idx = m_audiomanager.get_output_device_map(m_combo_out);
-                printf("Output dev found [%s] [%i]\n", str.c_str(), m_audio_out_idx);
+                printf("Restoring saved output dev found [%s] [%i]\n", str.c_str(), m_audio_out_idx);
                 m_output_device = str;
                 reset_audiomanager();
             }
@@ -1502,11 +1522,11 @@ public:
 
     void get_configuration_int(std::map<std::string, int> &cnf) override
     {
-        cnf["logScaleFFT"] = m_logscale_frequency == true ? 1 : 0;
-        cnf["smoothFFT"] = m_smooth_fft == true ? 1 : 0;
-        cnf["FFTwindowType"] = m_fft_window_fn_index;
-        cnf["showVoltmeter"] = m_show_rms_voltage == true ? 1 : 0;
-        cnf["theme"] = m_uitheme;
+        cnf["logScaleFFT"]      = m_logscale_frequency == true ? 1 : 0;
+        cnf["smoothFFT"]        = m_smooth_fft == true ? 1 : 0;
+        cnf["FFTwindowType"]    = m_fft_window_fn_index;
+        cnf["showVoltmeter"]    = m_show_rms_voltage == true ? 1 : 0;
+        cnf["theme"]            = m_uitheme;
     }
 
     void set_configuration_int(std::string s, int i) override

@@ -82,7 +82,7 @@ static void *UISettingsHandler_ReadOpen(ImGuiContext *ctx, ImGuiSettingsHandler 
 	if (strcmp("SettingsS", line) == 0){
 		return (void*)3;
 	}
-	return NULL;
+	return nullptr;
 }
 
 static void UISettingsHandler_WriteAll(ImGuiContext *ctx, ImGuiSettingsHandler *handler, ImGuiTextBuffer *buf)
