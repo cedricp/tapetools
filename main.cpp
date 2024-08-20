@@ -10,11 +10,7 @@
 #include <thread.h>
 #include <algorithm>
 #include <stdarg.h>
-
-extern "C" {
-    extern unsigned char _font_blob_end[];
-    extern unsigned char _font_blob_start[];
-}
+#include "Hack-Regular.h"
 
 void TextCenter(const char* text, ...) {
     char buffer[256];
@@ -27,7 +23,7 @@ void TextCenter(const char* text, ...) {
     float font_size = ImGui::GetFontSize() * strlen(buffer) / 2;
     ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2 - font_size + (font_size / 2));
 
-    ImGui::Text(buffer);
+    ImGui::Text("%s", buffer);
 }
 
 class MainWindow2 : public Window_SDL
@@ -284,6 +280,40 @@ class AudioToolWindow : public Widget
         m_combo_out = m_audiomanager.get_output_device_reverse_map(m_audio_out_idx);
         reinit_recorder();
         reset_sine_generator();
+    }
+
+    void detect_periods(){
+        double timestep = 1. / (double)m_audiorecorder.get_current_samplerate();
+        double *audio_data = m_sound_data1.data();
+        std::vector<double> frequencies;
+
+        int previous_idx = 0;
+        double lastzerocross = 0;
+        double previous = audio_data[0];
+        double freq_mean = 0;
+
+        for (int i = 1; i < m_capture_size; ++i)
+        {
+            double current = audio_data[i];
+            
+            if (previous < 0 && current > 0)
+            {
+                double a[2] = {timestep * (double)i-1., previous};
+                double b[2] = {timestep * (double)i, current};
+                double zcrosstime = zerocross(a,b);
+                if (lastzerocross > 0)
+                {
+                    double freq = 1.0 / (zcrosstime - lastzerocross);
+                    frequencies.push_back(freq);
+                    freq_mean += freq;
+                    printf("Found period with freq = %f\n", freq);
+                }
+                lastzerocross = zcrosstime;
+            }
+            previous = current;
+        }
+        freq_mean /= (double)frequencies.size();
+        printf("Frequency mean = %f\n", freq_mean);
     }
 
 public:
@@ -649,7 +679,7 @@ public:
         ImGui::EndChild();
     }
 
-    void draw_lcd(float value, ImVec2 size)
+    void draw_lcd(const float value, const ImVec2 size, const int lcd_digits_size)
     {
         char voltmeter[10];
         snprintf(voltmeter, 10, "%.4f", value);
@@ -661,7 +691,6 @@ public:
         draw_list->PushClipRect(p0, p1);
 
         int textsize = strlen(voltmeter);
-        const int lcd_digits_size = 6;
         float p=0.02*size.x,s=size.x/lcd_digits_size-p,x=s*.5,y=size.y*.5;
         for(int i=(textsize-1) - (textsize - lcd_digits_size);i>=0;i--)
         {
@@ -852,7 +881,7 @@ public:
              
             ImGui::BeginChild("ScopesChildVoltageLcd1", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
             TextCenter("Volts RMS Left");
-            draw_lcd(m_rms_left * m_rms_calibration_scale, ImVec2(200, 70));
+            draw_lcd(m_rms_left * m_rms_calibration_scale, ImVec2(180, 60), 6);
             if (m_rms_calibration_scale != 1.){
                 double db = 20. * log10(m_rms_left * m_rms_calibration_scale / .775);
                 TextCenter("[%.2f dBu]", db);
@@ -867,7 +896,7 @@ public:
             //ImGui::SetCursorPosY(height());
             ImGui::BeginChild("ScopesChildVoltageLcd2", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
             TextCenter("Volts RMS Right");
-            draw_lcd(m_rms_right * m_rms_calibration_scale, ImVec2(200, 70));
+            draw_lcd(m_rms_right * m_rms_calibration_scale, ImVec2(180, 60), 6);
             if (m_rms_calibration_scale != 1.){
                 double db = 20. * log10(m_rms_right * m_rms_calibration_scale / .775);
                 TextCenter("[%.2f dBu]", db);
@@ -881,9 +910,9 @@ public:
 
             if (m_compute_thd){
                 ImGui::BeginChild("ScopesChildFreqCounter", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
-                double freq = m_fftfreqs[m_fft_highest_idx[m_fundamental_index]] / 1000.;
+                double freq = m_fftfreqs ? m_fftfreqs[m_fft_highest_idx[m_fundamental_index]] / 1000. : 0.0;
                 TextCenter("Fundamental KHz");
-                draw_lcd(freq, ImVec2(200, 70));
+                draw_lcd(freq, ImVec2(180, 60), 6);
                 ImGui::EndChild();
             }
 

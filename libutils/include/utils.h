@@ -5,6 +5,13 @@
 void smoothed_z_score(const double y[], double signals[], const int count, const int lag, const float threshold, const float influence);
 bool sg_smooth(const double *v, double *res, const int size, const int width, const int deg);
 
+double zerocross(double a[2], double b[2])
+{
+	double slope = b[1] / a[1];
+	double c = -(slope * a[0]) + a[1];
+	return c / slope;
+}
+
 double rectangle_fft_window(int i, int length)
 {
 	return 1.0;

@@ -1,6 +1,7 @@
 
 macro(binarize RESOURCE_FILE RESOURCES_OBJ REDEF_SYM_PREFIX)
   set(BINARY_NAME _${RESOURCE_FILE})
+  get_filename_component(BASENAME ${RESOURCE_FILE} NAME_WE)
   string(MAKE_C_IDENTIFIER  _binary_${CMAKE_CURRENT_SOURCE_DIR} SYM_NAME)
   string(MAKE_C_IDENTIFIER  ${BINARY_NAME} BINARY_NAME)
 
@@ -19,6 +20,10 @@ macro(binarize RESOURCE_FILE RESOURCES_OBJ REDEF_SYM_PREFIX)
       --redefine-sym ${SYM_NAME}${BINARY_SIZE}=${REDEF_SYM_PREFIX}_size
       ${CMAKE_CURRENT_SOURCE_DIR}/${RESOURCE_FILE} ${RESOURCES_OBJ}
       DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${RESOURCE_FILE}
+  )
+
+  file(WRITE ${BASENAME}.h  
+    "extern \"C\"\n{\nextern unsigned char ${REDEF_SYM_PREFIX}_start[];\nextern unsigned char ${REDEF_SYM_PREFIX}_end[];\n}"
   )
 
   set_source_files_properties(

@@ -2,6 +2,7 @@ build
 INSTALL*
 imgui.ini
 libsoundio/include/config.h
+resources/*.h
 .vscode
 .vscode/settings.json
 G*
