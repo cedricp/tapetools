@@ -7,6 +7,7 @@
 #include <math.h>
 
 static int g_samplerates[] = {
+    192000,
     96000,
     88200,
     50400,

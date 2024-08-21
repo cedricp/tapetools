@@ -7,9 +7,11 @@ bool sg_smooth(const double *v, double *res, const int size, const int width, co
 
 double zerocross(double a[2], double b[2])
 {
-	double slope = b[1] / a[1];
+	double a1 = b[0] - a[0];
+	double b1 = b[1] - a[1];
+	double slope = b1 / a1;
 	double c = -(slope * a[0]) + a[1];
-	return c / slope;
+	return -c / slope;
 }
 
 double rectangle_fft_window(int i, int length)

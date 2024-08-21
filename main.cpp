@@ -140,6 +140,9 @@ class AudioToolWindow : public Widget
 
     double  m_rms_left = 0, m_rms_right = 0;
     bool    m_show_rms_voltage = false;
+    double  m_frequency_counter = 0;
+    double  m_wow_flutter_precent = 0;
+    double  m_freq_drift = 0;
 
     bool    m_sweep_started = false;
     bool    m_async_sweep = false;
@@ -290,6 +293,7 @@ class AudioToolWindow : public Widget
         int previous_idx = 0;
         double lastzerocross = 0;
         double previous = audio_data[0];
+        double previous_time = 0;
         double freq_mean = 0;
 
         for (int i = 1; i < m_capture_size; ++i)
@@ -298,7 +302,7 @@ class AudioToolWindow : public Widget
             
             if (previous < 0 && current > 0)
             {
-                double a[2] = {timestep * (double)i-1., previous};
+                double a[2] = {timestep * ((double)i-1.), previous};
                 double b[2] = {timestep * (double)i, current};
                 double zcrosstime = zerocross(a,b);
                 if (lastzerocross > 0)
@@ -306,14 +310,21 @@ class AudioToolWindow : public Widget
                     double freq = 1.0 / (zcrosstime - lastzerocross);
                     frequencies.push_back(freq);
                     freq_mean += freq;
-                    printf("Found period with freq = %f\n", freq);
                 }
                 lastzerocross = zcrosstime;
             }
             previous = current;
         }
         freq_mean /= (double)frequencies.size();
-        printf("Frequency mean = %f\n", freq_mean);
+        m_frequency_counter = freq_mean;
+        double last = frequencies[0];
+        double maxdeviation = 0;
+        for (int i = 1; i < frequencies.size();++i){
+            double diff = fabs(last - frequencies[i]);
+            if (diff > maxdeviation) maxdeviation = diff;
+        }
+        m_wow_flutter_precent = (1. - (freq_mean / (freq_mean + maxdeviation))) * 100.;
+        m_freq_drift = fabs(freq_mean - 3150.0) / 31.5 ;
     }
 
 public:
@@ -908,13 +919,14 @@ public:
             }
             ImGui::EndChild();
 
-            if (m_compute_thd){
-                ImGui::BeginChild("ScopesChildFreqCounter", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
-                double freq = m_fftfreqs ? m_fftfreqs[m_fft_highest_idx[m_fundamental_index]] / 1000. : 0.0;
-                TextCenter("Fundamental KHz");
-                draw_lcd(freq, ImVec2(180, 60), 6);
-                ImGui::EndChild();
-            }
+            ImGui::BeginChild("ScopesChildFreqCounter", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
+            //double freq = m_fftfreqs ? m_fftfreqs[m_fft_highest_idx[m_fundamental_index]] / 1000. : 0.0;
+            TextCenter("Frequency KHz");
+            lcd_fg = IM_COL32(0,200,0,255);
+            draw_lcd(m_frequency_counter / 1000., ImVec2(180, 60), 6);
+            TextCenter("W&F %.2f%%", m_wow_flutter_precent);
+            TextCenter("Drift %.2f%%", m_freq_drift);
+            ImGui::EndChild();
 
             ImGui::EndChild();
             ImGui::SameLine();
@@ -939,7 +951,7 @@ public:
             if (channelcount > 1) ImPlot::PlotLine("Right channel", m_sound_data_x.data(), m_sound_data2.data(), m_sound_data_x.size());
             
             char rmstext[20];
-            ImVec2 plotpos = ImPlot::GetPlotPos();
+            ImVec2 plotpos  = ImPlot::GetPlotPos();
             ImVec2 plotsize = ImPlot::GetPlotSize();
 
             if (channelcount > 0)
@@ -1197,12 +1209,15 @@ public:
         m_rms_left = m_rms_right = 0.0;
 
         // Fill audio waveform
+        double rand_freq = (double)rand() / (double)RAND_MAX * 10.;
         for (int i = 0; i < m_capture_size; i++)
         {
             m_sound_data1[i] = m_raw_buffer[i*channelcount] * m_audio_gain;
                 
             // THD test for non linear signal by applying small odd harmomics distortion
-            //m_sound_data1[i] += 0.5*sin(1000.*float(i) *2.f*M_PI*1./current_sample_rate);
+            //double dd = sin((3150.-rand_freq)*double(i) *2.f*M_PI*1./current_sample_rate + 0.2);
+            //m_sound_data1[i] = 0.7*sin(3150.*double(i) *2.f*M_PI*1./current_sample_rate + 0.2);
+            //m_sound_data1[i] = 0.7 * sin((3150.+rand_freq) * double(i) * 2.f * M_PI * 1./current_sample_rate);
             m_fftinl[i] = m_sound_data1[i] * m_current_window_cache[i];
             // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.4);
             // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.4f);
@@ -1217,6 +1232,8 @@ public:
                 m_rms_right += m_sound_data2[i] * m_sound_data2[i];
             }
         }
+
+        detect_periods();
 
         m_rms_left = m_rms_left / m_capture_size;
         m_rms_left = sqrt(m_rms_left);
