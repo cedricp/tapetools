@@ -7,7 +7,7 @@ Tapetools is a software that allows you to calibrate/fix old audio devices.
 ## Input ADC Calibration
 
 * Send an AC sine waveform signal (~50Hz) to the input of the sound capture card (you can use the tone generator for that anc connect output of the capure card to the input).
-* Measure the signal with a good A
+* Measure the signal with a good AC multimeter
 * Report the value of the multimeter to the "Measured RMS" box then press enter
 * Click on the "Calibrate from [right/left]" button (right or left channel)
 * You're done, the calibration is now done.
@@ -15,7 +15,7 @@ Tapetools is a software that allows you to calibrate/fix old audio devices.
 
 # Build instructions :
 
-## Window
+## Window (X86_64)
 
 ### MinGW dependencies
  

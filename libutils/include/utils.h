@@ -5,7 +5,7 @@
 void smoothed_z_score(const double y[], double signals[], const int count, const int lag, const float threshold, const float influence);
 bool sg_smooth(const double *v, double *res, const int size, const int width, const int deg);
 
-double zerocross(double a[2], double b[2])
+static double zerocross(double a[2], double b[2])
 {
 	double a1 = b[0] - a[0];
 	double b1 = b[1] - a[1];
@@ -14,12 +14,18 @@ double zerocross(double a[2], double b[2])
 	return -c / slope;
 }
 
-double rectangle_fft_window(int i, int length)
+static float wrap_phase(const float x) {
+    if (x >= (float)M_PI)       return x - 2.0f*(float)M_PI;
+    else if (x <= -(float)M_PI) return x + 2.0f*(float)M_PI;
+    else                        return x;
+};
+
+static double rectangle_fft_window(int i, int length)
 {
 	return 1.0;
 }
 
-double hamming_fft_window(int i, int length)
+static double hamming_fft_window(int i, int length)
 {
 	double a, b, w, N1;
 	a = 25.0/46.0;
@@ -29,12 +35,12 @@ double hamming_fft_window(int i, int length)
 	return w;
 }
 
-double hann_fft_window(int i, int length)
+static double hann_fft_window(int i, int length)
 {
     return 0.5f*(1.0f-cosf(2.0f*M_PI*(double)(i)/(double)(length-1.0f)));
 }
 
-double hann_poisson_fft_window(int i, int length)
+static double hann_poisson_fft_window(int i, int length)
 {
 	double a, N1, w;
 	a = 2.0;
@@ -44,7 +50,7 @@ double hann_poisson_fft_window(int i, int length)
 	return w;
 }
 
-double blackman_fft_window(int i, int length)
+static double blackman_fft_window(int i, int length)
 {
 	double a0, a1, a2, w, N1;
 	a0 = 7938.0/18608.0;
@@ -55,7 +61,7 @@ double blackman_fft_window(int i, int length)
 	return w;
 }
 
-double blackman_harris_fft_window(int i, int length)
+static double blackman_harris_fft_window(int i, int length)
 {
 	double a0, a1, a2, a3, w, N1;
 	a0 = 0.35875;
@@ -105,3 +111,20 @@ static double kaiser5_fft_window(int i,int len){
 static double kaiser7_fft_window(int i,int len){
 	return kaiser_fft_window(7.f, i, len);
 }
+
+class FIR {
+    protected:
+        double *m_coeff;      //!< Coefficients of the FIR filter
+        double *buffer;     //!< Sample buffer for FIR filter
+        unsigned int m_taps;  //!< Number of coefficients of the FIR filter
+    public:
+        FIR(const unsigned int &taps);
+        ~FIR();
+        double filter(const double &x);
+		void reset();
+};
+    
+class FIR_lowpass : public FIR {
+    public:
+        FIR_lowpass(const unsigned int &taps,const double &freq, const double& sampling_freq);
+};

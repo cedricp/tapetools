@@ -68,6 +68,8 @@ class AudioToolWindow : public Widget
     audioSineGenerator m_sine_generator;
     audioRecorder m_audiorecorder;
 
+    FIR_lowpass* m_lpfir = NULL;
+
     int  m_uitheme = 0;
     
     bool m_sine_generator_switch = false;
@@ -83,6 +85,7 @@ class AudioToolWindow : public Widget
     std::string m_output_device;
     
     std::vector<double> m_sound_data1, m_sound_data2;
+    std::vector<double> m_signal_i, m_signal_q;
     std::vector<double> m_sound_data_x;
     std::vector<double> m_raw_buffer;
     fftw_plan m_fftplanr = NULL;
@@ -315,6 +318,15 @@ class AudioToolWindow : public Widget
             }
             previous = current;
         }
+
+        if (frequencies.size() < 2)
+        {
+            m_frequency_counter = 0;
+            m_wow_flutter_precent = 0;
+            m_freq_drift = 0;
+            return;
+        }
+
         freq_mean /= (double)frequencies.size();
         m_frequency_counter = freq_mean;
         double last = frequencies[0];
@@ -355,6 +367,7 @@ public:
     {
         if (m_fftplanr) fftw_destroy_plan(m_fftplanr);
         if (m_fftplanl) fftw_destroy_plan(m_fftplanl);
+        if (m_lpfir) delete m_lpfir;
 
         delete[] m_fftinl;
         delete[] m_fftoutl;
@@ -379,6 +392,7 @@ public:
         m_fftplanr = nullptr;
         m_fftplanl = nullptr;
         m_current_window_cache = nullptr;
+        m_lpfir = nullptr;
     }
 
     void init_capture()
@@ -401,6 +415,7 @@ public:
         m_fftplanr = fftw_plan_dft_r2c_1d(capture_size, m_fftinr, m_fftoutr, FFTW_MEASURE | FFTW_PRESERVE_INPUT);
         m_fftplanl = fftw_plan_dft_r2c_1d(capture_size, m_fftinl, m_fftoutl, FFTW_MEASURE | FFTW_PRESERVE_INPUT);
         m_fft_channel = 0;
+        m_lpfir = new FIR_lowpass(100, 500.,  (double)m_audiorecorder.get_current_samplerate());
         compute_fft_window_cache();
     }
 
@@ -905,19 +920,22 @@ public:
             ImGui::EndChild();
 
             //ImGui::SetCursorPosY(height());
-            ImGui::BeginChild("ScopesChildVoltageLcd2", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
-            TextCenter("Volts RMS Right");
-            draw_lcd(m_rms_right * m_rms_calibration_scale, ImVec2(180, 60), 6);
-            if (m_rms_calibration_scale != 1.){
-                double db = 20. * log10(m_rms_right * m_rms_calibration_scale / .775);
-                TextCenter("[%.2f dBu]", db);
-            }
-            if (m_lockdb && m_current_db_target_channel == 1)
+            if (channelcount > 1)
             {
-                float target_val_right = 1.f - fabs( m_locked_db_value - m_rms_right * m_rms_calibration_scale ) *10.f;
-                ImGui::ProgressBar(target_val_right);
+                ImGui::BeginChild("ScopesChildVoltageLcd2", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
+                TextCenter("Volts RMS Right");
+                draw_lcd(m_rms_right * m_rms_calibration_scale, ImVec2(180, 60), 6);
+                if (m_rms_calibration_scale != 1.){
+                    double db = 20. * log10(m_rms_right * m_rms_calibration_scale / .775);
+                    TextCenter("[%.2f dBu]", db);
+                }
+                if (m_lockdb && m_current_db_target_channel == 1)
+                {
+                    float target_val_right = 1.f - fabs( m_locked_db_value - m_rms_right * m_rms_calibration_scale ) *10.f;
+                    ImGui::ProgressBar(target_val_right);
+                }
+                ImGui::EndChild();
             }
-            ImGui::EndChild();
 
             ImGui::BeginChild("ScopesChildFreqCounter", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
             //double freq = m_fftfreqs ? m_fftfreqs[m_fft_highest_idx[m_fundamental_index]] / 1000. : 0.0;
@@ -1154,7 +1172,7 @@ public:
         if (m_compute_thd)
         {
             ImGui::SameLine();
-            if (ImPlot::BeginPlot("Phase", ImVec2(plotheight, -1)))
+            if (ImPlot::BeginPlot("L/R Phase & Amplitude diff", ImVec2(plotheight, -1)))
             {
                 ImPlot::SetupAxis(ImAxis_Y1, "Phase");
                 ImPlot::SetupAxis(ImAxis_Y2, "dB", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
@@ -1201,24 +1219,32 @@ public:
         const double fft_step = half_sample_rate * inv_fft_capture_size;
         m_fft_highest_val = -100;
         
-        m_sound_data1.resize(m_capture_size);
-        m_sound_data2.resize(m_capture_size);
+        if (m_sound_data1.size() != m_capture_size) m_sound_data1.resize(m_capture_size);
+        if (m_sound_data2.size() != m_capture_size) m_sound_data2.resize(m_capture_size);
         m_audiorecorder.get_data(m_raw_buffer, m_capture_size * channelcount);
-        m_sound_data_x.resize(m_capture_size);
+        if (m_sound_data_x.size() != m_capture_size) m_sound_data_x.resize(m_capture_size);
+
+        if (m_signal_i.size() != m_capture_size) m_signal_i.resize(m_capture_size);
+        if (m_signal_q.size() != m_capture_size) m_signal_q.resize(m_capture_size);
 
         m_rms_left = m_rms_right = 0.0;
+        double twopif_over_sr = 2. * M_PI / current_sample_rate;
 
         // Fill audio waveform
-        double rand_freq = (double)rand() / (double)RAND_MAX * 10.;
         for (int i = 0; i < m_capture_size; i++)
         {
-            m_sound_data1[i] = m_raw_buffer[i*channelcount] * m_audio_gain;
+            double sound_data = m_raw_buffer[i*channelcount] * m_audio_gain;
+            m_sound_data1[i] = sound_data;
                 
             // THD test for non linear signal by applying small odd harmomics distortion
-            //double dd = sin((3150.-rand_freq)*double(i) *2.f*M_PI*1./current_sample_rate + 0.2);
-            //m_sound_data1[i] = 0.7*sin(3150.*double(i) *2.f*M_PI*1./current_sample_rate + 0.2);
+            //m_sound_data1[i] = 0.7 * sin(3150.*double(i) *2.f*M_PI*1./current_sample_rate + 0.2);
             //m_sound_data1[i] = 0.7 * sin((3150.+rand_freq) * double(i) * 2.f * M_PI * 1./current_sample_rate);
-            m_fftinl[i] = m_sound_data1[i] * m_current_window_cache[i];
+
+            // Build IQ signal
+            m_signal_i[i] = sound_data * cos(3150.*double(i) * twopif_over_sr);
+            m_signal_q[i] = sound_data * sin(3150.*double(i) * twopif_over_sr);
+
+            m_fftinl[i] = sound_data * m_current_window_cache[i];
             // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.4);
             // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.4f);
             m_sound_data_x[i] = float(i) * inv_current_sample_rate * 1000.0;
@@ -1234,6 +1260,26 @@ public:
         }
 
         detect_periods();
+
+        m_lpfir->reset();
+        for (int i = 0; i < m_capture_size; i++)
+        {
+            m_signal_i[i] = m_lpfir->filter(m_signal_i[i]);
+        }
+
+        m_lpfir->reset();
+        for (int i = 0; i < m_capture_size; i++)
+        {
+            m_signal_q[i] = m_lpfir->filter(m_signal_q[i]);
+        }
+
+        m_lpfir->reset();
+        for (int i = 1; i < m_capture_size; i++)
+        {
+            double phase = wrap_phase(atan2(m_signal_q[i], m_signal_i[i]) - atan2(m_signal_q[i-1], m_signal_i[i-1]));
+            m_sound_data1[i] = m_lpfir->filter(phase) * 100;;
+            m_sound_data2[i] = m_signal_q[i];
+        }
 
         m_rms_left = m_rms_left / m_capture_size;
         m_rms_left = sqrt(m_rms_left);

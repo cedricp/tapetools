@@ -1,6 +1,8 @@
 #include <cmath>               // for fabs
 #include <string.h>
 #include <vector>
+#include <stdio.h>
+#include "utils.h"
 
 double mean(const double data[], int len) {
     double sum = 0.0, mean = 0.0;
@@ -467,4 +469,54 @@ bool sg_smooth(const double *v, double *res, const int size, const int width, co
         }
     }
     return true;
+}
+
+FIR::FIR(const unsigned int &taps)
+{
+    m_coeff=new double[taps];
+    buffer=new double[taps];
+    m_taps=taps;
+    reset();
+}
+
+FIR::~FIR()
+{
+    delete [] m_coeff;
+    delete [] buffer;
+}
+
+double FIR::filter(const double &smp)
+{
+    memmove(&buffer[1],&buffer[0],(m_taps-1)*sizeof(*buffer));
+    buffer[0]=smp;
+
+    double output=0;
+    for(unsigned int i=0;i<m_taps;i++){
+        output+=buffer[i]*m_coeff[i];
+    }
+    return output;  
+}
+
+void FIR::reset()
+{
+    memset(buffer,0,m_taps*sizeof(double));
+}
+
+FIR_lowpass::FIR_lowpass(const unsigned int &taps,const double &cutoff_freq, const double& sampling_freq) : FIR(taps)
+{
+    double freq = cutoff_freq / sampling_freq;
+    if (freq<0.0 || freq>0.5){
+        printf("FIR_lowpass : invalid freq value : %f\n", freq);
+    }
+    else{
+        int W=taps/2;
+        for(int i=-W;i<W;i++){
+            if(i==0){
+                m_coeff[W]=2*freq;
+            }
+            else{      
+                m_coeff[i+W]=sin(2*(M_PI)*freq*i)/(i*(M_PI));
+            }
+        }
+    }
 }
