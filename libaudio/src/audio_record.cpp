@@ -61,7 +61,7 @@ bool audioRecorder::init(float latency, int device_idx, int samplerate)
         return false;
     }
 
-    int capacity = get_buffer_size(latency) * m_instream->bytes_per_sample;
+    int capacity = get_buffer_size(latency) * m_instream->bytes_per_sample * 4;
     m_ring_buffer = m_manager.get_new_ringbuffer(capacity);
     m_actual_capacity = capacity;
 
@@ -188,7 +188,7 @@ void audioRecorder::get_data(std::vector<double>& data, size_t size)
         }
     }
 
-    m_ring_buffer->advance_read_ptr(fill_bytes);
+    m_ring_buffer->advance_read_ptr(size*sizeof(float));
 }
 
 int audioRecorder::get_available_bytes()
