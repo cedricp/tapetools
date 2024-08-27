@@ -1098,7 +1098,7 @@ public:
 
         ImGui::EndChild();
 
-        if (ImPlot::BeginPlot("AudioFFT", ImVec2(m_compute_thd ? width() - plotheight - 10 : -1, -1)))
+        if (ImPlot::BeginPlot("Audio FFT", ImVec2(m_compute_thd ? width() - plotheight - 10 : -1, -1)))
         {
             double* fft_draw = m_fft_channel == 0 ? m_fftdrawl : m_fftdrawr;
             float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
