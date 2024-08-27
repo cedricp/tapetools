@@ -23,6 +23,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-DDEBUG)
 endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 
+add_subdirectory(libdsp)
 add_subdirectory(libsoundio)
 add_subdirectory(libaudio)
 add_subdirectory(libimgui)
@@ -36,7 +37,7 @@ target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/incl
 
 # Link rules
 
-target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} audio_static imgui_static utils_static $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> )
+target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} dsp_static audio_static imgui_static utils_static $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> )
 
 if(MINGW)
     set(LINKFLAGS "-static-libgcc -static-libstdc++")
