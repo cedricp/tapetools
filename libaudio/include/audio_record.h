@@ -16,7 +16,6 @@ class audioRecorder
     audioManager& m_manager;
     void destroy();
 public:
-    UserEvent buffer_full_event;
     audioRecorder(audioManager& audioManager);
     ~audioRecorder();
 
@@ -26,7 +25,7 @@ public:
     bool start();
     bool pause(bool);
 
-    void get_data(std::vector<double>& data, size_t size);
+    bool get_data(std::vector<double>& data, size_t size);
     int  get_current_samplerate();
     int  get_channel_count();
 

@@ -7,7 +7,7 @@
 #include "audio_record.h"
 
 
-audioRecorder::audioRecorder(audioManager& manager) : m_manager(manager), buffer_full_event("buffer_full_event")
+audioRecorder::audioRecorder(audioManager& manager) : m_manager(manager)
 {
 
 }
@@ -61,8 +61,8 @@ bool audioRecorder::init(float latency, int device_idx, int samplerate)
         return false;
     }
 
-    int capacity = get_buffer_size(latency) * m_instream->bytes_per_sample * 4;
-    m_ring_buffer = m_manager.get_new_ringbuffer(capacity);
+    int capacity = get_buffer_size(latency) * m_instream->bytes_per_sample;
+    m_ring_buffer = m_manager.get_new_ringbuffer(capacity*4);
     m_actual_capacity = capacity;
 
     return true;
@@ -138,11 +138,6 @@ void audioRecorder::read_callback(SoundIoInStream *instream, int frame_count_min
 
     int advance_bytes = written_frames * instream->bytes_per_frame;
     ar->m_ring_buffer->advance_write_ptr(advance_bytes);
-    
-    // Pushing this even will awake the main event loop when buffer is full
-    if (ar->m_ring_buffer->fill_count() >= ar->m_actual_capacity){
-        ar->buffer_full_event.push_delayed();
-    }
 }
 
 bool audioRecorder::start()
@@ -165,13 +160,16 @@ bool audioRecorder::pause(bool p)
     return true;
 }
 
-void audioRecorder::get_data(std::vector<double>& data, size_t size)
+bool audioRecorder::get_data(std::vector<double>& data, size_t size)
 {
     if (!m_ring_buffer){
-        return;
+        return false;
     }
 
     size_t fill_bytes = m_ring_buffer->fill_count();
+    if (fill_bytes < size*sizeof(float)){
+        return false;
+    }
 
     if (data.size() != size) data.resize(size, 0);
 
@@ -189,6 +187,7 @@ void audioRecorder::get_data(std::vector<double>& data, size_t size)
     }
 
     m_ring_buffer->advance_read_ptr(size*sizeof(float));
+    return true;
 }
 
 int audioRecorder::get_available_bytes()

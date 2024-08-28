@@ -776,9 +776,9 @@ bool App_SDL::abort_thread(std::string name)
 		if (thread->name() == name){
 			thread->stop();
 			thread->join();
-			#ifdef DEBUG
-			std::cout << "Deleted thread " << thread->name() << std::endl;
-			#endif
+			// #ifdef DEBUG
+			// std::cout << "Deleted thread " << thread->name() << std::endl;
+			// #endif
 			delete thread;
 			_impl->_threadpool.erase(_impl->_threadpool.begin() + threadnum);
 			return true;
@@ -824,7 +824,12 @@ void App_SDL::run()
 		if (sleep_mode) SDL_WaitEventTimeout(NULL, 500);
 		sleep_mode = true;
 
-        while (SDL_PollEvent(&event)) {
+		for (auto window : _impl->_windows){
+			window->probe_event();
+		}
+
+        while (SDL_PollEvent(&event))
+		{
 			if (event.type == SDL_QUIT){
                 goto end;
             }

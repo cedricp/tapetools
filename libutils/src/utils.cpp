@@ -3,6 +3,19 @@
 #include <vector>
 #include <stdio.h>
 #include "utils.h"
+#include <sys/time.h>
+
+unsigned long timestamp(void)
+{
+    struct timeval tv;
+    if (gettimeofday(&tv, NULL) < 0) return 0;
+    return (unsigned long)((unsigned long)tv.tv_sec * 1000 + (unsigned long)tv.tv_usec/1000);
+}
+
+void Chrono::print_elapsed_time(const char* prefix){
+        unsigned long time = timestamp() - m_time;
+		printf("%s [%i ms]\n", prefix, time);
+	}
 
 double mean(const double data[], int len) {
     double sum = 0.0, mean = 0.0;

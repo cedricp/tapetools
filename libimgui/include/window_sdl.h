@@ -102,6 +102,8 @@ public:
 
 	void show(bool show);
 
+	virtual void probe_event(){}
+
 	virtual void draw(bool compute_only=false);
 	void add_widget(Widget* widget);
 	unsigned int get_windid();

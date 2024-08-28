@@ -38,10 +38,11 @@ class WowAndFluterThread : public ASyncTask
     std::vector<double> &m_wow_flutter_data;
     std::vector<double> &m_wow_flutter_data_x;
     double m_test_frequency;
+    float m_analysis_time_s;
 
     // Objects
-    Dsp::SimpleFilter <Dsp::ChebyshevI::LowPass <6>, 2> m_lowpass_filter;
-    ThreadMutex m_mutex;
+    Dsp::SimpleFilter <Dsp::ChebyshevI::LowPass <4>, 2> m_lowpass_filter;
+    ThreadMutex& m_mutex;
 
 protected:
     void entry() override
@@ -51,9 +52,11 @@ protected:
 
 public:
     WowAndFluterThread(int sr, std::vector<double>& longtermaudio, std::vector<double> &wow_flutter_data,
-        std::vector<double> &wow_flutter_data_x, std::vector<double> incoming_data, int frequency) : m_longterm_audio(longtermaudio), m_samplerate(sr),
+        std::vector<double> &wow_flutter_data_x, std::vector<double> incoming_data, int frequency, ThreadMutex& mutex,
+        float analysis_time_s)
+         : m_longterm_audio(longtermaudio), m_samplerate(sr), m_analysis_time_s(analysis_time_s),
         m_wow_flutter_data(wow_flutter_data), m_wow_flutter_data_x(wow_flutter_data_x), ASyncTask("WFtask"),
-        m_incomimg_sound_data(incoming_data), m_test_frequency(frequency)
+        m_incomimg_sound_data(incoming_data), m_test_frequency(frequency), m_mutex(mutex)
     {
         
     }
@@ -61,12 +64,16 @@ public:
 private:
     void compute_wow_and_flutter()
     {
+        // Chrono chrono;
+        
         // Init low pass filter
-        m_lowpass_filter.setup (6, m_samplerate, 700, 1);
+        m_lowpass_filter.setup (4, m_samplerate, 700, 1);
+        // chrono.print_elapsed_time("Low pass filter setup");
 
-        // We need ~3 seconds of audio recording
+        // We need ~2 seconds of audio recording
         // Append captured audio data to get them
-        int audio_capture_length = 3 * m_samplerate;
+        m_mutex.lock();
+        int audio_capture_length = m_analysis_time_s * m_samplerate;
         int sampled_audio_length = m_incomimg_sound_data.size();
 
         if (m_longterm_audio.empty())
@@ -85,6 +92,8 @@ private:
             memcpy(&m_longterm_audio[move_size], &m_incomimg_sound_data[0], sampled_audio_length*sizeof(double));
         }
 
+        m_mutex.unlock();
+
         int actual_audio_length = m_longterm_audio.size();
         double current_samplerate = m_samplerate;
         double inv_current_samplerate = 1. / current_samplerate;
@@ -93,7 +102,7 @@ private:
         m_signal_i.resize(actual_audio_length);
         m_signal_q.resize(actual_audio_length);
         
-        // signal to IQ data
+        // real signal to IQ data
         for (int i = 0; i < actual_audio_length; ++i)
         {
             m_signal_i[i] = m_longterm_audio[i] * cos(m_test_frequency*double(i) * twopif_over_sr);
@@ -103,24 +112,28 @@ private:
         // Low pass filter IQ signal to suppress fundamental
         double *lp_chans[2] = {m_signal_i.data(), m_signal_q.data()};
         m_lowpass_filter.process(actual_audio_length, lp_chans);
+        // chrono.print_elapsed_time("Low pass step ");
 
-        int decimated_size = actual_audio_length / 10;
+
+        int decimation = 20;
+
+        int decimated_size = actual_audio_length / decimation;
         double phase_to_hz = (current_samplerate / (M_PI * 2.));
-        m_mutex.lock();
+        
         if (m_wow_flutter_data.size() != decimated_size)
         {
             m_wow_flutter_data.resize(decimated_size);
             m_wow_flutter_data_x.resize(decimated_size);
         }
 
-        for (int i = 10; i < decimated_size; i++)
+        for (int i = 1; i < decimated_size; i++)
         {
-            int ten_i = i * 10;
-            double phase = wrap_phase(atan2(m_signal_q[ten_i-1], m_signal_i[ten_i-1]) - atan2(m_signal_q[ten_i], m_signal_i[ten_i]));
+            int step_i = i * decimation;
+            double phase = wrap_phase(atan2(m_signal_q[step_i-1], m_signal_i[step_i-1]) - atan2(m_signal_q[step_i], m_signal_i[step_i]));
             m_wow_flutter_data[i] = phase * phase_to_hz;
-            m_wow_flutter_data_x[i] = (double)ten_i * inv_current_samplerate;
+            m_wow_flutter_data_x[i] = (double)step_i * inv_current_samplerate;
         }
-        m_mutex.unlock();
+        // chrono.print_elapsed_time("Total ");
     }
 };
 
@@ -204,8 +217,6 @@ class AudioToolWindow : public Widget
     double  m_rms_left = 0, m_rms_right = 0;
     bool    m_show_rms_voltage = false;
     double  m_frequency_counter = 0;
-    double  m_wow_flutter_precent = 0;
-    double  m_freq_drift = 0;
 
     bool    m_sweep_started = false;
     bool    m_async_sweep = false;
@@ -231,6 +242,7 @@ class AudioToolWindow : public Widget
 
     int     m_wow_test_frequency = 1;
     int     m_wow_test_frequency_custom = 3000;
+    ThreadMutex m_wow_data_mutex;
 
     CALLBACK_METHOD(on_timer_event, AudioToolWindow)
     {
@@ -316,20 +328,6 @@ class AudioToolWindow : public Widget
         update_ui();
     }
 
-    CALLBACK_METHOD(on_recorder_data_ready, AudioToolWindow)
-    {
-        if (m_pause_compute) return;
-        
-        bool computed = compute();
-        if (computed)
-        {
-            compute_thd();
-            compute_thdn();
-            if (m_compute_channel_phase) compute_channels_phase();
-        }
-        if (computed) update_ui();
-    }
-
     CALLBACK_METHOD(on_device_changed, AudioToolWindow)
     {
         //reset_audiomanager();
@@ -339,6 +337,20 @@ class AudioToolWindow : public Widget
     CALLBACK_METHOD(on_backend_disconnected, AudioToolWindow)
     {
         reset_audiomanager();
+    }
+
+    void on_compute()
+    {
+        if (m_pause_compute) return;
+
+        bool computed = compute();
+        if (computed)
+        {
+            compute_thd();
+            compute_thdn();
+            if (m_compute_channel_phase) compute_channels_phase();
+        }
+        if (computed) update_ui();
     }
 
     void reset_audiomanager()
@@ -386,8 +398,6 @@ class AudioToolWindow : public Widget
         if (frequencies.size() < 2)
         {
             m_frequency_counter = 0;
-            m_wow_flutter_precent = 0;
-            m_freq_drift = 0;
             return;
         }
 
@@ -399,8 +409,6 @@ class AudioToolWindow : public Widget
             double diff = fabs(last - frequencies[i]);
             if (diff > maxdeviation) maxdeviation = diff;
         }
-        m_wow_flutter_precent = (1. - (freq_mean / (freq_mean + maxdeviation))) * 100.;
-        m_freq_drift = fabs(freq_mean - 3150.0) / 31.5 ;
     }
 
 public:
@@ -417,7 +425,6 @@ public:
 
         m_audiomanager.device_changed_event.connect_event(STATIC_METHOD(on_device_changed), this);
         m_audiomanager.backend_disconnected_event.connect_event(STATIC_METHOD(on_backend_disconnected), this);
-        m_audiorecorder.buffer_full_event.connect_event(STATIC_METHOD(on_recorder_data_ready), this);
 
         m_audiomanager.flush();
         m_sweep_timer.connect_event(STATIC_METHOD(on_timer_event), this);
@@ -480,6 +487,10 @@ public:
         
         if (m_optimized_fft) fft_flags |= FFTW_MEASURE;
         else fft_flags |= FFTW_ESTIMATE;
+
+        m_wow_data_mutex.lock();
+        m_longterm_audio.clear();
+        m_wow_data_mutex.unlock();
 
         m_fftplanr = fftw_plan_dft_r2c_1d(capture_size, m_fftinr, m_fftoutr, fft_flags);
         m_fftplanl = fftw_plan_dft_r2c_1d(capture_size, m_fftinl, m_fftoutl, fft_flags);
@@ -877,12 +888,6 @@ public:
         ImGui::SetItemTooltip("Shows wow and flutter panel");
         ImGui::EndChild();
         ImGui::SameLine();
-       
-        ImGui::BeginChild("ScopesChildYzoom", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::SetNextItemWidth(70);
-        ImGui::SliderFloat("Amplitude mult", &m_scopezoom, 1, 50);
-        ImGui::SetItemTooltip("Zoom Y axis");
-        ImGui::EndChild();
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildCalib", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
@@ -1012,8 +1017,6 @@ public:
             TextCenter("Frequency KHz");
             lcd_fg = IM_COL32(0,200,0,255);
             draw_lcd(m_frequency_counter / 1000., ImVec2(180, 60), 6);
-            TextCenter("W&F %.2f%%", m_wow_flutter_precent);
-            TextCenter("Drift %.2f%%", m_freq_drift);
             ImGui::EndChild();
 
             ImGui::EndChild();
@@ -1034,6 +1037,13 @@ public:
             }
             ImPlot::SetupAxes("Time (ms)", "Amplitude", 0, ImPlotAxisFlags_Lock);
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xmax);
+
+            if (ImPlot::IsAxisHovered(ImAxis_Y1) || ImPlot::IsAxisHovered(ImAxis_Y2)){
+                // Zoom Y axis in/out
+                m_scopezoom += ImGui::GetIO().MouseWheel * -2;
+                if (m_scopezoom < 1) m_scopezoom = 1;
+                if (m_scopezoom > 50) m_scopezoom = 50;
+            }
             
             if (channelcount > 0) ImPlot::PlotLine("Left channel", m_sound_data_x.data(), m_sound_data1.data(), m_sound_data_x.size());
             if (channelcount > 1) ImPlot::PlotLine("Right channel", m_sound_data_x.data(), m_sound_data2.data(), m_sound_data_x.size());
@@ -1078,7 +1088,7 @@ public:
             const char* items[] = {"3000","3150", "Custom"};
             ImGui::BeginChild("ChildWFControl", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
             ImGui::SetNextItemWidth(80);
-            ImGui::Combo("Test frequency", &m_wow_test_frequency, items, 3);
+            ImGui::Combo("Reference frequency", &m_wow_test_frequency, items, 3);
             if (m_wow_test_frequency == 2)
             {
                 ImGui::SameLine();
@@ -1089,20 +1099,29 @@ public:
             }
             ImGui::EndChild();
 
-            if (m_wow_test_frequency == 0) frequency = 30.00;
-            else if (m_wow_test_frequency == 1) frequency = 31.50;
-            else if (m_wow_test_frequency == 2) frequency = m_wow_test_frequency_custom / 100.;
+            static float max_freq = 200;
 
+            if (m_wow_test_frequency == 0) frequency = 3000;
+            else if (m_wow_test_frequency == 1) frequency = 3150;
+            else if (m_wow_test_frequency == 2) frequency = m_wow_test_frequency_custom;
 
-            if(ImPlot::BeginPlot("Wow and flutter analysis", ImVec2(plotheight*1.5, -1)))
+            float max_percent = (max_freq / frequency) * 100.;
+
+            if(ImPlot::BeginPlot("Wow and flutter analysis (unweighted)", ImVec2(plotheight*1.5, -1)))
             {
-                ImPlot::SetupAxes("Time", "Freqency drift (Hz)", 0, ImPlotAxisFlags_Lock);
-                ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, 3.);
+                ImPlot::SetupAxes("Time (seconds)", "Freqency drift (Hz)", 0, ImPlotAxisFlags_Lock);
+                ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, 2.);
                 ImPlot::SetupAxisLimits(ImAxis_X1, 0, 3., 0);
-                ImPlot::SetupAxisLimits(ImAxis_Y1, -200, 200, ImPlotCond_Always);
-                ImPlot::SetupAxis(ImAxis_Y2, "%", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
-                ImPlot::SetupAxisLimits(ImAxis_Y2, (-200/frequency), (200/frequency), ImPlotCond_Always);
+                ImPlot::SetupAxisLimits(ImAxis_Y1, -max_freq, max_freq, ImPlotCond_Always);
+                ImPlot::SetupAxis(ImAxis_Y2, "Peak drift %", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
+                ImPlot::SetupAxisLimits(ImAxis_Y2, -max_percent, max_percent, ImPlotCond_Always);
                 ImPlot::PlotLine("Wow and flutter", m_wow_flutter_data_x.data(), m_wow_flutter_data.data(), m_wow_flutter_data.size());
+                if (ImPlot::IsAxisHovered(ImAxis_Y1) || ImPlot::IsAxisHovered(ImAxis_Y2)){
+                    // Zoom Y axis in/out
+                    max_freq += ImGui::GetIO().MouseWheel * -10;
+                    if (max_freq < 10) max_freq = 10;
+                    if (max_freq > 500) max_freq = 500;
+                }
                 ImPlot::EndPlot();
             }
             ImGui::EndChild();
@@ -1161,9 +1180,9 @@ public:
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild8", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(100);
-        if(ImGui::InputInt("Capture size (ms)", &m_recorder_latency_ms, 50, 200, ImGuiInputTextFlags_EnterReturnsTrue))
+        if(ImGui::InputInt("Capture size (ms)", &m_recorder_latency_ms, 100, 200, ImGuiInputTextFlags_EnterReturnsTrue))
         {
-            if(m_recorder_latency_ms < 50) m_recorder_latency_ms = 50;
+            if(m_recorder_latency_ms < 100) m_recorder_latency_ms = 100;
             if(m_recorder_latency_ms > 1000) m_recorder_latency_ms = 1000;
             must_reinit_recorder = true;
         }
@@ -1268,9 +1287,10 @@ public:
             {
                 ImPlot::SetupAxis(ImAxis_Y1, "Phase (degrees)");
                 ImPlot::SetupAxis(ImAxis_Y2, "dB", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
+                ImPlot::SetupAxis(ImAxis_X1, "Time");
 
                 ImPlot::SetupAxesLimits(0.f, m_phase_time.size(), -180.0, 180.0, ImPlotCond_Always);
-                ImPlot::SetupAxisLimits(ImAxis_Y2, -40., 40., ImPlotCond_Always);
+                ImPlot::SetupAxisLimits(ImAxis_Y2, -20., 20., ImPlotCond_Always);
 
                 ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
                 ImPlot::PlotLine("L/R phase", &m_phase_time[0], &m_phase_history[0], m_phase_time.size());
@@ -1303,6 +1323,11 @@ public:
             return false;
         }
 
+        bool data_available = m_audiorecorder.get_data(m_raw_buffer, m_capture_size * channelcount);
+        if (!data_available){
+            return false;
+        }
+
         const int fft_capture_size = m_capture_size / 2;
         const double current_sample_rate = m_audiorecorder.get_current_samplerate();
         const double half_sample_rate = current_sample_rate / 2.0;
@@ -1313,7 +1338,6 @@ public:
         
         if (m_sound_data1.size() != m_capture_size) m_sound_data1.resize(m_capture_size);
         if (m_sound_data2.size() != m_capture_size) m_sound_data2.resize(m_capture_size);
-        m_audiorecorder.get_data(m_raw_buffer, m_capture_size * channelcount);
         if (m_sound_data_x.size() != m_capture_size) m_sound_data_x.resize(m_capture_size);
 
         m_rms_left = m_rms_right = 0.0;
@@ -1343,6 +1367,11 @@ public:
                 m_fftinr[i] = m_sound_data2[i] * m_current_window_cache[i];
                 m_rms_right += m_sound_data2[i] * m_sound_data2[i];
             }
+        }
+
+        if (m_show_wow_flutter){
+            // Audio data ready, launch W&F measurement as soon as possible in parallel
+             compute_wow_and_flutter();
         }
 
         detect_periods();
@@ -1398,8 +1427,6 @@ public:
             } // compute_noise_floor
         } // compute_fft
 
-        if (m_show_wow_flutter) compute_wow_and_flutter();
-
         return true;
     }
 
@@ -1407,6 +1434,7 @@ public:
     {
         App_SDL::get()->release_finished_threads();
         if(App_SDL::get()->get_thread("WFtask")){
+        // Check is previous thread has terminated, if not, reject these samples to not overload
 #ifdef DEBUG
             printf("compute_wow_and_flutter : Missed audiodata\n");
 #endif
@@ -1416,7 +1444,7 @@ public:
         if (m_wow_test_frequency == 1) test_frequency = 3150;
         else if (m_wow_test_frequency == 2) test_frequency = m_wow_test_frequency_custom;
         WowAndFluterThread* wt = new WowAndFluterThread(m_audiorecorder.get_current_samplerate(), m_longterm_audio,
-        m_wow_flutter_data, m_wow_flutter_data_x, m_sound_data1, test_frequency);
+        m_wow_flutter_data, m_wow_flutter_data_x, m_sound_data1, test_frequency, m_wow_data_mutex, 2.);
         wt->start();
     }
 
@@ -1740,6 +1768,15 @@ public:
         if (s == "calibrationValue")
             m_rms_calibration_scale = f;
     }
+
+    void check_data_buffer()
+    {
+        int wanted_buffer = m_capture_size * m_audiorecorder.get_channel_count();
+        if (m_audiorecorder.get_available_samples() >= wanted_buffer)
+        {
+            on_compute();
+        }
+    }
 };
 
 class MainWindow : public Window_SDL
@@ -1751,6 +1788,11 @@ public:
         size_t font_data_size = _font_blob_end - _font_blob_start;
         load_font_from_memory((const char*)_font_blob_start, font_data_size, 16);
         m_audiotool = new AudioToolWindow(this);
+    }
+
+    void probe_event() override
+    {
+        m_audiotool->check_data_buffer();
     }
 
     virtual ~MainWindow()

@@ -4,6 +4,22 @@
 
 void smoothed_z_score(const double y[], double signals[], const int count, const int lag, const float threshold, const float influence);
 bool sg_smooth(const double *v, double *res, const int size, const int width, const int deg);
+unsigned long timestamp(void);
+
+class Chrono
+{
+	unsigned long m_time;
+public:
+	Chrono(){
+		reset();
+	}
+
+	void reset(){
+		m_time = timestamp();
+	}
+
+	void print_elapsed_time(const char* prefix);
+};
 
 static double zerocross(double a[2], double b[2])
 {
