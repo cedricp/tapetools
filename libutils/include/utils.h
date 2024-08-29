@@ -127,20 +127,3 @@ static double kaiser5_fft_window(int i,int len){
 static double kaiser7_fft_window(int i,int len){
 	return kaiser_fft_window(7.f, i, len);
 }
-
-class FIR {
-    protected:
-        double *m_coeff;      //!< Coefficients of the FIR filter
-        double *buffer;     //!< Sample buffer for FIR filter
-        unsigned int m_taps;  //!< Number of coefficients of the FIR filter
-    public:
-        FIR(const unsigned int &taps);
-        ~FIR();
-        double filter(const double &x);
-		void reset();
-};
-    
-class FIR_lowpass : public FIR {
-    public:
-        FIR_lowpass(const unsigned int &taps,const double &freq, const double& sampling_freq);
-};
