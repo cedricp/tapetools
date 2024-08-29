@@ -30,18 +30,18 @@ void TextCenter(const char* text, ...) {
 class WowAndFluterThread : public ASyncTask
 {
     // Data
-    std::vector<double>& m_longterm_audio;
+    std::vector<double> &m_longterm_audio;
+    std::vector<double> &m_wow_flutter_data;
+    std::vector<double> &m_wow_flutter_data_x;
     std::vector<double> m_incomimg_sound_data;
     std::vector<double> m_signal_i;
     std::vector<double> m_signal_q;
-    std::vector<double> &m_wow_flutter_data;
-    std::vector<double> &m_wow_flutter_data_x;
+    float &m_wow_peak;
+    float &m_wow_mean;
     int m_samplerate;
     double m_test_frequency;
     float m_analysis_time_s;
     float m_filter_freq;
-    float& m_wow_peak;
-    float& m_wow_mean;
 
     // Objects
     Dsp::SimpleFilter <Dsp::ChebyshevI::LowPass <4>, 2> m_iq_lowpass_filter;
@@ -57,9 +57,9 @@ public:
         m_wow_mean(wow_mean)
     {
         m_filter_freq = 0;
-        if (filter_freq == 1) m_filter_freq = 5;
+        if (filter_freq == 1) m_filter_freq = 6;
         if (filter_freq == 2) m_filter_freq = 20;
-        if (filter_freq == 3) m_filter_freq = 60;
+        if (filter_freq == 3) m_filter_freq = 100;
     }
 
 private:
@@ -69,28 +69,8 @@ private:
         m_iq_lowpass_filter.setup(4, m_samplerate, 700, 0.1);
 
         // We need ~2 seconds of audio recording
-        // Append captured audio data to get them
-        int audio_capture_length = m_analysis_time_s * m_samplerate;
-        int sampled_audio_length = m_incomimg_sound_data.size();
 
         m_mutex.lock();
-        if (m_longterm_audio.empty())
-        {
-            m_longterm_audio.reserve(audio_capture_length);
-        }
-
-        if (m_longterm_audio.size() < audio_capture_length)
-        {
-            m_longterm_audio.insert(m_longterm_audio.end(), m_incomimg_sound_data.begin(), m_incomimg_sound_data.end());
-        }
-        else
-        {
-            int move_size = audio_capture_length - sampled_audio_length;
-            memcpy(&m_longterm_audio[0], &m_longterm_audio[sampled_audio_length], move_size*sizeof(double));
-            memcpy(&m_longterm_audio[move_size], &m_incomimg_sound_data[0], sampled_audio_length*sizeof(double));
-        }
-        m_mutex.unlock();
-
         int actual_audio_length = m_longterm_audio.size();
         double current_samplerate = m_samplerate;
         double inv_current_samplerate = 1. / current_samplerate;
@@ -105,6 +85,7 @@ private:
             m_signal_i[i] = m_longterm_audio[i] * cos(m_test_frequency*double(i) * twopif_over_sr);
             m_signal_q[i] = m_longterm_audio[i] * sin(m_test_frequency*double(i) * twopif_over_sr);
         }
+        m_mutex.unlock();
 
         // Low pass filter IQ signal to suppress fundamental
         double *lp_chans[2] = {m_signal_i.data(), m_signal_q.data()};
@@ -124,7 +105,7 @@ private:
         for (int i = 1; i < decimated_size; i++)
         {
             int step_i = i * decimation;
-            int step_i_x = (i - (decimated_size / 5)) * decimation;
+            int step_i_x = (i - (decimated_size / 10)) * decimation;
             double phase = wrap_phase(atan2(m_signal_q[step_i-1], m_signal_i[step_i-1]) - atan2(m_signal_q[step_i], m_signal_i[step_i]));
             m_wow_flutter_data[i] = phase * phase_to_hz;
             m_wow_flutter_data_x[i] = (double)step_i_x * inv_current_samplerate;
@@ -139,7 +120,7 @@ private:
 
         double max_dev = -1000, min_dev = 1000, mean = 0;
         // I start the measure a little after the beginnig to suppress lpf settling part
-        for (int i = decimated_size/5; i < decimated_size; ++i)
+        for (int i = decimated_size/10; i < decimated_size; ++i)
         {
             double current = m_wow_flutter_data[i];
             if (current > max_dev) max_dev = current;
@@ -225,6 +206,7 @@ class AudioToolWindow : public Widget
     double  m_thd = 0;
     double  m_thdn = 0;
     double  m_thddb = 0;
+    bool    m_show_thd = false;
 
     double  m_left_right_db;
     double  m_phase_diff_degrees;
@@ -241,6 +223,8 @@ class AudioToolWindow : public Widget
     int     m_sweep_current_frequency;
     int     m_sweep_capture_num = 30;
     int     m_measure_delay = 400;
+    int     m_sweep_last_measure_freq;
+    float   m_sweep_threshold_level = -50;
     std::vector<double> m_sweep_values;
     std::vector<double> m_sweep_freqs;
     Timer   m_sweep_timer;
@@ -274,8 +258,8 @@ class AudioToolWindow : public Widget
 
         if (!m_async_sweep)
         {
-            int min_freq_idx = std::max(int((m_sweep_current_frequency-500)*fft_step), 0);
-            int max_freq_idx = std::min(int((m_sweep_current_frequency+500)*fft_step), m_capture_size / 2);
+            int min_freq_idx = std::max(int((m_sweep_current_frequency-50)*fft_step), 0);
+            int max_freq_idx = std::min(int((m_sweep_current_frequency+50)*fft_step), m_capture_size / 2);
 
             double max_val = m_noise_foor;
             for (int i = min_freq_idx; i < max_freq_idx; ++i)
@@ -295,15 +279,22 @@ class AudioToolWindow : public Widget
 
             m_sweep_current_frequency = pow(10., newlogfreq);
             m_sine_generator.set_pitch(m_sweep_current_frequency);
+
+            if (m_sweep_current_frequency >= 20000)
+            {   
+                // We reached the end of the measure
+                stop_sweep_gen();
+                return;
+            }
         } else {
-            double max_val = m_noise_foor;
+            double fft_max_val = m_sweep_threshold_level;
             double frequency = -1;
-            for (int i = 0; i < m_capture_size / 2; ++i)
+            for (int i = 1; i < m_capture_size / 2; ++i)
             {
-                if (current_fft_draw[i] > max_val)
+                if (current_fft_draw[i] > fft_max_val)
                 {
                     // TODO : Check selected channel 
-                    max_val = current_fft_draw[i];
+                    fft_max_val = current_fft_draw[i];
                     frequency = double(i) / fft_step;
                 }
             }
@@ -311,48 +302,43 @@ class AudioToolWindow : public Widget
             {
                 return;
             }
-            int index = 0;
-            bool found = false;
+            int sweep_values_index = 0;
+            bool found_bin = false;
             for (auto freq : m_sweep_freqs)
             {
-                if (freq == frequency)
+                double freq_low = freq-(freq*0.1);
+                double freq_hi  = freq+(freq*0.1);
+                if (frequency > freq_low && frequency < freq_hi)
                 {
-                    if (m_sweep_values[index] < max_val)
-                    m_sweep_values[index] = max_val;
-                    found = true;
+                    if (m_sweep_values[sweep_values_index] < fft_max_val)
+                    m_sweep_values[sweep_values_index] = fft_max_val;
+                    found_bin = true;
                     break;
                 }
-                if (freq > frequency && index > -1)
+                if (freq > frequency && sweep_values_index >= 0)
                 {
-                    m_sweep_values.insert(m_sweep_values.begin() + index, max_val);
-                    m_sweep_freqs.insert(m_sweep_freqs.begin() + index, frequency);
-                    found = true;
+                    m_sweep_values.insert(m_sweep_values.begin() + sweep_values_index, fft_max_val);
+                    m_sweep_freqs.insert(m_sweep_freqs.begin() + sweep_values_index, frequency);
+                    found_bin = true;
                     break;
                 }
-                index++;
+                sweep_values_index++;
             }
-            if (!found)
+            if (!found_bin)
             {
-                m_sweep_values.push_back(max_val);
+                m_sweep_values.push_back(fft_max_val);
                 m_sweep_freqs.push_back(frequency);
             }
+            m_sweep_last_measure_freq = frequency > m_sweep_last_measure_freq ? frequency : m_sweep_last_measure_freq;
         }
         
-        if (m_sweep_current_frequency >= 20000)
-        {
-            // We reached the end of the measure
-            stop_sweep_gen();
-            return;
-        }
-
         m_sweep_timer.start();
         update_ui();
     }
 
     CALLBACK_METHOD(on_device_changed, AudioToolWindow)
     {
-        //reset_audiomanager();
-        printf("Device changed\n");
+        printf("Audio device configuration changed.\n");
     }
 
     CALLBACK_METHOD(on_backend_disconnected, AudioToolWindow)
@@ -653,6 +639,7 @@ public:
         reset_sine_generator();
         m_sine_generator.set_pitch(m_sweep_current_frequency);
         m_sweep_timer.start();
+        m_sweep_last_measure_freq = 10;
     }
 
     void stop_sweep_gen()
@@ -711,12 +698,12 @@ public:
         ImGui::BeginChild("ScopesChild2", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         if (!m_sweep_started)
         {
-            ImGui::ToggleButton("Async", &m_async_sweep);
-            ImGui::SameLine();
             if (ImGui::Button("Start"))
             {
                 start_sweep_gen();
             }
+            ImGui::SameLine();
+            ImGui::ToggleButton("Async", &m_async_sweep);
         } else {
             if (ImGui::Button("Stop"))
             {
@@ -741,24 +728,34 @@ public:
         ImGui::ToggleButton("Log scale frequency", &m_logscale_frequency);
         ImGui::SetItemTooltip("Set log scale frequency axis");
         ImGui::EndChild();
-        ImGui::SameLine();
 
-        ImGui::BeginChild("ScopesChild4", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::SetNextItemWidth(70);
-        if(ImGui::DragInt("Delay (ms)", &m_measure_delay, 1.f, m_recorder_latency_ms * 2, 3000))
+        if (!m_async_sweep)
         {
-            // Set a comfortable time amount to let the FFT settle (at leat 400ms for 200ms latency)
-            m_sweep_timer.set(m_measure_delay);
-        }
-        ImGui::SetItemTooltip("Delay between tone change and capture, not set too low");
-        ImGui::EndChild();
+            ImGui::SameLine();
+            ImGui::BeginChild("ScopesChild4", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            ImGui::SetNextItemWidth(70);
+            if(ImGui::DragInt("Delay (ms)", &m_measure_delay, 1.f, m_recorder_latency_ms * 2, 3000))
+            {
+                // Set a comfortable time amount to let the FFT settle (at leat 400ms for 200ms latency)
+                m_sweep_timer.set(m_measure_delay);
+            }
+            ImGui::SetItemTooltip("Delay between tone change and capture, not set too low");
+            ImGui::EndChild();
 
-        ImGui::SameLine();
-        ImGui::BeginChild("ScopesChildSpan", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::SetNextItemWidth(70);
-        ImGui::DragInt("Sweep capture #", &m_sweep_capture_num, 10.f, 10, 500);
-        ImGui::SetItemTooltip("Number of measurement points");
-        ImGui::EndChild();
+            ImGui::SameLine();
+            ImGui::BeginChild("ScopesChildSpan", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            ImGui::SetNextItemWidth(70);
+            ImGui::DragInt("Sweep capture #", &m_sweep_capture_num, 10.f, 10, 500);
+            ImGui::SetItemTooltip("Number of measurement points");
+            ImGui::EndChild();
+        } else {
+            ImGui::SameLine();
+            ImGui::BeginChild("ScopesChildSpan", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            ImGui::SetNextItemWidth(70);
+            ImGui::DragFloat("Threshold level (dB)", &m_sweep_threshold_level, 1., -100, 0);
+            ImGui::SetItemTooltip("Number of measurement points");
+            ImGui::EndChild();
+        }
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild5", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
@@ -805,6 +802,9 @@ public:
                 ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
                 ImPlot::PlotLine("Frequency response", m_sweep_freqs.data(), m_sweep_values.data(), m_sweep_freqs.size());
             }
+
+            float sweep_bar[4] = {(float)m_sweep_last_measure_freq, (float)m_sweep_last_measure_freq, 40.0, -200.0};
+            ImPlot::PlotLine("Sweep", sweep_bar, sweep_bar+2, 2);
             
             ImPlot::EndPlot();
         }
@@ -1061,7 +1061,7 @@ public:
 
             if (ImPlot::IsAxisHovered(ImAxis_Y1) || ImPlot::IsAxisHovered(ImAxis_Y2)){
                 // Zoom Y axis in/out
-                m_scopezoom += ImGui::GetIO().MouseWheel * -2;
+                m_scopezoom += ImGui::GetIO().MouseWheel * .1;
                 if (m_scopezoom < 1) m_scopezoom = 1;
                 if (m_scopezoom > 50) m_scopezoom = 50;
             }
@@ -1105,7 +1105,7 @@ public:
         if (m_show_wow_flutter)
         {
             const char* ref_freq_presets[] = {"3000","3150", "Custom"};
-            const char* filter_presets[] = {"OFF", "5","20", "60"};
+            const char* filter_presets[] = {"Disabled", "Wow (6Hz)","Flutter low (20Hz)", "Flutter high (100Hz)"};
             float frequency;
             
             ImGui::BeginChild("ChildWF", ImVec2(0, -1), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
@@ -1121,7 +1121,7 @@ public:
                 if (m_wow_test_frequency_custom > 10000) m_wow_test_frequency_custom = 10000;
             }
             ImGui::SameLine();
-            ImGui::SetNextItemWidth(100);
+            ImGui::SetNextItemWidth(160);
             ImGui::Combo("Low pass filter (Hz)", &m_wf_filter_freq_combo, filter_presets, 4);
             ImGui::EndChild();
 
@@ -1136,8 +1136,8 @@ public:
             if(ImPlot::BeginPlot("Wow and flutter analysis (unweighted)", ImVec2(plotheight*1.5, -1)))
             {
                 ImPlot::SetupAxes("Time (seconds)", "Freqency drift (Hz)", 0, ImPlotAxisFlags_Lock);
-                ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0., 2.);
-                ImPlot::SetupAxisLimits(ImAxis_X1, 0., 2., 0);
+                ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0., 5.);
+                ImPlot::SetupAxisLimits(ImAxis_X1, 0., 5., 0);
                 ImPlot::SetupAxisLimits(ImAxis_Y1, -max_freq, max_freq, ImPlotCond_Always);
                 ImPlot::SetupAxis(ImAxis_Y2, "Peak drift %", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
                 ImPlot::SetupAxisLimits(ImAxis_Y2, -max_percent, max_percent, ImPlotCond_Always);
@@ -1152,7 +1152,7 @@ public:
                 m_wow_data_mutex.lock();
                     ImPlot::PlotLine("Wow and flutter", m_wow_flutter_data_x.data(), m_wow_flutter_data.data(), m_wow_flutter_data.size());
                     
-                    double wow_mean_bar[4] = {0., 2., m_wow_mean, m_wow_mean};
+                    double wow_mean_bar[4] = {0., 5., m_wow_mean, m_wow_mean};
                     ImPlot::PlotLine("Wow & flutter mean", wow_mean_bar, wow_mean_bar+2, 2);
 
                     float peak_percent = (m_wow_peak_detection / (frequency + m_wow_mean)) * 100.;
@@ -1237,7 +1237,13 @@ public:
         ImGui::SetItemTooltip("Audio sampling time in millisecond");
         ImGui::EndChild();
 
-        if (m_show_zscore_settings)
+        ImGui::SameLine();
+        ImGui::BeginChild("ShowThdChild", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::ToggleButton("Show THD", &m_show_thd);
+        ImGui::SetItemTooltip("Enable HD overlay");
+        ImGui::EndChild();
+
+        if (m_show_zscore_settings && m_show_thd)
         {
             ImGui::SameLine();
             ImGui::BeginChild("ScopesChildZScore", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
@@ -1254,7 +1260,6 @@ public:
             ImGui::SetItemTooltip("Threshold of Z-score");
             ImGui::EndChild();
         }
-
         ImGui::EndChild();
 
         if (ImPlot::BeginPlot("Audio FFT", ImVec2(m_compute_channel_phase ? width() - plotheight * 1.5f - 10 : -1, -1)))
@@ -1278,7 +1283,7 @@ public:
                 ImPlot::SetupAxisLimits(ImAxis_Y2, -120 + diffdb, 20 + diffdb, ImPlotCond_Always);
             }
 
-            if (m_fftfreqs)
+            if (m_fftfreqs && m_show_thd)
             {
                 // THD+N clipping info
                 // double range_min[4] = {m_fftfreqs[m_fft_fund_idx_range_min], m_fftfreqs[m_fft_fund_idx_range_min], 4200, -200};
@@ -1482,21 +1487,52 @@ public:
 
     void compute_wow_and_flutter()
     {
+
+
+        double analysis_time_s = 5.5;
+        double samplerate = m_audiorecorder.get_current_samplerate();
+
+                // Append captured audio data to get them
+        int audio_capture_length = analysis_time_s * samplerate;
+        int sampled_audio_length = m_sound_data1.size();
+
+        m_wow_data_mutex.lock();
+        if (m_longterm_audio.empty())
+        {
+            m_longterm_audio.reserve(audio_capture_length);
+        }
+
+        if (m_longterm_audio.size() < audio_capture_length)
+        {
+            m_longterm_audio.insert(m_longterm_audio.end(), m_sound_data1.begin(), m_sound_data1.end());
+        }
+        else
+        {
+            int move_size = audio_capture_length - sampled_audio_length;
+            memcpy(&m_longterm_audio[0], &m_longterm_audio[sampled_audio_length], move_size*sizeof(double));
+            memcpy(&m_longterm_audio[move_size], &m_sound_data1[0], sampled_audio_length*sizeof(double));
+        }
+        m_wow_data_mutex.unlock();
+
         App_SDL::get()->release_finished_threads();
         if(App_SDL::get()->get_thread("WFtask")){
-        // Check is previous thread has terminated, if not, reject these samples to not overload
-#ifdef DEBUG
-            printf("compute_wow_and_flutter : Missed audiodata\n");
-#endif
+            // Check is previous thread has terminated, if not, reject these samples to not overload
             return;
         }
+
+        if (m_longterm_audio.size() < audio_capture_length)
+        {
+            // Buffer not fully filled
+            return;
+        }
+
         int test_frequency = 3000;
         if (m_wow_test_frequency == 1) test_frequency = 3150;
         else if (m_wow_test_frequency == 2) test_frequency = m_wow_test_frequency_custom;
 
         // Launch thread
-        WowAndFluterThread* wt = new WowAndFluterThread(m_audiorecorder.get_current_samplerate(), m_longterm_audio,
-            m_wow_flutter_data, m_wow_flutter_data_x, m_sound_data1, test_frequency, m_wow_data_mutex, 2.5, m_wf_filter_freq_combo,
+        WowAndFluterThread* wt = new WowAndFluterThread(samplerate, m_longterm_audio,
+            m_wow_flutter_data, m_wow_flutter_data_x, m_sound_data1, test_frequency, m_wow_data_mutex, analysis_time_s, m_wf_filter_freq_combo,
             m_wow_peak_detection, m_wow_mean);
         wt->start();
     }
@@ -1822,13 +1858,15 @@ public:
             m_rms_calibration_scale = f;
     }
 
-    void check_data_buffer()
+    bool check_data_buffer()
     {
         int wanted_buffer = m_capture_size * m_audiorecorder.get_channel_count();
         if (m_audiorecorder.get_available_samples() >= wanted_buffer)
         {
             on_compute();
+            return true;
         }
+        return false;
     }
 };
 
@@ -1843,9 +1881,14 @@ public:
         m_audiotool = new AudioToolWindow(this);
     }
 
-    void probe_event() override
+    bool probe_event() override
     {
-        m_audiotool->check_data_buffer();
+        if(m_audiotool->check_data_buffer())
+        {
+            update_ui();
+            return true;
+        }
+        return false;
     }
 
     virtual ~MainWindow()

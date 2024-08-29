@@ -821,11 +821,14 @@ void App_SDL::run()
     while (!done)
     {
         SDL_Event event;
-		if (sleep_mode) SDL_WaitEventTimeout(NULL, 500);
+		if (sleep_mode) SDL_WaitEventTimeout(NULL, 100);
 		sleep_mode = true;
 
 		for (auto window : _impl->_windows){
-			window->probe_event();
+			if (window->probe_event())
+			{
+				window->set_last_event_time();
+			}
 		}
 
         while (SDL_PollEvent(&event))
@@ -885,7 +888,7 @@ void App_SDL::run()
 		auto windows = _impl->_windows;
 		for(auto window: windows){
 			unsigned long event_time = current_time - window->last_event_time();
-			bool force_draw = event_time < 150;
+			bool force_draw = event_time < 500;
 			if (!window->lazy() || force_draw){
 				window->draw(false);
 				sleep_mode = false;

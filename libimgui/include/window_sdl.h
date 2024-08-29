@@ -102,7 +102,7 @@ public:
 
 	void show(bool show);
 
-	virtual void probe_event(){}
+	virtual bool probe_event(){return false;}
 
 	virtual void draw(bool compute_only=false);
 	void add_widget(Widget* widget);
