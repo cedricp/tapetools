@@ -1,3 +1,5 @@
+#define _USE_MATH_DEFINES
+
 #include "SDL.h"
 #include "window_sdl.h"
 #include "audio_sine_gen.h"
