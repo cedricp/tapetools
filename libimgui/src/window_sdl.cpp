@@ -23,6 +23,8 @@
 #ifdef WIN32
 #include <shlobj.h>
 #include <shlwapi.h>
+#else
+#include <sys/stat.h>
 #endif
 
 static ImPlotContext* _implotcontext = 0L;
@@ -301,6 +303,19 @@ void Window_SDL::show(bool show)
 #else
 		std::string appdata = getenv("HOME");
 		appdata += "/.config/";
+		if (!App_SDL::get()->app_name().empty())
+		{
+			struct stat st;
+			appdata += App_SDL::get()->app_name() + "/";
+			if (!((stat(appdata.c_str(), &st) == 0) && (((st.st_mode) & S_IFMT) == S_IFDIR)))
+			{
+				printf("Creating missing conf dir\n");
+				if (mkdir(appdata.c_str(), 0755) != 0)
+				{
+					printf("Cannot create config directory\n");
+				}
+			}
+		}
 		appdata += _impl->_name + ".ini";
 		_impl->_inifilename = appdata;
 #endif

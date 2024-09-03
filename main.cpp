@@ -41,7 +41,7 @@ class WowAndFluterThread : public ASyncTask
     float &m_wow_peak;
     float &m_wow_mean;
     int m_samplerate;
-    double m_test_frequency;
+    double m_reference_frequency;
     float m_analysis_time_s;
     float m_filter_freq;
 
@@ -55,7 +55,7 @@ public:
         float analysis_time_s, int filter_freq, float& wow_peak, float& wow_mean)
          : m_longterm_audio(longtermaudio), m_samplerate(sr), m_analysis_time_s(analysis_time_s),
         m_wow_flutter_data(wow_flutter_data), m_wow_flutter_data_x(wow_flutter_data_x), ASyncTask("WFtask"),
-        m_incomimg_sound_data(incoming_data), m_test_frequency(frequency), m_mutex(mutex), m_wow_peak(wow_peak),
+        m_incomimg_sound_data(incoming_data), m_reference_frequency(frequency), m_mutex(mutex), m_wow_peak(wow_peak),
         m_wow_mean(wow_mean)
     {
         m_filter_freq = 0;
@@ -84,8 +84,8 @@ private:
         // real signal to IQ data
         for (int i = 0; i < actual_audio_length; ++i)
         {
-            m_signal_i[i] = m_longterm_audio[i] * cos(m_test_frequency*double(i) * twopif_over_sr);
-            m_signal_q[i] = m_longterm_audio[i] * sin(m_test_frequency*double(i) * twopif_over_sr);
+            m_signal_i[i] = m_longterm_audio[i] * cos(m_reference_frequency*double(i) * twopif_over_sr);
+            m_signal_q[i] = m_longterm_audio[i] * sin(m_reference_frequency*double(i) * twopif_over_sr);
         }
         m_mutex.unlock();
 
@@ -107,6 +107,7 @@ private:
         for (int i = 1; i < decimated_size; i++)
         {
             int step_i = i * decimation;
+            // Start graph a little later to hide LPF settle time
             int step_i_x = (i - (decimated_size / 10)) * decimation;
             double phase = wrap_phase(atan2(m_signal_q[step_i-1], m_signal_i[step_i-1]) - atan2(m_signal_q[step_i], m_signal_i[step_i]));
             m_wow_flutter_data[i] = phase * phase_to_hz;
@@ -196,7 +197,8 @@ class AudioToolWindow : public Widget
     double  (*m_window_fn)(int, int) = hann_fft_window;
     int     m_fft_window_fn_index = 5;
     double  *m_current_window_cache = nullptr;
-    int     m_fft_channel = 0;
+    bool    m_fft_channel_left = true;
+    bool    m_fft_channel_right = false;
     double  m_noise_foor = -100;
     double  m_fft_highest_pos[200];
     int     m_fft_highest_idx[200];
@@ -256,7 +258,7 @@ class AudioToolWindow : public Widget
         
         float current_sample_rate = m_audiorecorder.get_current_samplerate();
         float fft_step = m_capture_size / current_sample_rate;
-        double* current_fft_draw = m_fft_channel == 0 ? m_fftdrawl : m_fftdrawr;
+        double* current_fft_draw = m_fft_channel_left ? m_fftdrawl : m_fftdrawr;
 
         if (!m_async_sweep)
         {
@@ -266,7 +268,6 @@ class AudioToolWindow : public Widget
             double max_val = m_noise_foor;
             for (int i = min_freq_idx; i < max_freq_idx; ++i)
             {
-                // TODO : Check selected channel 
                 if (current_fft_draw[i] > max_val) max_val = current_fft_draw[i];
             }
 
@@ -503,7 +504,6 @@ public:
 
         m_fftplanr = fftw_plan_dft_r2c_1d(capture_size, m_fftinr, m_fftoutr, fft_flags);
         m_fftplanl = fftw_plan_dft_r2c_1d(capture_size, m_fftinl, m_fftoutl, fft_flags);
-        m_fft_channel = 0;
         compute_fft_window_cache();
     }
 
@@ -772,16 +772,14 @@ public:
         {
             ImGui::SameLine();
             ImGui::BeginChild("ScopesChild6", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-            bool left = m_fft_channel == 0;
-            bool right = m_fft_channel == 1;
-            if (ImGui::Checkbox("Left", &left) )
+            if (ImGui::Checkbox("Left", &m_fft_channel_left) )
             {
-                m_fft_channel = 0;
+                m_fft_channel_right = !m_fft_channel_left;
             }
             ImGui::SameLine();
-            if (ImGui::Checkbox("right", &right) )
+            if (ImGui::Checkbox("right", &m_fft_channel_right) )
             {
-                m_fft_channel = 1;
+                m_fft_channel_left = !m_fft_channel_right;
             }
             ImGui::EndChild();
         }
@@ -799,7 +797,7 @@ public:
 
             if (channelcount>0 && m_fftfreqs)
             {
-                ImPlot::PlotLine("Audio FFT", m_fftfreqs, m_fft_channel == 0 ?  m_fftdrawl : m_fftdrawr, m_sound_data_x.size()/2);
+                ImPlot::PlotLine("Audio FFT", m_fftfreqs, m_fft_channel_left  ?  m_fftdrawl : m_fftdrawr, m_sound_data_x.size()/2);
                 double nf[4] = {0., (current_sample_rate)/2.0, m_noise_foor, m_noise_foor};
                 ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
                 ImPlot::PlotLine("Frequency response", m_sweep_freqs.data(), m_sweep_values.data(), m_sweep_freqs.size());
@@ -1211,17 +1209,14 @@ public:
         if (channelcount > 1)
         {
             ImGui::BeginChild("ScopesChild7", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-            bool left = m_fft_channel == 0;
-            bool right = m_fft_channel == 1;
-            if (ImGui::Checkbox("Left", &left) )
+        if (ImGui::Checkbox("Left", &m_fft_channel_left) )
             {
-                m_fft_channel = 0;
+                m_fft_channel_right = !m_fft_channel_left;
             }
-            ImGui::SetItemTooltip("Analyse left channel");
             ImGui::SameLine();
-            if (ImGui::Checkbox("Right", &right) )
+            if (ImGui::Checkbox("right", &m_fft_channel_right) )
             {
-                m_fft_channel = 1;
+                m_fft_channel_left = !m_fft_channel_right;
             }
             ImGui::SetItemTooltip("Analyse right channel");
             ImGui::EndChild();
@@ -1266,7 +1261,7 @@ public:
 
         if (ImPlot::BeginPlot("Audio FFT", ImVec2(m_compute_channel_phase ? width() - plotheight * 1.5f - 10 : -1, -1)))
         {
-            double* fft_draw = m_fft_channel == 0 ? m_fftdrawl : m_fftdrawr;
+            double* fft_draw = m_fft_channel_left  ? m_fftdrawl : m_fftdrawr;
             float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
             ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock);
             if (m_logscale_frequency)
@@ -1325,14 +1320,8 @@ public:
             
             if (channelcount>0 && m_fftfreqs)
             {
-                const char* buffer = NULL;
-                if (m_fft_channel == 0)
-                {
-                    buffer = "Audio left FFT";
-                } else {
-                    buffer = "Audio right FFT";
-                }
-                ImPlot::PlotLine(buffer, m_fftfreqs, fft_draw, m_sound_data_x.size()/2);
+                if (m_fft_channel_left) ImPlot::PlotLine("Audio left FFT", m_fftfreqs, m_fftdrawl, m_sound_data_x.size()/2);
+                if (m_fft_channel_right) ImPlot::PlotLine("Audio right FFT", m_fftfreqs, m_fftdrawr, m_sound_data_x.size()/2);
             }
 
             ImPlot::EndPlot();
@@ -1444,7 +1433,7 @@ public:
         
         if (compute_fft)
         {
-            double* current_fft_draw = m_fft_channel == 0 ? m_fftdrawl : m_fftdrawr;
+            double* current_fft_draw = m_fft_channel_left  ? m_fftdrawl : m_fftdrawr;
             // Compute and fill audio FFT
             ::fftw_execute(m_fftplanl);
             if (channelcount > 1) ::fftw_execute(m_fftplanr);
@@ -1458,7 +1447,7 @@ public:
                 fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
                 fftout = std::max(20.0 * log10(fftout), -200.0);
                 m_fftdrawl[i] = isnan(fftout) ? -200.f : fftout;
-                if (m_fft_channel == 0) sum += fftout;
+                if (m_fft_channel_left) sum += fftout;
 
                 if (channelcount > 1)
                 {
@@ -1466,7 +1455,7 @@ public:
                     fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
                     fftout = std::max(20.0 * log10(fftout), -200.0);
                     m_fftdrawr[i] = isnan(fftout) ? -200.f : fftout;
-                    if (m_fft_channel == 1) sum += fftout;
+                    if (m_fft_channel_right) sum += fftout;
                 }
             }
 
@@ -1528,13 +1517,14 @@ public:
             return;
         }
 
-        int test_frequency = 3000;
-        if (m_wow_test_frequency == 1) test_frequency = 3150;
-        else if (m_wow_test_frequency == 2) test_frequency = m_wow_test_frequency_custom;
+        int reference_frequency = 3000;
+        if (m_wow_test_frequency == 1) reference_frequency = 3150;
+        else if (m_wow_test_frequency == 2) reference_frequency = m_wow_test_frequency_custom;
 
         // Launch thread
         WowAndFluterThread* wt = new WowAndFluterThread(samplerate, m_longterm_audio,
-            m_wow_flutter_data, m_wow_flutter_data_x, m_sound_data1, test_frequency, m_wow_data_mutex, analysis_time_s, m_wf_filter_freq_combo,
+            m_wow_flutter_data, m_wow_flutter_data_x, m_fft_channel_left ? m_sound_data1 : m_sound_data2, reference_frequency,
+            m_wow_data_mutex, analysis_time_s, m_wf_filter_freq_combo,
             m_wow_peak_detection, m_wow_mean);
         wt->start();
     }
@@ -1612,7 +1602,7 @@ public:
 
     void compute_thd()
     {
-        double* current_fft_draw = m_fft_channel == 0 ? m_fftdrawl : m_fftdrawr;
+        double* current_fft_draw = m_fft_channel_left == 0 ? m_fftdrawl : m_fftdrawr;
         // Find peaks
         // Source : https://stackoverflow.com/questions/22583391/peak-signal-detection-in-realtime-timeseries-data
         const int fft_capture_size = m_capture_size / 2;
