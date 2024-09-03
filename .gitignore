@@ -6,3 +6,4 @@ resources/*.h
 .vscode
 .vscode/settings.json
 G*
+resources/Output

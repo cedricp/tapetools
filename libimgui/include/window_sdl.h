@@ -152,6 +152,7 @@ public:
 	void destroy();
 #endif
 	void set_app_name(std::string name){ m_appname = name; }
+	std::string app_name(){return m_appname;}
 	ImFont* load_font(std::string fontname, float size);
 	ImFont* load_font_from_memory(const char* data, int memsize, float size);
 	void register_user_event(UserEvent* ev);

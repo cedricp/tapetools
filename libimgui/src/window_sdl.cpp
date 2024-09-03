@@ -20,6 +20,11 @@
 #include "timer.h"
 //#include "3dlut.h"
 
+#ifdef WIN32
+#include <shlobj.h>
+#include <shlwapi.h>
+#endif
+
 static ImPlotContext* _implotcontext = 0L;
 
 struct impl
@@ -283,8 +288,22 @@ void Window_SDL::show(bool show)
 		// Setup Dear ImGui style
 		ImGui::StyleColorsDark();
 		_impl->_is_shown = true;
-
-		_impl->_inifilename = _impl->_name + ".ini";
+#ifdef WIN32
+		TCHAR appdata[MAX_PATH];
+    	SHGetFolderPath(0, CSIDL_LOCAL_APPDATA, 0, SHGFP_TYPE_CURRENT, appdata);
+    	if(! App_SDL::get()->app_name().empty())  PathAppend(appdata, App_SDL::get()->app_name().c_str());
+		if (CreateDirectory(appdata, NULL) || ERROR_ALREADY_EXISTS == GetLastError())
+		{
+			PathAppend(appdata, _impl->_name.c_str());
+			_impl->_inifilename = appdata;
+			_impl->_inifilename += ".ini";
+		}
+#else
+		std::string appdata = getenv("HOME");
+		appdata += "/.config/";
+		appdata += _impl->_name + ".ini";
+		_impl->_inifilename = appdata;
+#endif
 		ImGui::GetIO().IniFilename = _impl ->_inifilename.c_str();
 		if (current_context) ImGui::SetCurrentContext(current_context);
 	}

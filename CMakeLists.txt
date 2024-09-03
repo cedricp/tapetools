@@ -37,7 +37,12 @@ target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/incl
 
 # Link rules
 
-target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} dsp_static audio_static imgui_static utils_static $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> )
+if(MINGW)
+set(PLATFORM_LIBS shlwapi)
+target_sources(tapetools PRIVATE resources/tapetools.rc)
+endif()
+
+target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} dsp_static audio_static imgui_static utils_static $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS})
 
 if(MINGW)
     set(LINKFLAGS "-static-libgcc -static-libstdc++")
