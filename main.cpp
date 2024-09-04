@@ -782,7 +782,7 @@ public:
         if (channelcount > 1)
         {
             ImGui::SameLine();
-            ImGui::BeginChild("ScopesChild6", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            ImGui::BeginChild("ScopesChildChannelSelect", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
             if (ImGui::Checkbox("Left", &m_fft_channel_left) )
             {
                 m_fft_channel_right = !m_fft_channel_left;
@@ -1136,20 +1136,22 @@ public:
             ImGui::Combo("Low pass filter (Hz)", &m_wf_filter_freq_combo, filter_presets, 4);
             ImGui::EndChild();
 
-            ImGui::SameLine();
-            ImGui::BeginChild("ScopesChildChannelSelect", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-            bool left = m_fft_channel == 0;
-            bool right = m_fft_channel == 1;
-            if (ImGui::Checkbox("Left", &left) )
+            if (channelcount > 1)
             {
-                m_fft_channel = 0;
+                ImGui::SameLine();
+                ImGui::BeginChild("ScopesChildChannelSelect", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+                if (ImGui::Checkbox("Left", &m_fft_channel_left) )
+                {
+                    m_fft_channel_right = !m_fft_channel_left;
+                }
+                ImGui::SameLine();
+                if (ImGui::Checkbox("right", &m_fft_channel_right) )
+                {
+                    m_fft_channel_left = !m_fft_channel_right;
+                }
+                ImGui::SetItemTooltip("Analyse right channel");
+                ImGui::EndChild();
             }
-            ImGui::SameLine();
-            if (ImGui::Checkbox("right", &right) )
-            {
-                m_fft_channel = 1;
-            }
-            ImGui::EndChild();
 
             static float max_freq = 200;
 
@@ -1234,8 +1236,8 @@ public:
         ImGui::SameLine();
         if (channelcount > 1)
         {
-            ImGui::BeginChild("ScopesChild7", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        if (ImGui::Checkbox("Left", &m_fft_channel_left) )
+            ImGui::BeginChild("ScopesChildChannelSelect", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            if (ImGui::Checkbox("Left", &m_fft_channel_left) )
             {
                 m_fft_channel_right = !m_fft_channel_left;
             }
