@@ -307,6 +307,7 @@ void Window_SDL::show(bool show)
 		ImGui::GetIO().IniFilename = _impl ->_inifilename.c_str();
 		if (current_context) ImGui::SetCurrentContext(current_context);
 	}
+	
 	if (!show && _impl->_is_shown){
 		set_imgui_context();
 		ImGui_ImplOpenGL3_Shutdown();

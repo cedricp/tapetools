@@ -573,11 +573,22 @@ public:
         ImGui::GetStyle().GrabMinSize = 4.0;
     }
 
+    void check_settings_loaded()
+    {
+        static bool settings_loaded = false;
+        if (!settings_loaded && GImGui->SettingsLoaded)
+        {
+            printf("Settings restored\n");
+            settings_loaded = true;
+            reset_audiomanager();
+        }
+    }
+
     void draw() override 
     {
         m_audiomanager.flush();
-        int channelcount = m_audiorecorder.get_channel_count();
-    
+        check_settings_loaded();
+
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("Preferences"))
             {
@@ -760,7 +771,7 @@ public:
         }
 
         ImGui::SameLine();
-        ImGui::BeginChild("ScopesChild5", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::BeginChild("ScopesChidWindowMode", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(150);
         if (ImGui::Combo("Window mode", &m_fft_window_fn_index, vector_getter, (void *)&m_wmodes, m_wmodes.size()))
         {
@@ -771,7 +782,7 @@ public:
         if (channelcount > 1)
         {
             ImGui::SameLine();
-            ImGui::BeginChild("ScopesChild6", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            ImGui::BeginChild("ScopesChildChannelSelect", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
             bool left = m_fft_channel == 0;
             bool right = m_fft_channel == 1;
             if (ImGui::Checkbox("Left", &left) )
@@ -1125,6 +1136,21 @@ public:
             ImGui::SameLine();
             ImGui::SetNextItemWidth(160);
             ImGui::Combo("Low pass filter (Hz)", &m_wf_filter_freq_combo, filter_presets, 4);
+            ImGui::EndChild();
+
+            ImGui::SameLine();
+            ImGui::BeginChild("ScopesChildChannelSelect", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            bool left = m_fft_channel == 0;
+            bool right = m_fft_channel == 1;
+            if (ImGui::Checkbox("Left", &left) )
+            {
+                m_fft_channel = 0;
+            }
+            ImGui::SameLine();
+            if (ImGui::Checkbox("right", &right) )
+            {
+                m_fft_channel = 1;
+            }
             ImGui::EndChild();
 
             static float max_freq = 200;
@@ -1799,7 +1825,6 @@ public:
                 m_audio_in_idx = m_audiomanager.get_input_device_map(m_combo_in);
                 printf("Restoring saved input dev found [%s] [%i]\n", str.c_str(), m_audio_in_idx);
                 m_input_device = str;
-                reset_audiomanager();
             }
         }
 
@@ -1813,7 +1838,6 @@ public:
                 m_audio_out_idx = m_audiomanager.get_output_device_map(m_combo_out);
                 printf("Restoring saved output dev found [%s] [%i]\n", str.c_str(), m_audio_out_idx);
                 m_output_device = str;
-                reset_audiomanager();
             }
         }
     }
@@ -1825,6 +1849,8 @@ public:
         cnf["showVoltmeter"]    = m_show_rms_voltage == true ? 1 : 0;
         cnf["theme"]            = m_uitheme;
         cnf["optimizedFFT"]     = m_optimized_fft == true ? 1 : 0;
+        cnf["inSampleRateIdx"]  = m_in_sample_rate;
+        cnf["outSampleRateIdx"] = m_out_sample_rate;
     }
 
     void set_configuration_int(std::string s, int i) override
@@ -1846,6 +1872,14 @@ public:
         else if (s == "optimizedFFT")
         {
             m_optimized_fft = i;
+        } 
+        else if (s == "inSampleRateIdx")
+        {
+            m_in_sample_rate = i;
+        }
+        else if (s == "outSampleRateIdx")
+        {
+            m_out_sample_rate = i;
         }
     }
 
