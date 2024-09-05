@@ -9,7 +9,8 @@
 #include <pthread.h>
 #endif
 
-#include "string"
+#include <string>
+#include <functional>
 
 class ThreadMutex
 {

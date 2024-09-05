@@ -123,14 +123,16 @@ private:
 
         double max_dev = -1000, min_dev = 1000, mean = 0;
         // I start the measure a little after the beginnig to suppress lpf settling part
-        for (int i = decimated_size/10; i < decimated_size; ++i)
+        int num_samples = 0;
+        for (int i = decimated_size/5; i < decimated_size; ++i)
         {
             double current = m_wow_flutter_data[i];
             if (current > max_dev) max_dev = current;
             if (current < min_dev) min_dev = current;
             mean += current;
+            num_samples++;
         }
-        mean /= decimated_size - (decimated_size/5);
+        mean /= num_samples;
         double peak_plus = fabs(max_dev - mean);
         double peak_minus = fabs(mean - min_dev);
         m_wow_peak = peak_plus > peak_minus ? peak_plus : peak_minus;
