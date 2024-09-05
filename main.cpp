@@ -1084,7 +1084,7 @@ public:
                 ImPlot::SetupAxisLimits(ImAxis_Y2, -m_rms_calibration_scale / m_scopezoom, m_rms_calibration_scale / m_scopezoom, ImPlotCond_Always);
             }
             ImPlot::SetupAxis(ImAxis_X1, "Time [milliseconds]", 0);
-            ImPlot::SetupAxis(ImAxis_Y1, "Amplitude [dB FullScale]", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_Lock);
+            ImPlot::SetupAxis(ImAxis_Y1, "Amplitude [dB FullScale]", ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_Opposite | ImPlotAxisFlags_Lock);
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xmax);
 
             if (ImPlot::IsAxisHovered(ImAxis_Y1) || ImPlot::IsAxisHovered(ImAxis_Y2)){
@@ -1322,9 +1322,11 @@ public:
 
         if (ImPlot::BeginPlot("Audio FFT", ImVec2(m_compute_channel_phase ? width() - plotheight * 1.5f - 10 : -1, -1)))
         {
+            bool calibration_active = m_rms_calibration_scale != 1.0;
             double* fft_draw = m_fft_channel_left  ? m_fftdrawl : m_fftdrawr;
             float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
-            ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock);
+            ImPlot::SetupAxis(ImAxis_X1, "Frequency", 0);
+            ImPlot::SetupAxis(ImAxis_Y1, "dB FullScale", ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_Lock | ImPlotAxisFlags_Opposite);
             if (m_logscale_frequency)
             {
                 ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
@@ -1334,29 +1336,25 @@ public:
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 20.f, 24000.f);
 
             double diffdb = 0;
-            if (m_rms_calibration_scale != 1.0)
+            if (calibration_active)
             {
                 diffdb = 20.0 * log10(m_rms_calibration_scale);
-                ImPlot::SetupAxis(ImAxis_Y2, "dBu", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
+                ImPlot::SetupAxis(ImAxis_Y2, "dBu", 0);
                 ImPlot::SetupAxisLimits(ImAxis_Y2, -120 + diffdb, 20 + diffdb, ImPlotCond_Always);
             }
 
             if (m_fftfreqs && m_show_thd)
             {
-                // THD+N clipping info
-                // double range_min[4] = {m_fftfreqs[m_fft_fund_idx_range_min], m_fftfreqs[m_fft_fund_idx_range_min], 4200, -200};
-                // ImPlot::PlotLine("Cut min", range_min, range_min+2, 2);
-                // double range_max[4] = {m_fftfreqs[m_fft_fund_idx_range_max], m_fftfreqs[m_fft_fund_idx_range_max], 4200, -200};
-                // ImPlot::PlotLine("Cut max", range_max, range_max+2, 2);
                 ImPlot::PlotShaded("Fundamental detection", (double*)&m_fftfreqs[m_fft_fund_idx_range_min+1], (double*)&fft_draw[m_fft_fund_idx_range_min+1], m_fft_fund_idx_range_max - m_fft_fund_idx_range_min, -200.0);
                 
                 char thdtext[64];
                 snprintf(thdtext, 32, "THD : %.3f %%", m_thd);
                 ImVec2 plotpos = ImPlot::GetPlotPos();
                 ImVec2 plotsize = ImPlot::GetPlotSize();
+                float plot_to_pix_graph = 140. / plotsize.y;
                 ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1)));
                 ImPlot::PlotText(thdtext, pnt.x, pnt.y);
-                pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.14)));
+                pnt.y -= 20 * plot_to_pix_graph;
                 snprintf(thdtext, 32, "THD+N : %.3f %% (%.2f dB)", m_thdn, m_thddb);
                 ImPlot::PlotText(thdtext, pnt.x, pnt.y);
 
@@ -1365,19 +1363,19 @@ public:
                     double fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 40.0, -200.0};
                     ImPlot::PlotLine("Peaks", fund, fund+2, 2);
                     double y_pos = fft_draw[m_fft_highest_idx[i]];
-                    y_pos += m_rms_calibration_scale == 1.0 ? 0 : diffdb;
-                    if (m_rms_calibration_scale == 1.0)
+                    if (!calibration_active)
                     {
                         snprintf(thdtext, 16, "%.4fdB", y_pos);
                     }
                     else
                     {
-                        snprintf(thdtext, 16, "%.4fdBu", y_pos);
+                        double y_pos2 = y_pos + diffdb;
+                        snprintf(thdtext, 16, "%.4fdBu", y_pos2);
                     } 
-                    ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos+20);
+                    ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos+40 * plot_to_pix_graph);
                     double freq = m_fftfreqs[m_fft_highest_idx[i]] / 1000.0;
                     snprintf(thdtext, 16, "%.4fKHz", freq);
-                    ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos+10);
+                    ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos+20 * plot_to_pix_graph);
                 }
 
             }
