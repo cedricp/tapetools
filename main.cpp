@@ -1080,10 +1080,11 @@ public:
 
             if (m_rms_calibration_scale != 1.0)
             {
-                ImPlot::SetupAxis(ImAxis_Y2, "Volts", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
+                ImPlot::SetupAxis(ImAxis_Y2, "Volts");
                 ImPlot::SetupAxisLimits(ImAxis_Y2, -m_rms_calibration_scale / m_scopezoom, m_rms_calibration_scale / m_scopezoom, ImPlotCond_Always);
             }
-            ImPlot::SetupAxes("Time (ms)", "Amplitude", 0, ImPlotAxisFlags_Lock);
+            ImPlot::SetupAxis(ImAxis_X1, "Time [milliseconds]", 0);
+            ImPlot::SetupAxis(ImAxis_Y1, "Amplitude [dB FullScale]", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_Lock);
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, xmax);
 
             if (ImPlot::IsAxisHovered(ImAxis_Y1) || ImPlot::IsAxisHovered(ImAxis_Y2)){
@@ -1373,10 +1374,10 @@ public:
                     {
                         snprintf(thdtext, 16, "%.4fdBu", y_pos);
                     } 
-                    ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos);
+                    ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos+20);
                     double freq = m_fftfreqs[m_fft_highest_idx[i]] / 1000.0;
                     snprintf(thdtext, 16, "%.4fKHz", freq);
-                    ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos - 8);
+                    ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos+10);
                 }
 
             }
@@ -1395,6 +1396,8 @@ public:
         }
         if (m_compute_channel_phase)
         {
+            static float phase_limit_mult = 1.f;
+            static float amplitude_limit_mult = 1.f;
             ImGui::SameLine();
             if (ImPlot::BeginPlot("L/R Phase & Amplitude diff", ImVec2(plotheight * 1.5, -1)))
             {
@@ -1402,8 +1405,22 @@ public:
                 ImPlot::SetupAxis(ImAxis_Y2, "dB", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
                 ImPlot::SetupAxis(ImAxis_X1, "Time");
 
-                ImPlot::SetupAxesLimits(0.f, m_phase_time.size(), -180.0, 180.0, ImPlotCond_Always);
-                ImPlot::SetupAxisLimits(ImAxis_Y2, -20., 20., ImPlotCond_Always);
+                ImPlot::SetupAxesLimits(0.f, m_phase_time.size(), -180.0 * phase_limit_mult, 180.0 * phase_limit_mult, ImPlotCond_Always);
+                ImPlot::SetupAxisLimits(ImAxis_Y2, -20. * amplitude_limit_mult, 20. * amplitude_limit_mult, ImPlotCond_Always);
+
+                if (ImPlot::IsAxisHovered(ImAxis_Y1)){
+                    // Zoom Y axis in/out
+                    phase_limit_mult += ImGui::GetIO().MouseWheel * .01;
+                    if (phase_limit_mult < .1) phase_limit_mult = .1;
+                    if (phase_limit_mult > 1) phase_limit_mult = 1;
+                }
+
+                if (ImPlot::IsAxisHovered(ImAxis_Y2)){
+                    // Zoom Y axis in/out
+                    amplitude_limit_mult += ImGui::GetIO().MouseWheel * .1;
+                    if (amplitude_limit_mult < .1) amplitude_limit_mult = .1;
+                    if (amplitude_limit_mult > 10) amplitude_limit_mult = 10;
+                }
 
                 ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
                 ImPlot::PlotLine("L/R phase", &m_phase_time[0], &m_phase_history[0], m_phase_time.size());
@@ -1598,7 +1615,7 @@ public:
 
     void compute_thdn()
     {
-        int fft_capture_size = m_capture_size/4;
+        int fft_capture_size = m_capture_size/2;
         fftw_complex * current_fft = m_fft_channel_left ? m_fftoutl : m_fftoutr;
         const double invsqrt2 = 1.0 / sqrt(2.0);
         const double inv_capture_size = 1.0 / (double(fft_capture_size));
@@ -1607,20 +1624,24 @@ public:
 
         double max_val = -200;
         int max_val_index = 0;
-        // Find fundamental
-        for (int i = 0; i < fft_capture_size; ++i)
+
+        double total_rms = 0;
+        for (int i = 1; i < fft_capture_size; ++i)
         {
-            double fft_rms_sample = sqrt(current_fft[i][0] * current_fft[i][0] + current_fft[i][1] * current_fft[i][1]) * inv_capture_size * invsqrt2;
-            fft_rms_sample *= m_window_amplitude_correction[m_fft_window_fn_index];
-            m_rms_fft[i] = fft_rms_sample;
-            if (fft_rms_sample > max_val)
+            double fft_module = sqrt(current_fft[i][0] * current_fft[i][0] + current_fft[i][1] * current_fft[i][1]) * inv_capture_size;
+            //fft_module *= m_window_amplitude_correction[m_fft_window_fn_index];
+            fft_module *= fft_module;
+            total_rms += fft_module;
+            m_rms_fft[i] = fft_module;
+            
+            if (fft_module > max_val)
             {
-                max_val = fft_rms_sample;
+                max_val = fft_module;
                 max_val_index = i;
             }
         }
+        total_rms = sqrt(total_rms) * invsqrt2;
 
-        double rms_fundamental = m_rms_fft[max_val_index];
 
         // Find FFT fundamental range
         double tmp = max_val;
@@ -1651,28 +1672,23 @@ public:
             return;
         }
 
-        double tot_rms = 0;
-        double noise = 0;
-
+        double noise_rms = 0;
         // Start at 1, we don't want DC value
-        int num_noise_samples = 0;
         for (int i = 1; i < m_fft_fund_idx_range_min; ++i)
         {
-            noise += m_rms_fft[i];
-            tot_rms += noise;
+            noise_rms += m_rms_fft[i];
         }
 
         for (int i = m_fft_fund_idx_range_max; i < fft_capture_size; ++i)
         {
-            noise += m_rms_fft[i];
-            tot_rms += noise;
+            noise_rms += m_rms_fft[i];
         }
 
+        noise_rms = sqrt(noise_rms) * invsqrt2;
 
-        double noise_mean = noise/float(tot_rms);
-        double noise_db = 20. * log10(noise_mean);
-        printf("RMS Fund = %f @ %f - %f\n", rms_fundamental, m_fftfreqs[max_val_index], noise_db);
-        m_thdn = noise_mean / rms_fundamental;
+        double noise_db = 20. * log10(noise_rms);
+
+        m_thdn = noise_rms / total_rms;
         m_thddb = 20.0 * log10(m_thdn);
         m_thdn *= 100.0;
     }
