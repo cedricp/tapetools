@@ -12,6 +12,23 @@
 #include <string>
 #include <functional>
 
+unsigned long timestamp(void);
+
+class Chrono
+{
+	unsigned long m_time;
+public:
+	Chrono(){
+		reset();
+	}
+
+	void reset(){
+		m_time = timestamp();
+	}
+
+	void print_elapsed_time(const char* prefix);
+};
+
 class ThreadMutex
 {
 #ifdef WIN32
@@ -71,6 +88,7 @@ class Thread
 {
     volatile bool m_running;
 protected:
+    Chrono m_chrono;
     std::string m_name;
 #ifdef WIN32
     DWORD m_thread_id;

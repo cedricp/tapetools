@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <stdarg.h>
 #include <Dsp.h>
+#include <scanner.h>
 #include "Hack-Regular.h"
 
 void TextCenter(const char* text, ...) {
@@ -28,6 +29,43 @@ void TextCenter(const char* text, ...) {
 
     ImGui::Text("%s", buffer);
 }
+
+class SdrThread : public Thread
+{
+    Scanner m_scanner;
+    bool m_data_available = false;
+public:
+    SdrThread() : Thread("SdrThread", true, false)
+    {
+        m_scanner.init();
+    }
+
+    ~SdrThread()
+    {
+        stop();
+    }
+
+    void entry() override
+    {
+        if (m_scanner.scan() == SCANNER_NOK)
+        {
+            usleep(500000);
+            m_scanner.init();
+        }
+        m_data_available = true;
+    }
+
+    bool data_available()
+    {
+        return m_data_available;
+    }
+
+    const std::vector<Scan_result>& get_scan_result()
+    {
+        m_data_available = false;
+        return m_scanner.get_scan_result();
+    }
+};
 
 class WowAndFluterThread : public ASyncTask
 {
@@ -54,14 +92,19 @@ public:
         std::vector<double> &wow_flutter_data_x, std::vector<double> incoming_data, int frequency, ThreadMutex& mutex,
         float analysis_time_s, int filter_freq, float& wow_peak, float& wow_mean)
          : m_longterm_audio(longtermaudio), m_samplerate(sr), m_analysis_time_s(analysis_time_s),
-        m_wow_flutter_data(wow_flutter_data), m_wow_flutter_data_x(wow_flutter_data_x), ASyncTask("WFtask"),
+        m_wow_flutter_data(wow_flutter_data), m_wow_flutter_data_x(wow_flutter_data_x),
         m_incomimg_sound_data(incoming_data), m_reference_frequency(frequency), m_mutex(mutex), m_wow_peak(wow_peak),
-        m_wow_mean(wow_mean)
+        m_wow_mean(wow_mean), ASyncTask("WFtask")
     {
         m_filter_freq = 0;
         if (filter_freq == 1) m_filter_freq = 6;
         if (filter_freq == 2) m_filter_freq = 20;
         if (filter_freq == 3) m_filter_freq = 100;
+    }
+
+    ~WowAndFluterThread()
+    {
+        //m_chrono.print_elapsed_time("WF thread time : ");
     }
 
 private:
@@ -124,7 +167,7 @@ private:
         double max_dev = -1000, min_dev = 1000, mean = 0;
         // I start the measure a little after the beginnig to suppress lpf settling part
         int num_samples = 0;
-        for (int i = decimated_size/5; i < decimated_size; ++i)
+        for (int i = decimated_size/10; i < decimated_size; ++i)
         {
             double current = m_wow_flutter_data[i];
             if (current > max_dev) max_dev = current;
@@ -212,6 +255,7 @@ class AudioToolWindow : public Widget
     double  m_thd = 0;
     double  m_thdn = 0;
     double  m_thddb = 0;
+    double  m_fft_rms = 0;
     bool    m_show_thd = false;
 
     double  m_left_right_db;
@@ -234,7 +278,7 @@ class AudioToolWindow : public Widget
     std::vector<double> m_sweep_values;
     std::vector<double> m_sweep_freqs;
     Timer   m_sweep_timer;
-    bool    m_pause_compute = false;
+    bool    m_compute_on = false;
 
     bool    m_use_targetdb = false;
     bool    m_lockdb = false;
@@ -254,6 +298,8 @@ class AudioToolWindow : public Widget
     int     m_wf_filter_freq_combo = 0;
     float   m_wow_mean = 0;
     ThreadMutex m_wow_data_mutex;
+
+    SdrThread m_sdr_thread;
 
     CALLBACK_METHOD(on_timer_event, AudioToolWindow)
     {
@@ -351,20 +397,6 @@ class AudioToolWindow : public Widget
         reset_audiomanager();
     }
 
-    void on_compute()
-    {
-        if (m_pause_compute) return;
-
-        bool computed = compute();
-        if (computed)
-        {
-            compute_thd();
-            compute_thdn();
-            if (m_compute_channel_phase) compute_channels_phase();
-        }
-        if (computed) update_ui();
-    }
-
     void reset_audiomanager()
     {
         if (m_input_device.empty()) m_audio_in_idx  = m_audiomanager.get_default_input_device_id();
@@ -440,12 +472,15 @@ public:
 
         m_audiomanager.flush();
         m_sweep_timer.connect_event(STATIC_METHOD(on_timer_event), this);
+
+        m_sdr_thread.start();
     }
 
     virtual ~AudioToolWindow()
     {
         m_sine_generator.destroy();
         destroy_capture();
+        m_sdr_thread.stop();
     }
 
     void destroy_capture()
@@ -526,7 +561,10 @@ public:
         {
             m_audiorecorder.start();
         }
+
         init_capture();
+
+        m_audiorecorder.pause(!m_compute_on);
     }
 
     void reset_sine_generator()
@@ -554,25 +592,26 @@ public:
         for(int i = 0; i < m_capture_size; ++i) m_current_window_cache[i] = m_window_fn(i, m_capture_size);
     }
 
-    void compute_fft_window_corrections()
+    void compute_fft_window_corrections(int num_samples = 1000)
     {
         int tmp = m_fft_window_fn_index;
+        double inv_num_samples = 1. / num_samples;
         for (int j = 0; j < 8; ++j)
         {
             m_fft_window_fn_index = j;
             set_window_fn(false);
             double sum = 0;
             double rms = 0;
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < num_samples; i++)
             {
-                double val = m_window_fn(i, 1000);
+                double val = m_window_fn(i, num_samples);
                 sum += val;
                 rms += val*val;
             }
 
             // Normalization
-            m_window_amplitude_correction[j] = 1.0 / (sum * 0.001);
-            m_window_energy_correction[j] = 1.0 / sqrt(rms * 0.001);
+            m_window_amplitude_correction[j] = 1.0 / (sum * inv_num_samples);
+            m_window_energy_correction[j] = 1.0 / sqrt(rms * inv_num_samples);
         }
         // Restore
         m_fft_window_fn_index = tmp;
@@ -637,7 +676,7 @@ public:
                 }
                 ImGui::PopItemFlag();
                 
-                if(ImGui::MenuItem("Show Zscore settings", nullptr, nullptr))  m_show_zscore_settings = !m_show_zscore_settings;
+                //if(ImGui::MenuItem("Show Zscore settings", nullptr, nullptr))  m_show_zscore_settings = !m_show_zscore_settings;
                 
                 ImGui::EndMenu();
             }
@@ -655,6 +694,11 @@ public:
             draw_sweep_tab();
             ImGui::EndTabItem();
         }
+        if (ImGui::BeginTabItem("SDR analysis"))
+        {
+            draw_sdr();
+            ImGui::EndTabItem();
+        }
         ImGui::EndTabBar();
 
         draw_tools_windows();
@@ -662,6 +706,8 @@ public:
 
     void start_sweep_gen()
     {
+        m_compute_on = true;
+        reinit_recorder();
         m_sweep_started = true;
         m_sweep_current_frequency = 20;
         m_sweep_freqs.clear();
@@ -840,6 +886,43 @@ public:
         ImGui::EndChild();
     }
 
+    void draw_sdr()
+    {
+
+        ImGui::BeginChild("ScopesChild1", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
+
+        ImGui::BeginChild("ScopesChild2", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        if (ImGui::Button("Start"))
+        {
+            
+        }
+
+        ImGui::EndChild();
+
+        if (ImPlot::BeginPlot("SDR FFT", ImVec2(-1, -1)))
+        {
+            ImPlot::SetupAxes("Frequency (MHz)", "dBm", 0, ImPlotAxisFlags_Lock);
+            // if (m_logscale_frequency){
+            //     ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+            // }
+            ImPlot::SetupAxesLimits(88, 108, -60.0, 40.0);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 88, 108);
+
+            const std::vector<Scan_result> scan_res = m_sdr_thread.get_scan_result();
+            if (scan_res.size())
+            {
+                for (int i = 0; i < scan_res.size(); ++i)
+                {
+                    ImPlot::PlotLine("RF FFT", scan_res[i].buffer_x.data(), scan_res[i].buffer.data(), scan_res[i].buffer_x.size());
+                }
+            }
+
+            ImPlot::EndPlot();
+        }
+
+        ImGui::EndChild();
+    }
+
     void draw_lcd(const float value, const ImVec2 size, const int lcd_digits_size)
     {
         char voltmeter[10];
@@ -921,11 +1004,19 @@ public:
         /*
         * Time domain analysis
         */
-        ImGui::BeginChild("ScopesChild", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
+        ImGui::BeginChild("ScopesChildMain", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
         float plotheight = height() / 2.0f - 5.f;
 
+        ImGui::BeginChild("ScopesChildBar", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
 
-        ImGui::BeginChild("ScopesChild1", ImVec2(0, plotheight), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
+        ImGui::BeginChild("ScopesChildCaptureOnOff", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        if (ImGui::ToggleButton("Start", &m_compute_on))
+        {
+            m_audiorecorder.pause(!m_compute_on);
+        }
+        ImGui::SetItemTooltip("Start realtime capture");
+        ImGui::EndChild();
+        ImGui::SameLine();
 
         ImGui::BeginChild("ScopesChildShowRmsVolts", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("Show voltmeter", &m_show_rms_voltage);
@@ -934,7 +1025,17 @@ public:
         ImGui::SameLine();
 
         ImGui::BeginChild("ScopesChildShowWAF", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::ToggleButton("W&F", &m_show_wow_flutter);
+        if (ImGui::ToggleButton("W&F", &m_show_wow_flutter))
+        {
+            while(App_SDL::get()->get_thread("WFtask"))
+            {
+                App_SDL::get()->release_finished_threads();
+            }
+
+            m_longterm_audio.clear();
+            m_wow_flutter_data.clear();
+            m_wow_flutter_data_x.clear();
+        }
         ImGui::SetItemTooltip("Shows wow and flutter panel");
         ImGui::EndChild();
         ImGui::SameLine();
@@ -1003,7 +1104,7 @@ public:
             if (!m_lockdb)
             {
                 ImGui::SameLine();
-                ImGui::SetNextItemWidth(60);
+                ImGui::SetNextItemWidth(70);
                 ImGui::Combo("Channel", &m_current_db_target_channel, items, 2);
                 ImGui::SetItemTooltip("Which channel to work on");
                 ImGui::SameLine();
@@ -1303,23 +1404,23 @@ public:
         ImGui::SetItemTooltip("Enable HD overlay");
         ImGui::EndChild();
 
-        if (m_show_zscore_settings && m_show_thd)
-        {
-            ImGui::SameLine();
-            ImGui::BeginChild("ScopesChildZScore", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-            ImGui::SetNextItemWidth(50);
-            ImGui::SliderInt("ZscoreLag", &m_zscore_lag, 5, 500);
-            ImGui::SetItemTooltip("Set the length of the Z-score algorithm (for peak detection)");
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(50);
-            ImGui::SliderFloat("ZscoreInfl.", &m_zscore_influence, 0., 1.);
-            ImGui::SetItemTooltip("Influence of Z-score");
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(50);
-            ImGui::SliderFloat("ZscoreThres.", &m_zscore_threshold, 0.5, 100.);
-            ImGui::SetItemTooltip("Threshold of Z-score");
-            ImGui::EndChild();
-        }
+        // if (m_show_zscore_settings && m_show_thd)
+        // {
+        //     ImGui::SameLine();
+        //     ImGui::BeginChild("ScopesChildZScore", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        //     ImGui::SetNextItemWidth(50);
+        //     ImGui::SliderInt("ZscoreLag", &m_zscore_lag, 5, 500);
+        //     ImGui::SetItemTooltip("Set the length of the Z-score algorithm (for peak detection)");
+        //     ImGui::SameLine();
+        //     ImGui::SetNextItemWidth(50);
+        //     ImGui::SliderFloat("ZscoreInfl.", &m_zscore_influence, 0., 1.);
+        //     ImGui::SetItemTooltip("Influence of Z-score");
+        //     ImGui::SameLine();
+        //     ImGui::SetNextItemWidth(50);
+        //     ImGui::SliderFloat("ZscoreThres.", &m_zscore_threshold, 0.5, 100.);
+        //     ImGui::SetItemTooltip("Threshold of Z-score");
+        //     ImGui::EndChild();
+        // }
         ImGui::EndChild();
 
         if (ImPlot::BeginPlot("Audio FFT", ImVec2(m_compute_channel_phase ? width() - plotheight * 1.5f - 10 : -1, -1)))
@@ -1327,6 +1428,7 @@ public:
             bool calibration_active = m_rms_calibration_scale != 1.0;
             double* fft_draw = m_fft_channel_left  ? m_fftdrawl : m_fftdrawr;
             float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
+            ImPlot::SetupLegend(ImPlotLocation_NorthEast);
             ImPlot::SetupAxis(ImAxis_X1, "Frequency", 0);
             ImPlot::SetupAxis(ImAxis_Y1, "dB FullScale", ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_Lock | ImPlotAxisFlags_Opposite);
             if (m_logscale_frequency)
@@ -1358,6 +1460,9 @@ public:
                 ImPlot::PlotText(thdtext, pnt.x, pnt.y);
                 pnt.y -= 20 * plot_to_pix_graph;
                 snprintf(thdtext, 32, "THD+N : %.3f %% (%.2f dB)", m_thdn, m_thddb);
+                ImPlot::PlotText(thdtext, pnt.x, pnt.y);
+                pnt.y -= 20 * plot_to_pix_graph;
+                snprintf(thdtext, 32, "Total RMS : %.4f", m_fft_rms * m_rms_calibration_scale);
                 ImPlot::PlotText(thdtext, pnt.x, pnt.y);
 
                 for (int i = m_fundamental_index; i < m_fft_found_peaks; ++i)
@@ -1481,19 +1586,13 @@ public:
             m_sound_data1[i] = sound_data;
                 
             // THD test for non linear signal by applying small odd harmomics distortion
-            //m_sound_data1[i] = 0.7 * sin(3150.*double(i) *2.f*M_PI*1./current_sample_rate + 0.2);
-            //m_sound_data1[i] = 0.7 * sin((3150.+rand_freq) * double(i) * 2.f * M_PI * 1./current_sample_rate);
-
             m_fftinl[i] = sound_data * m_current_window_cache[i];
-            // if (m_sound_data1[i] > 0.f) m_sound_data1[i] = powf(m_sound_data1[i], 1.4);
-            // if (m_sound_data1[i] < 0.f) m_sound_data1[i] = -powf(-m_sound_data1[i], 1.4f);
             m_sound_data_x[i] = float(i) * inv_current_sample_rate * 1000.0;
 
             m_rms_left += m_sound_data1[i] * m_sound_data1[i];
             if(channelcount>1)
             {
                 m_sound_data2[i] = m_raw_buffer[i*channelcount+1] * m_audio_gain;
-                //m_sound_data2[i] += 0.3*sin(1000.*float(i) *2.f*M_PI*1./current_sample_rate + (M_PI_4));
                 m_fftinr[i] = m_sound_data2[i] * m_current_window_cache[i];
                 m_rms_right += m_sound_data2[i] * m_sound_data2[i];
             }
@@ -1562,8 +1661,6 @@ public:
 
     void compute_wow_and_flutter()
     {
-
-
         double analysis_time_s = 5.5;
         double samplerate = m_audiorecorder.get_current_samplerate();
 
@@ -1595,12 +1692,6 @@ public:
             return;
         }
 
-        if (m_longterm_audio.size() < audio_capture_length)
-        {
-            // Buffer not fully filled
-            return;
-        }
-
         int reference_frequency = 3000;
         if (m_wow_test_frequency == 1) reference_frequency = 3150;
         else if (m_wow_test_frequency == 2) reference_frequency = m_wow_test_frequency_custom;
@@ -1625,13 +1716,13 @@ public:
         double max_val = -200;
         int max_val_index = 0;
 
-        double total_rms = 0;
+        m_fft_rms = 0;
         for (int i = 1; i < fft_capture_size; ++i)
         {
-            double fft_module = sqrt(current_fft[i][0] * current_fft[i][0] + current_fft[i][1] * current_fft[i][1]) * inv_capture_size;
-            //fft_module *= m_window_amplitude_correction[m_fft_window_fn_index];
+            double fft_module = sqrt(current_fft[i][0] * current_fft[i][0] + current_fft[i][1] * current_fft[i][1]);
+            fft_module *= m_window_energy_correction[m_fft_window_fn_index];
             fft_module *= fft_module;
-            total_rms += fft_module;
+            m_fft_rms += fft_module;
             m_rms_fft[i] = fft_module;
             
             if (fft_module > max_val)
@@ -1640,8 +1731,8 @@ public:
                 max_val_index = i;
             }
         }
-        total_rms = sqrt(total_rms) * invsqrt2;
-
+        m_fft_rms = sqrt(m_fft_rms) * invsqrt2 * inv_capture_size;
+        //printf("RMS = %f\n", total_rms);
 
         // Find FFT fundamental range
         double tmp = max_val;
@@ -1684,11 +1775,11 @@ public:
             noise_rms += m_rms_fft[i];
         }
 
-        noise_rms = sqrt(noise_rms) * invsqrt2;
+        noise_rms = sqrt(noise_rms) * invsqrt2 * inv_capture_size;
 
         double noise_db = 20. * log10(noise_rms);
 
-        m_thdn = noise_rms / total_rms;
+        m_thdn = noise_rms / m_fft_rms;
         m_thddb = 20.0 * log10(m_thdn);
         m_thdn *= 100.0;
     }
@@ -1893,7 +1984,9 @@ public:
             set_window_fn();
         }
         else if (s == "showVoltmeter")
+        {
             m_show_rms_voltage = i;
+        }
         else if (s == "theme")
         {
             m_uitheme = i;
@@ -1929,9 +2022,18 @@ public:
         int wanted_buffer = m_capture_size * m_audiorecorder.get_channel_count();
         if (m_audiorecorder.get_available_samples() >= wanted_buffer)
         {
-            on_compute();
-            return true;
+            bool computed = compute();
+            if (computed)
+            {
+                if (m_show_thd) compute_thd();
+                if (m_show_thd) compute_thdn();
+                if (m_compute_channel_phase) compute_channels_phase();
+            }
+
+            if (computed) update_ui();
+                return true;
         }
+
         return false;
     }
 };
@@ -1951,7 +2053,6 @@ public:
     {
         if(m_audiotool->check_data_buffer())
         {
-            update_ui();
             return true;
         }
         return false;
@@ -1970,6 +2071,13 @@ public:
 
 int main(int argc, char *argv[])
 {
+    Rtl_dev dev;
+    printf("RTL Devs : %i\n", dev.get_device_count());
+    if (dev.get_device_count())
+    {
+        dev.open_device(0);
+        printf("RTL connected : %i\n", dev.device_connected());
+    }
     App_SDL *app = App_SDL::get();
     app->set_app_name("TapeTools");
     Window_SDL *window = new MainWindow;

@@ -14,6 +14,7 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(FFTW REQUIRED)
+find_package(LIBUSB REQUIRED)
 
 message(STATUS "FFTW3 libs ${FFTW_DOUBLE_LIB}")
 message(STATUS "FFTW3 includes ${FFTW_INCLUDE_DIRS}")
@@ -28,12 +29,13 @@ add_subdirectory(libsoundio)
 add_subdirectory(libaudio)
 add_subdirectory(libimgui)
 add_subdirectory(libutils)
+add_subdirectory(libsdr)
 add_subdirectory(resources)
 
 # Executable rules
 
 add_executable(tapetools main.cpp)
-target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libsoundio/include" "libaudio/include" "libutils/include" "resources")
+target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libsoundio/include" "libaudio/include" "libutils/include" "resources" "libsdr/include")
 
 # Link rules
 
@@ -42,7 +44,7 @@ set(PLATFORM_LIBS shlwapi)
 target_sources(tapetools PRIVATE resources/tapetools.rc)
 endif()
 
-target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} dsp_static audio_static imgui_static utils_static $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS})
+target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} rtlsdr_static dsp_static audio_static imgui_static utils_static $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS})
 
 if(MINGW)
     set(LINKFLAGS "-static-libgcc -static-libstdc++")

@@ -3,8 +3,21 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <window_sdl.h>
+#include <sys/time.h>
 
-	
+unsigned long timestamp(void)
+{
+    struct timeval tv;
+    if (gettimeofday(&tv, NULL) < 0) return 0;
+    return (unsigned long)((unsigned long)tv.tv_sec * 1000000 + (unsigned long)tv.tv_usec);
+}
+
+void Chrono::print_elapsed_time(const char* prefix)
+{
+    unsigned long time = timestamp() - m_time;
+    printf("%s [%i us]\n", prefix, time);
+}
+
 typedef void* (*THREADFUNCPTR)(void*);
 
 #ifdef WIN32
@@ -79,6 +92,7 @@ void Thread::start()
         pthread_create(&m_thread_id, NULL, (THREADFUNCPTR)&Thread::run_posix, this);
 #endif
     }
+    m_chrono.reset();
 }
 
 void Thread::usleep(unsigned long us)

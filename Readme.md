@@ -19,11 +19,12 @@ Tapetools is a software that allows you to calibrate/fix old audio devices.
 
 ### MinGW dependencies
  
-Install with pacman :
+Install these libraries with pacman :
 
 * mingw64/mingw-w64-x86_64-fftw
 * mingw64/mingw-w64-x86_64-SDL2
 * mingw64/mingw-w64-x86_64-glew
+* mingw64/mingw-w64-x86_64-libusb-win32
 
 # Linux (Ubuntu)
 
@@ -32,6 +33,7 @@ Install via apt-get :
 * libfftw3-dev
 * libsdl2-dev
 * libglew-dev
+* libusb
 * cmake
 
 with command : ```sudo apt install libfftw3-dev libsdl2-dev libglew-dev```

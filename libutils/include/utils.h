@@ -1,25 +1,12 @@
 #pragma once
 
+#define _USE_MATH_DEFINES
+
+#include <math.h>
 #include <vector>
 
 void smoothed_z_score(const double y[], double signals[], const int count, const int lag, const float threshold, const float influence);
 bool sg_smooth(const double *v, double *res, const int size, const int width, const int deg);
-unsigned long timestamp(void);
-
-class Chrono
-{
-	unsigned long m_time;
-public:
-	Chrono(){
-		reset();
-	}
-
-	void reset(){
-		m_time = timestamp();
-	}
-
-	void print_elapsed_time(const char* prefix);
-};
 
 static double zerocross(double a[2], double b[2])
 {
@@ -86,6 +73,33 @@ static double blackman_harris_fft_window(int i, int length)
 	a3 = 0.01168;
 	N1 = (double)(length-1);
 	w = a0 - a1*cos(2*i*M_PI/N1) + a2*cos(4*i*M_PI/N1) - a3*cos(6*i*M_PI/N1);
+	return w;
+}
+
+static double youssef_fft_window(int i, int length)
+/* really a blackman-harris-poisson window, but that is a mouthful */
+{
+	double a, a0, a1, a2, a3, w, N1;
+	a0 = 0.35875;
+	a1 = 0.48829;
+	a2 = 0.14128;
+	a3 = 0.01168;
+	N1 = (double)(length-1);
+	w = a0 - a1*cos(2*i*M_PI/N1) + a2*cos(4*i*M_PI/N1) - a3*cos(6*i*M_PI/N1);
+	a = 0.0025;
+	w *= pow(M_E, (-a*(double)abs((int)(N1-1-2*i)))/N1);
+	return w;
+}
+
+static double bartlett_fft_window(int i, int length)
+{
+	double N1, L, w;
+	L = (double)length;
+	N1 = L - 1;
+	w = (i - N1/2) / (L/2);
+	if (w < 0) {
+		w = -w;}
+	w = 1 - w;
 	return w;
 }
 
