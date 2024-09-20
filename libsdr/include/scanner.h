@@ -32,56 +32,58 @@ enum window_types {
 
 #define RTL_GAIN_AUTO -10000
 
-struct Scan_result
-{
-	int length;
-	int freq_start;
-	int freq_stop;
-	float freq_step;
-	int num_samples;
-	std::vector<float> buffer;
-	std::vector<float> buffer_x;
-};
-
-struct scan_info{
-	int 	num_frequency_hops;
-	int 	dongle_bw_hz;
-	int 	downsampling;
-	double 	cropping_percent;
-	int 	total_fft_bins;
-	int 	logged_fft_bins;
-	double 	fft_bin_size_hz;
-	int 	buffer_size_bytes;
-	double 	buffer_size_ms;
-};
-
-class Scanner_settings{
-public:
-	Scanner_settings(){
-		lower_freq = 88000000;
-		upper_freq = 108000000;
-		step_freq = 1000;
-		crop = 0.2;
-		rtl_dev_index = 0;
-		direct_sampling = false;
-		offset_tuning = false;
-		ppm_correction = 0;
-		gain = RTL_GAIN_AUTO;
-		window_type = WINDOW_TYPE_HAMMING;
+class SDR_Scanner{
+public :
+	class Scanner_settings{
+	public:
+		Scanner_settings(){
+			lower_freq = 88000000;
+			upper_freq = 108000000;
+			step_freq = 1000;
+			crop = 0.2;
+			rtl_dev_index = 0;
+			direct_sampling = false;
+			offset_tuning = false;
+			ppm_correction = 0;
+			gain = RTL_GAIN_AUTO;
+			window_type = WINDOW_TYPE_HAMMING;
+			int rtl_dev_index;
+		}
+		int lower_freq, upper_freq, step_freq;
+		double crop;
 		int rtl_dev_index;
-	}
-	int lower_freq, upper_freq, step_freq;
-	double crop;
-	int rtl_dev_index;
-	bool direct_sampling;
-	bool offset_tuning;
-	int gain;
-	int ppm_correction;
-	window_types window_type;
-};
+		bool direct_sampling;
+		bool offset_tuning;
+		int gain;
+		int ppm_correction;
+		window_types window_type;
+	};
 
-class Scanner{
-	struct tuning_state
+	struct Scan_result
+	{
+		int length;
+		int freq_start;
+		int freq_stop;
+		float freq_step;
+		int num_samples;
+		std::vector<float> buffer;
+		std::vector<float> buffer_x;
+	};
+
+	struct Scan_info{
+		int 	num_frequency_hops;
+		int 	dongle_bw_hz;
+		int 	downsampling;
+		double 	cropping_percent;
+		int 	total_fft_bins;
+		int 	logged_fft_bins;
+		double 	fft_bin_size_hz;
+		int 	buffer_size_bytes;
+		double 	buffer_size_ms;
+	};
+
+private:
+	struct Tuning_state
 	/* one per tuning range */
 	{
 		int 	freq;
@@ -106,34 +108,35 @@ class Scanner{
 	int 		m_comp_fir_size;
 	int		 	m_peak_hold;
 	int		 	m_tune_count;
-	tuning_state m_tunes[MAX_TUNES];
-	scan_info	 m_scan_info;
-	Rtl_dev		 m_rtl_device;
+	Tuning_state m_tunes[MAX_TUNES];
+	Scan_info	 m_scan_info;
+	RTL_Device		 m_rtl_device;
 	bool		m_settings_dirty = true;
 
+	Scanner_settings m_settings;
 	std::vector<Scan_result> m_scan_results;
 
 	void make_sine_table(int size);
 	int  fix_fft(int16_t iq[], int m);
-	void rms_power(struct tuning_state *ts);
+	void rms_power(struct Tuning_state *ts);
 	int  frequency_range(double crop, int upper, int lower, int max_size);
 	void fifth_order(int16_t *data, int length);
 	void remove_dc(int16_t *data, int length);
 	void generic_fir(int16_t *data, int length, int *fir);
 	void downsample_iq(int16_t *data, int length);
 	void destroy_tunes_memory();
-	void compute_fft(Scan_result& res, tuning_state* ts);
+	void compute_fft(Scan_result& res, Tuning_state* ts);
 	void set_gain(int gain);
 	void set_auto_gain();
-	Scanner_settings m_settings;
 	void compute_fft_window_corrections(double (*window_fn)(int, int), int num_samples = 1000);
+	
 public:
-	Scanner();
-	~Scanner();
+	SDR_Scanner();
+	~SDR_Scanner();
 	int init();
 	int scan();
-	const scan_info& get_scan_info(){return m_scan_info;}
-	Rtl_dev& get_rtl_device(){return m_rtl_device;}
+	const Scan_info& get_scan_info(){return m_scan_info;}
+	RTL_Device& get_rtl_device(){return m_rtl_device;}
 	std::string get_error(int s);
 	const std::vector<Scan_result>& get_scan_result(){return m_scan_results;}
 

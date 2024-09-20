@@ -32,7 +32,7 @@ void TextCenter(const char* text, ...) {
 
 class SdrThread : public Thread
 {
-    Scanner m_scanner;
+    SDR_Scanner m_scanner;
     bool m_data_available = false;
 public:
     SdrThread() : Thread("SdrThread", true, false)
@@ -60,7 +60,7 @@ public:
         return m_data_available;
     }
 
-    const std::vector<Scan_result>& get_scan_result()
+    const std::vector<SDR_Scanner::Scan_result>& get_scan_result()
     {
         m_data_available = false;
         return m_scanner.get_scan_result();
@@ -908,7 +908,7 @@ public:
             ImPlot::SetupAxesLimits(88, 108, -60.0, 40.0);
             ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 88, 108);
 
-            const std::vector<Scan_result> scan_res = m_sdr_thread.get_scan_result();
+            const std::vector<SDR_Scanner::Scan_result> scan_res = m_sdr_thread.get_scan_result();
             if (scan_res.size())
             {
                 for (int i = 0; i < scan_res.size(); ++i)
@@ -2071,7 +2071,7 @@ public:
 
 int main(int argc, char *argv[])
 {
-    Rtl_dev dev;
+    RTL_Device dev;
     printf("RTL Devs : %i\n", dev.get_device_count());
     if (dev.get_device_count())
     {

@@ -25,13 +25,13 @@ enum rtl_sampling_mode {
 	RTL_DIRECT_SAMPLING_MODE_Q
 };
 
-class Rtl_dev
+class RTL_Device
 {
 	int m_device_id;
 	impl *m_impl;
 public:
-	Rtl_dev();
-	~Rtl_dev();
+	RTL_Device();
+	~RTL_Device();
 
 	int  get_device_count();
 	int  open_device(int dev_idx);

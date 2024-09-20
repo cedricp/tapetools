@@ -97,7 +97,7 @@ inline long real_conj(int16_t real, int16_t imag)
 	return ((long)real*(long)real + (long)imag*(long)imag);
 }
 
-Scanner::Scanner()
+SDR_Scanner::SDR_Scanner()
 {
 	m_boxcar = 1;
 	m_comp_fir_size = 0;
@@ -108,7 +108,7 @@ Scanner::Scanner()
 	m_fft_buf = NULL;
 }
 
-Scanner::~Scanner()
+SDR_Scanner::~SDR_Scanner()
 {
 	destroy_tunes_memory();
 
@@ -119,15 +119,13 @@ Scanner::~Scanner()
 }
 
 void
-Scanner::destroy_tunes_memory()
+SDR_Scanner::destroy_tunes_memory()
 {
 	for (int i=0; i<m_tune_count; i++) {
-		tuning_state *ts = &m_tunes[i];
+		Tuning_state *ts = &m_tunes[i];
 		free(ts->avg);
 		free(ts->buf8);
 	}
-
-	m_tune_count = 0;
 
 	if (m_sinewave)
 		free(m_sinewave);
@@ -136,13 +134,14 @@ Scanner::destroy_tunes_memory()
 	if (m_window_coefs)
 		free(m_window_coefs);
 
+	m_tune_count = 0;
 	m_sinewave = nullptr;
 	m_fft_buf = nullptr;
 	m_window_coefs = nullptr;
 }
 
 void
-Scanner::make_sine_table(int size)
+SDR_Scanner::make_sine_table(int size)
 {
 	int i;
 	double d;
@@ -157,7 +156,7 @@ Scanner::make_sine_table(int size)
 }
 
 int
-Scanner::fix_fft(int16_t iq[], int m)
+SDR_Scanner::fix_fft(int16_t iq[], int m)
 /* interleaved iq[], 0 <= n < 2**m, changes in place */
 {
 	int mr, nn, i, j, l, k, istep, n, shift;
@@ -216,7 +215,7 @@ Scanner::fix_fft(int16_t iq[], int m)
 }
 
 void
-Scanner::rms_power(struct tuning_state *ts)
+SDR_Scanner::rms_power(struct Tuning_state *ts)
 /* for bins between 1MHz and 2MHz */
 {
 	int i, s;
@@ -245,14 +244,14 @@ Scanner::rms_power(struct tuning_state *ts)
 }
 
 int
-Scanner::frequency_range(double crop, int upper, int lower, int max_size)
+SDR_Scanner::frequency_range(double crop, int upper, int lower, int max_size)
 /* flesh out the tunes[] for scanning */
 // do we want the fewest ranges (easy) or the fewest bins (harder)?
 {
 	int i, j, bw_seen, bw_used, bin_e, buf_len;
 	int downsample, downsample_passes;
 	double bin_size;
-	tuning_state *ts;
+	Tuning_state *ts;
 
 	// Cleanup memory
 	destroy_tunes_memory();
@@ -354,7 +353,7 @@ Scanner::frequency_range(double crop, int upper, int lower, int max_size)
 }
 
 void
-Scanner::fifth_order(int16_t *data, int length)
+SDR_Scanner::fifth_order(int16_t *data, int length)
 /* for half of interleaved data */
 {
 	int i;
@@ -382,7 +381,7 @@ Scanner::fifth_order(int16_t *data, int length)
 }
 
 void
-Scanner::remove_dc(int16_t *data, int length)
+SDR_Scanner::remove_dc(int16_t *data, int length)
 /* works on interleaved data */
 {
 	int i;
@@ -400,7 +399,7 @@ Scanner::remove_dc(int16_t *data, int length)
 }
 
 void
-Scanner::generic_fir(int16_t *data, int length, int *fir)
+SDR_Scanner::generic_fir(int16_t *data, int length, int *fir)
 /* Okay, not at all generic.  Assumes length 9, fix that eventually. */
 {
 	int d, temp, sum;
@@ -431,14 +430,14 @@ Scanner::generic_fir(int16_t *data, int length, int *fir)
 }
 
 void
-Scanner::downsample_iq(int16_t *data, int length)
+SDR_Scanner::downsample_iq(int16_t *data, int length)
 {
 	fifth_order(data, length);
 	fifth_order(data+1, length-1);
 }
 
 int
-Scanner::scan()
+SDR_Scanner::scan()
 {
 	if (m_settings_dirty)
 	{
@@ -450,7 +449,7 @@ Scanner::scan()
 	}
 	int i, j, j2, f, n_read, offset, bin_e, bin_len, buf_len, ds, ds_p;
 	int32_t w;
-	struct tuning_state *ts;
+	struct Tuning_state *ts;
 	bin_e = m_tunes[0].bin_e;
 	bin_len = 1 << bin_e;
 	buf_len = m_tunes[0].buf_len;
@@ -553,7 +552,7 @@ Scanner::scan()
 }
 
 std::string
-Scanner::get_error(int s)
+SDR_Scanner::get_error(int s)
 {
 	switch(s){
 	case SCANNER_MEMORY_ERROR:
@@ -570,18 +569,18 @@ Scanner::get_error(int s)
 	return "";
 }
 
-void Scanner::set_gain(int gain)
+void SDR_Scanner::set_gain(int gain)
 {
 	m_rtl_device.set_gain(gain);
 }
 
-void Scanner::set_auto_gain()
+void SDR_Scanner::set_auto_gain()
 {
 	m_rtl_device.set_gain(RTL_GAIN_AUTO);
 }
 
 int
-Scanner::init()
+SDR_Scanner::init()
 {
 	destroy_tunes_memory();
 
@@ -684,7 +683,7 @@ Scanner::init()
 }
 
     void 
-	Scanner::compute_fft_window_corrections(double (*window_fn)(int, int), int num_samples)
+	SDR_Scanner::compute_fft_window_corrections(double (*window_fn)(int, int), int num_samples)
     {
 		double sum = 0;
 		double rms = 0;
@@ -702,7 +701,7 @@ Scanner::init()
     }
 
 void
-Scanner::compute_fft(Scan_result& res, tuning_state* ts)
+SDR_Scanner::compute_fft(Scan_result& res, Tuning_state* ts)
 {
 	int i, len, ds, i1, i2, bw2, bin_count;
 	long tmp;

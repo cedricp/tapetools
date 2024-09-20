@@ -37,6 +37,30 @@
  * Static constants
  */
 
+/*
+ * These should be "safe" values, always. If we fail to get PLL lock in this range,
+ * it's a hard error.
+ */
+#define PLL_SAFE_LOW 28e6
+#define PLL_SAFE_HIGH 1845e6
+
+/*
+ * These are the initial, widest, PLL limits that we will try.
+ *
+ * Be cautious with lowering the low bound further - the PLL can claim to be locked
+ * when configured to a lower frequency, but actually be running at around 26.6MHz
+ * regardless of what it was configured for.
+ *
+ * This shows up as a tuning offset at low frequencies, and a "dead zone" about
+ * 6MHz below the PLL lower bound where retuning within that region has no effect.
+ */
+#define PLL_INITIAL_LOW 26.7e6
+#define PLL_INITIAL_HIGH 1885e6
+
+/* We shrink the range edges by at least this much each time there is a soft PLL lock failure */
+#define PLL_STEP_LOW 0.1e6
+#define PLL_STEP_HIGH 1.0e6
+
 /* Those initial values start from REG_SHADOW_START */
 static const uint8_t r82xx_init_array[NUM_REGS] = {
 	0x83, 0x32, 0x75,			/* 05 to 07 */
@@ -286,11 +310,6 @@ static int r82xx_write(struct r82xx_priv *priv, uint8_t reg, const uint8_t *val,
 	return 0;
 }
 
-static int r82xx_write_reg(struct r82xx_priv *priv, uint8_t reg, uint8_t val)
-{
-	return r82xx_write(priv, reg, &val, 1);
-}
-
 static int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg)
 {
 	reg -= REG_SHADOW_START;
@@ -299,6 +318,21 @@ static int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg)
 		return priv->regs[reg];
 	else
 		return -1;
+}
+
+static int r82xx_write_reg(struct r82xx_priv *priv, uint8_t reg, uint8_t val)
+{
+	if (priv->reg_cache && r82xx_read_cache_reg(priv, reg) == val)
+		return 0;
+	if (priv->reg_batch) {
+		shadow_store(priv, reg, &val, 1);
+		if (reg < priv->reg_low)
+			priv->reg_low = reg;
+		if (reg > priv->reg_high)
+			priv->reg_high = reg;
+		return 0;
+	}
+	return r82xx_write(priv, reg, &val, 1);
 }
 
 static int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t val,
@@ -311,7 +345,34 @@ static int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t va
 
 	val = (rc & ~bit_mask) | (val & bit_mask);
 
-	return r82xx_write(priv, reg, &val, 1);
+	return r82xx_write_reg(priv, reg, val);
+}
+
+static int r82xx_write_batch_init(struct r82xx_priv *priv)
+{
+	priv->reg_batch = 0;
+	if (priv->reg_cache) {
+		priv->reg_batch = 1;
+		priv->reg_low = NUM_REGS;
+		priv->reg_high = 0;
+	}
+	return 0;
+}
+
+static int r82xx_write_batch_sync(struct r82xx_priv *priv)
+{
+	int rc, offset, len;
+	if (!priv->reg_cache)
+		return -1;
+	if (!priv->reg_batch)
+		return -1;
+	priv->reg_batch = 0;
+	if (priv->reg_low > priv->reg_high)
+		return 0; /* No work to do */
+	offset = priv->reg_low - REG_SHADOW_START;
+	len = priv->reg_high - priv->reg_low + 1;
+	rc = r82xx_write(priv, priv->reg_low, priv->regs+offset, len);
+	return rc;
 }
 
 static uint8_t r82xx_bitrev(uint8_t byte)
@@ -414,17 +475,16 @@ static int r82xx_set_mux(struct r82xx_priv *priv, uint32_t freq)
 	return rc;
 }
 
-static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
+static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq, uint32_t *freq_out)
 {
 	int rc, i;
 	unsigned sleep_time = 10000;
 	uint64_t vco_freq;
-	uint32_t vco_fra;	/* VCO contribution by SDM (kHz) */
-	uint32_t vco_min = 1770000;
-	uint32_t vco_max = vco_min * 2;
-	uint32_t freq_khz, pll_ref, pll_ref_khz;
-	uint16_t n_sdm = 2;
-	uint16_t sdm = 0;
+	uint64_t vco_div;
+	uint32_t vco_min = 1750000; /* kHz */
+	uint32_t vco_max = vco_min * 2; /* kHz */
+	uint32_t freq_khz, pll_ref;
+	uint32_t sdm = 0;
 	uint8_t mix_div = 2;
 	uint8_t div_buf = 0;
 	uint8_t div_num = 0;
@@ -433,10 +493,11 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	uint8_t ni, si, nint, vco_fine_tune, val;
 	uint8_t data[5];
 
+	r82xx_write_batch_init(priv);
+
 	/* Frequency in kHz */
 	freq_khz = (freq + 500) / 1000;
 	pll_ref = priv->cfg->xtal;
-	pll_ref_khz = (priv->cfg->xtal + 500) / 1000;
 
 	rc = r82xx_write_reg_mask(priv, 0x10, refdiv2, 0x10);
 	if (rc < 0)
@@ -448,32 +509,27 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 		return rc;
 
 	/* set VCO current = 100 */
+	priv->pll_off = 0;
 	rc = r82xx_write_reg_mask(priv, 0x12, 0x80, 0xe0);
 	if (rc < 0)
 		return rc;
 
 	/* Calculate divider */
-	while (mix_div <= 64) {
-		if (((freq_khz * mix_div) >= vco_min) &&
-		   ((freq_khz * mix_div) < vco_max)) {
-			div_buf = mix_div;
-			while (div_buf > 2) {
-				div_buf = div_buf >> 1;
-				div_num++;
-			}
-			break;
-		}
-		mix_div = mix_div << 1;
-	}
 
-	rc = r82xx_read(priv, 0x00, data, sizeof(data));
-	if (rc < 0)
-		return rc;
+	for (mix_div = 2, div_num = 0; mix_div < 64; mix_div <<= 1, div_num++)
+		if ((freq_khz * mix_div) >= vco_min)
+			break;
 
 	if (priv->cfg->rafael_chip == CHIP_R828D)
 		vco_power_ref = 1;
 
+	/*
+	rc = r82xx_read(priv, 0x00, data, sizeof(data));
+	if (rc < 0)
+		return rc;
 	vco_fine_tune = (data[4] & 0x30) >> 4;
+	*/
+	vco_fine_tune = 2;
 
 	if (vco_fine_tune > vco_power_ref)
 		div_num = div_num - 1;
@@ -485,10 +541,25 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 		return rc;
 
 	vco_freq = (uint64_t)freq * (uint64_t)mix_div;
-	nint = vco_freq / (2 * pll_ref);
-	vco_fra = (vco_freq - 2 * pll_ref * nint) / 1000;
 
-	if (nint > ((128 / vco_power_ref) - 1)) {
+	/*
+	 * We want to approximate:
+	 *  vco_freq / (2 * pll_ref)
+	 * in the form:
+	 *  nint + sdm/65536
+	 * where nint,sdm are integers and 0 < nint, 0 <= sdm < 65536
+	 * Scaling to fixed point and rounding:
+	 *  vco_div = 65536*(nint + sdm/65536) = int( 0.5 + 65536 * vco_freq / (2 * pll_ref) )
+	 *  vco_div = 65536*nint + sdm         = int( (pll_ref + 65536 * vco_freq) / (2 * pll_ref) )
+	 */
+        
+	vco_div = (pll_ref + 65536 * vco_freq) / (2 * pll_ref);
+	nint = (uint32_t) (vco_div / 65536);
+	sdm = (uint32_t) (vco_div % 65536);
+
+	if (nint < 13 ||
+	    (priv->cfg->rafael_chip == CHIP_R828D && nint > 127) ||
+	    (priv->cfg->rafael_chip != CHIP_R828D && nint > 76)) {
 		fprintf(stderr, "[R82XX] No valid PLL values for %u Hz!\n", freq);
 		return -1;
 	}
@@ -496,30 +567,27 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	ni = (nint - 13) / 4;
 	si = nint - 4 * ni - 13;
 
+	if (freq_out) {
+		uint64_t actual_vco = (uint64_t)2 * pll_ref * nint + (uint64_t)2 * pll_ref * sdm / 65536;
+		*freq_out = (uint32_t) ((actual_vco + mix_div/2) / mix_div);
+	}
+
 	rc = r82xx_write_reg(priv, 0x14, ni + (si << 6));
 	if (rc < 0)
 		return rc;
 
 	/* pw_sdm */
-	if (!vco_fra)
+	if (sdm == 0)
 		val = 0x08;
 	else
 		val = 0x00;
 
-	rc = r82xx_write_reg_mask(priv, 0x12, val, 0x08);
+	if (priv->disable_dither)
+		val |= 0x10;
+
+	rc = r82xx_write_reg_mask(priv, 0x12, val, 0x18);
 	if (rc < 0)
 		return rc;
-
-	/* sdm calculator */
-	while (vco_fra > 1) {
-		if (vco_fra > (2 * pll_ref_khz / n_sdm)) {
-			sdm = sdm + 32768 / (n_sdm / 2);
-			vco_fra = vco_fra - 2 * pll_ref_khz / n_sdm;
-			if (n_sdm >= 0x8000)
-				break;
-		}
-		n_sdm <<= 1;
-	}
 
 	rc = r82xx_write_reg(priv, 0x16, sdm >> 8);
 	if (rc < 0)
@@ -528,31 +596,36 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	if (rc < 0)
 		return rc;
 
+	if (priv->reg_batch) {
+		rc = r82xx_write_batch_sync(priv);
+		if (rc < 0) {
+			fprintf(stderr, "[R82XX] Batch error in PLL for %u Hz!\n", freq);
+			return rc;
+		}
+	}
+
 	for (i = 0; i < 2; i++) {
 //		usleep_range(sleep_time, sleep_time + 1000);
 
 		/* Check if PLL has locked */
+		data[2] = 0;
 		rc = r82xx_read(priv, 0x00, data, 3);
 		if (rc < 0)
 			return rc;
 		if (data[2] & 0x40)
 			break;
+		if (i > 0)
+			break;
 
-		if (!i) {
-			/* Didn't lock. Increase VCO current */
-			rc = r82xx_write_reg_mask(priv, 0x12, 0x60, 0xe0);
-			if (rc < 0)
-				return rc;
-		}
+		/* Didn't lock. Increase VCO current */
+		rc = r82xx_write_reg_mask(priv, 0x12, 0x60, 0xe0);
+		if (rc < 0)
+			return rc;
 	}
 
 	if (!(data[2] & 0x40)) {
-		printf("[R82XX] PLL not locked!\n");
-		priv->has_lock = 0;
-		return 0;
+		return -42;
 	}
-
-	priv->has_lock = 1;
 
 	/* set pll autotune = 8kHz */
 	rc = r82xx_write_reg_mask(priv, 0x1a, 0x08, 0x08);
@@ -757,91 +830,29 @@ static int r82xx_sysfreq_sel(struct r82xx_priv *priv, uint32_t freq,
 	 return 0;
 }
 
-static int r82xx_set_tv_standard(struct r82xx_priv *priv,
+static int r82xx_init_tv_standard(struct r82xx_priv *priv,
 				 unsigned bw,
 				 enum r82xx_tuner_type type,
 				 uint32_t delsys)
 
 {
+	/* everything that was previously done in r82xx_set_tv_standard
+	 * and doesn't need to be changed when filter settings change */
 	int rc, i;
 	uint32_t if_khz, filt_cal_lo;
-	uint8_t data[5];
-	uint8_t filt_gain, img_r, filt_q, hp_cor, ext_enable, loop_through;
+	uint8_t data[5], val;
+	uint8_t filt_gain, img_r, ext_enable, loop_through;
 	uint8_t lt_att, flt_ext_widest, polyfil_cur;
-	int need_calibration;
 
-	if (delsys == SYS_ISDBT) {
-		if_khz = 4063;
-		filt_cal_lo = 59000;
-		filt_gain = 0x10;	/* +3db, 6mhz on */
-		img_r = 0x00;		/* image negative */
-		filt_q = 0x10;		/* r10[4]:low q(1'b1) */
-		hp_cor = 0x6a;		/* 1.7m disable, +2cap, 1.25mhz */
-		ext_enable = 0x40;	/* r30[6], ext enable; r30[5]:0 ext at lna max */
-		loop_through = 0x00;	/* r5[7], lt on */
-		lt_att = 0x00;		/* r31[7], lt att enable */
-		flt_ext_widest = 0x00;	/* r15[7]: flt_ext_wide off */
-		polyfil_cur = 0x60;	/* r25[6:5]:min */
-	} else {
-		if (bw <= 6) {
-			if_khz = 3570;
-			filt_cal_lo = 56000;	/* 52000->56000 */
-			filt_gain = 0x10;	/* +3db, 6mhz on */
-			img_r = 0x00;		/* image negative */
-			filt_q = 0x10;		/* r10[4]:low q(1'b1) */
-			hp_cor = 0x6b;		/* 1.7m disable, +2cap, 1.0mhz */
-			ext_enable = 0x60;	/* r30[6]=1 ext enable; r30[5]:1 ext at lna max-1 */
-			loop_through = 0x00;	/* r5[7], lt on */
-			lt_att = 0x00;		/* r31[7], lt att enable */
-			flt_ext_widest = 0x00;	/* r15[7]: flt_ext_wide off */
-			polyfil_cur = 0x60;	/* r25[6:5]:min */
-		} else if (bw == 7) {
-#if 0
-			/*
-			 * There are two 7 MHz tables defined on the original
-			 * driver, but just the second one seems to be visible
-			 * by rtl2832. Keep this one here commented, as it
-			 * might be needed in the future
-			 */
-
-			if_khz = 4070;
-			filt_cal_lo = 60000;
-			filt_gain = 0x10;	/* +3db, 6mhz on */
-			img_r = 0x00;		/* image negative */
-			filt_q = 0x10;		/* r10[4]:low q(1'b1) */
-			hp_cor = 0x2b;		/* 1.7m disable, +1cap, 1.0mhz */
-			ext_enable = 0x60;	/* r30[6]=1 ext enable; r30[5]:1 ext at lna max-1 */
-			loop_through = 0x00;	/* r5[7], lt on */
-			lt_att = 0x00;		/* r31[7], lt att enable */
-			flt_ext_widest = 0x00;	/* r15[7]: flt_ext_wide off */
-			polyfil_cur = 0x60;	/* r25[6:5]:min */
-#endif
-			/* 7 MHz, second table */
-			if_khz = 4570;
-			filt_cal_lo = 63000;
-			filt_gain = 0x10;	/* +3db, 6mhz on */
-			img_r = 0x00;		/* image negative */
-			filt_q = 0x10;		/* r10[4]:low q(1'b1) */
-			hp_cor = 0x2a;		/* 1.7m disable, +1cap, 1.25mhz */
-			ext_enable = 0x60;	/* r30[6]=1 ext enable; r30[5]:1 ext at lna max-1 */
-			loop_through = 0x00;	/* r5[7], lt on */
-			lt_att = 0x00;		/* r31[7], lt att enable */
-			flt_ext_widest = 0x00;	/* r15[7]: flt_ext_wide off */
-			polyfil_cur = 0x60;	/* r25[6:5]:min */
-		} else {
-			if_khz = 4570;
-			filt_cal_lo = 68500;
-			filt_gain = 0x10;	/* +3db, 6mhz on */
-			img_r = 0x00;		/* image negative */
-			filt_q = 0x10;		/* r10[4]:low q(1'b1) */
-			hp_cor = 0x0b;		/* 1.7m disable, +0cap, 1.0mhz */
-			ext_enable = 0x60;	/* r30[6]=1 ext enable; r30[5]:1 ext at lna max-1 */
-			loop_through = 0x00;	/* r5[7], lt on */
-			lt_att = 0x00;		/* r31[7], lt att enable */
-			flt_ext_widest = 0x00;	/* r15[7]: flt_ext_wide off */
-			polyfil_cur = 0x60;	/* r25[6:5]:min */
-		}
-	}
+	if_khz = R82XX_DEFAULT_IF_FREQ/1000;
+	filt_cal_lo = 56000;	/* 52000->56000 */
+	filt_gain = 0x10;	/* +3db, 6mhz on */
+	img_r = 0x00;		/* image negative */
+	ext_enable = 0x60;	/* r30[6]=1 ext enable; r30[5]:1 ext at lna max-1 */
+	loop_through = 0x00;	/* r5[7], lt on */
+	lt_att = 0x00;		/* r31[7], lt att enable */
+	flt_ext_widest = 0x00;	/* r15[7]: flt_ext_wide off */
+	polyfil_cur = 0x60;	/* r25[6:5]:min */
 
 	/* Initialize the shadow registers */
 	memcpy(priv->regs, r82xx_init_array, sizeof(r82xx_init_array));
@@ -864,72 +875,6 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 //		usleep_range(1000, 2000);
 	}
 	priv->int_freq = if_khz * 1000;
-
-	/* Check if standard changed. If so, filter calibration is needed */
-	/* as we call this function only once in rtlsdr, force calibration */
-	need_calibration = 1;
-
-	if (need_calibration) {
-		for (i = 0; i < 2; i++) {
-			/* Set filt_cap */
-			rc = r82xx_write_reg_mask(priv, 0x0b, hp_cor, 0x60);
-			if (rc < 0)
-				return rc;
-
-			/* set cali clk =on */
-			rc = r82xx_write_reg_mask(priv, 0x0f, 0x04, 0x04);
-			if (rc < 0)
-				return rc;
-
-			/* X'tal cap 0pF for PLL */
-			rc = r82xx_write_reg_mask(priv, 0x10, 0x00, 0x03);
-			if (rc < 0)
-				return rc;
-
-			rc = r82xx_set_pll(priv, filt_cal_lo * 1000);
-			if (rc < 0 || !priv->has_lock)
-				return rc;
-
-			/* Start Trigger */
-			rc = r82xx_write_reg_mask(priv, 0x0b, 0x10, 0x10);
-			if (rc < 0)
-				return rc;
-
-//			usleep_range(1000, 2000);
-
-			/* Stop Trigger */
-			rc = r82xx_write_reg_mask(priv, 0x0b, 0x00, 0x10);
-			if (rc < 0)
-				return rc;
-
-			/* set cali clk =off */
-			rc = r82xx_write_reg_mask(priv, 0x0f, 0x00, 0x04);
-			if (rc < 0)
-				return rc;
-
-			/* Check if calibration worked */
-			rc = r82xx_read(priv, 0x00, data, sizeof(data));
-			if (rc < 0)
-				return rc;
-
-			priv->fil_cal_code = data[4] & 0x0f;
-			if (priv->fil_cal_code && priv->fil_cal_code != 0x0f)
-				break;
-		}
-		/* narrowest */
-		if (priv->fil_cal_code == 0x0f)
-			priv->fil_cal_code = 0;
-	}
-
-	rc = r82xx_write_reg_mask(priv, 0x0a,
-				  filt_q | priv->fil_cal_code, 0x1f);
-	if (rc < 0)
-		return rc;
-
-	/* Set BW, Filter_gain, & HP corner */
-	rc = r82xx_write_reg_mask(priv, 0x0b, hp_cor, 0xef);
-	if (rc < 0)
-		return rc;
 
 	/* Set Img_R */
 	rc = r82xx_write_reg_mask(priv, 0x07, img_r, 0x80);
@@ -969,9 +914,74 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 	/* Store current standard. If it changes, re-calibrate the tuner */
 	priv->delsys = delsys;
 	priv->type = type;
-	priv->bw = bw;
 
 	return 0;
+}
+
+static int update_if_filter(struct r82xx_priv *priv) {
+	int rc, i, hpf, lpf;
+	uint8_t filt_q, hp_cor;
+	int cal;
+
+	hpf = ((int)priv->if_filter_freq - (int)priv->bw/2)/1000;
+	lpf = ((int)priv->if_filter_freq + (int)priv->bw/2)/1000;
+
+	filt_q = 0x10;		/* r10[4]:low q(1'b1) */
+
+	if(lpf <= 2500) {
+				hp_cor = 0xE0; /* 1.7m enable,  +2cap */
+				cal = 16*(2500-lpf) / (2500-2000);
+	} else if(lpf <= 3100) {
+				hp_cor = 0xA0;	/* 1.7m enable,  +1cap */
+				cal = 16*(3100-lpf) / (3100-2200);
+	} else if(lpf <= 3900) {
+				hp_cor = 0x80;	/* 1.7m enable,  +0cap */
+				cal = 16*(3900-lpf) / (3900-2600);
+	} else if(lpf <= 7100) {
+				hp_cor = 0x60;	/* 1.7m disable, +2cap */
+				cal = 16*(7100-lpf) / (7100-5300);
+	} else if(lpf <= 8700) {
+				hp_cor = 0x20;	/* 1.7m disable, +1cap */
+				cal = 16*(8700-lpf) / (8700-6300);
+	} else {
+				hp_cor = 0x00;	/* 1.7m disable, +0cap */
+				cal = 16*(11000-lpf) / (11000-7500);
+	}
+
+	if(hpf >= 4700)      hp_cor |= 0x00;	/*         5 MHz */
+	else if(hpf >= 3800) hp_cor |= 0x01;	/*         4 MHz */
+	else if(hpf >= 3000) hp_cor |= 0x02;	/* -12dB @ 2.25 MHz */
+	else if(hpf >= 2800) hp_cor |= 0x03;	/*  -8dB @ 2.25 MHz */
+	else if(hpf >= 2600) hp_cor |= 0x04;	/*  -4dB @ 2.25 MHz */
+	else if(hpf >= 2400) hp_cor |= 0x05;	/* -12dB @ 1.75 MHz */
+	else if(hpf >= 2200) hp_cor |= 0x06;	/*  -8dB @ 1.75 MHz */
+	else if(hpf >= 2000) hp_cor |= 0x07;	/*  -4dB @ 1.75 MHz */
+	else if(hpf >= 1800) hp_cor |= 0x08;	/* -12dB @ 1.25 MHz */
+	else if(hpf >= 1600) hp_cor |= 0x09;	/*  -8dB @ 1.25 MHz */
+	else if(hpf >= 1400) hp_cor |= 0x0A;	/*  -4dB @ 1.25 MHz */
+	else                 hp_cor |= 0x0B;
+
+
+	if(cal < 0) cal = 0;
+	else if(cal > 15) cal = 15;
+	priv->fil_cal_code = cal;
+
+	rc = r82xx_write_reg_mask(priv, 0x0a,
+				  filt_q | priv->fil_cal_code, 0x1f);
+	if (rc < 0)
+		return rc;
+
+	/* Set BW, Filter_gain, & HP corner */
+	rc = r82xx_write_reg_mask(priv, 0x0b, hp_cor, 0xef);
+	if (rc < 0)
+		return rc;
+
+	return 0;
+}
+
+int r82xx_set_bw(struct r82xx_priv *priv, uint32_t bw) {
+	priv->bw = bw;
+	return update_if_filter(priv);
 }
 
 static int r82xx_read_gain(struct r82xx_priv *priv)
@@ -1073,19 +1083,19 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain)
 	return 0;
 }
 
-int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
+int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq, uint32_t *lo_freq_out)
 {
-	int rc = -1;
+	int rc;
 	uint32_t lo_freq = freq + priv->int_freq;
+	uint32_t margin = 1e6 + priv->bw/2;
 	uint8_t air_cable1_in;
+	int changed_pll_limits = 0;
 
-	rc = r82xx_set_mux(priv, lo_freq);
-	if (rc < 0)
-		goto err;
+	r82xx_write_batch_init(priv);
 
-	rc = r82xx_set_pll(priv, lo_freq);
-	if (rc < 0 || !priv->has_lock)
-		goto err;
+	/* RF input settings */
+
+	rc = r82xx_set_mux(priv, freq);
 
 	/* switch between 'Cable1' and 'Air-In' inputs on sticks with
 	 * R828D tuner. We switch at 345 MHz, because that's where the
@@ -1096,13 +1106,152 @@ int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 	if ((priv->cfg->rafael_chip == CHIP_R828D) &&
 	    (air_cable1_in != priv->input)) {
 		priv->input = air_cable1_in;
-		rc = r82xx_write_reg_mask(priv, 0x05, air_cable1_in, 0x60);
+		rc |= r82xx_write_reg_mask(priv, 0x05, air_cable1_in, 0x60);
+	}
+
+	/* IF generation settings */
+
+ retune:
+	if (freq < 14.4e6 && freq < (priv->pll_low_limit - 14.4e6)) {
+		/* Previously "no-mod direct sampling" - confuse the VCO/PLL
+		 * sufficiently that we get the HF signal leaking through
+		 * the tuner, then sample that directly.
+		 *
+		 * Disable the VCO, as far as we can.
+		 * This throws a big spike of noise into the signal,
+		 * so only do it once when crossing the 14.4MHz boundary,
+		 * not on every retune.
+		 */
+		if (!priv->pll_off) {
+			rc |= r82xx_set_pll(priv, 50e6, NULL);              /* Might influence the noise floor? */
+			rc |= r82xx_write_reg_mask(priv, 0x10, 0xd0, 0xe0); /* impossible mix_div setting */
+			rc |= r82xx_write_reg_mask(priv, 0x12, 0xe0, 0xe0); /* VCO current = 0 */
+			priv->pll_off = 1;
+		}
+
+		/* We are effectively tuned to 0Hz - the downconverter must do all the heavy lifting now */
+		lo_freq = 0;
+		if (lo_freq_out) *lo_freq_out = 0;
+	} else {
+		/* Normal tuning case */
+		int pll_error = 0;
+
+		if (priv->pll_off) {
+			/* Crossed the 14.4MHz boundary, power the VCO back on */
+			rc |= r82xx_write_reg_mask(priv, 0x12, 0x80, 0xe0);
+			priv->pll_off = 0;
+		}
+
+		/*
+		 * Keep PLL within empirically stable bounds; outside those bounds,
+		 * we prefer to tune to the "wrong" frequency; the difference will be
+		 * mopped up by the 2832 downconverter.
+		 *
+		 * Beware that outside the stable range, the PLL can claim to be locked
+		 * while it is actually stuck at a different frequency (e.g. sometimes
+		 * it can claim to get PLL lock when configured anywhere between 24 and
+		 * 26MHz, but it actually always locks to 26.6-ish).
+		 *
+		 * Make sure to keep the LO away from tuned frequency as there seems
+		 * to be a ~600kHz high-pass filter in the IF path, so you don't want
+		 * any interesting frequencies to land near the IF.
+		 */
+
+		if (lo_freq < priv->pll_low_limit) {
+			if (freq > (priv->pll_low_limit-margin) && freq < (priv->pll_low_limit+margin)) {
+				lo_freq = freq + margin;
+			} else {
+				lo_freq = priv->pll_low_limit;
+			}
+		} else if (lo_freq > priv->pll_high_limit) {
+			if (freq > (priv->pll_high_limit-margin) && freq < (priv->pll_high_limit+margin)) {
+				lo_freq = freq - margin;
+			} else {
+				lo_freq = priv->pll_high_limit;
+			}
+		}
+
+		pll_error = r82xx_set_pll(priv, lo_freq, lo_freq_out);
+		if (pll_error == -42) {
+			/* Magic return value to say that the PLL didn't lock.
+			 * If we are close to the edge of the PLL range, shift the range and try again.
+			 */
+			if (lo_freq < PLL_SAFE_LOW) {
+				priv->pll_low_limit = lo_freq + PLL_STEP_LOW;
+				if (priv->pll_low_limit > PLL_SAFE_LOW)
+					priv->pll_low_limit = PLL_SAFE_LOW;
+				changed_pll_limits = 1;
+				goto retune;
+			} else if (lo_freq > PLL_SAFE_HIGH) {
+				priv->pll_high_limit = lo_freq - PLL_STEP_HIGH;
+				if (priv->pll_high_limit < PLL_SAFE_HIGH)
+					priv->pll_high_limit = PLL_SAFE_HIGH;
+				changed_pll_limits = 1;
+				goto retune;
+			} else {
+				fprintf(stderr, "[r82xx] Failed to get PLL lock at %u Hz\n", lo_freq);
+			}
+		}
+
+		rc |= pll_error;
+	}
+
+	if (changed_pll_limits) {
+		fprintf(stderr, "[r82xx] Updated PLL limits to %u .. %u Hz\n", priv->pll_low_limit, priv->pll_high_limit);
+	}
+
+	/* IF filter / image rejection settings */
+
+	if (lo_freq > freq) {
+		/* high-side mixing, image negative */
+		rc |= r82xx_write_reg_mask(priv, 0x07, 0x00, 0x80);
+		priv->if_filter_freq = lo_freq - freq;
+	} else {
+		/* low-side mixing, image positive */
+		rc |= r82xx_write_reg_mask(priv, 0x07, 0x80, 0x80);
+		priv->if_filter_freq = freq - lo_freq;
+	}
+
+	update_if_filter(priv);
+
+	if (priv->reg_batch) {
+		rc |= r82xx_write_batch_sync(priv);
 	}
 
 err:
 	if (rc < 0)
 		fprintf(stderr, "%s: failed=%d\n", __FUNCTION__, rc);
 	return rc;
+}
+
+int r82xx_set_nomod(struct r82xx_priv *priv)
+{
+	int rc = -1;
+
+	fprintf(stderr, "Using R820T no-mod direct sampling mode\n");
+
+	/*rc = r82xx_set_bw(priv, 1000000);
+	if (rc < 0)
+		goto err;*/
+
+	/* experimentally determined magic numbers
+	 * needs more experimenting with all the registers */
+	rc = r82xx_set_mux(priv, 300000000);
+	if (rc < 0)
+		goto err;
+
+	r82xx_set_pll(priv, 25000000, NULL);
+
+err:
+	if (rc < 0)
+		fprintf(stderr, "%s: failed=%d\n", __FUNCTION__, rc);
+	return rc;
+}
+
+int r82xx_set_dither(struct r82xx_priv *priv, int dither)
+{
+	priv->disable_dither = !dither;
+	return 0;
 }
 
 /*
@@ -1117,6 +1266,7 @@ int r82xx_standby(struct r82xx_priv *priv)
 	if (!priv->init_done)
 		return 0;
 
+	priv->reg_cache = 0;
 	rc = r82xx_write_reg(priv, 0x06, 0xb1);
 	if (rc < 0)
 		return rc;
@@ -1152,6 +1302,7 @@ int r82xx_standby(struct r82xx_priv *priv)
 	/* Force initial calibration */
 	priv->type = -1;
 
+	priv->reg_cache = 1;
 	return rc;
 }
 
@@ -1226,16 +1377,24 @@ int r82xx_init(struct r82xx_priv *priv)
 	priv->xtal_cap_sel = XTAL_HIGH_CAP_0P;
 
 	/* Initialize registers */
+	priv->reg_cache = 0;
 	rc = r82xx_write(priv, 0x05,
 			 r82xx_init_array, sizeof(r82xx_init_array));
 
-	rc = r82xx_set_tv_standard(priv, 3, TUNER_DIGITAL_TV, 0);
-	if (rc < 0)
-		goto err;
+	rc |= r82xx_init_tv_standard(priv, 3, TUNER_DIGITAL_TV, 0);
 
-	rc = r82xx_sysfreq_sel(priv, 0, TUNER_DIGITAL_TV, SYS_DVBT);
+	priv->bw = R82XX_DEFAULT_IF_BW;
+	priv->int_freq = R82XX_DEFAULT_IF_FREQ;
+	/* r82xx_set_bw will always be called by rtlsdr_set_sample_rate,
+	   so there's no need to call r82xx_set_if_filter here */
+
+	rc |= r82xx_sysfreq_sel(priv, 0, TUNER_DIGITAL_TV, SYS_DVBT);
+
+	priv->pll_low_limit = PLL_INITIAL_LOW;
+	priv->pll_high_limit = PLL_INITIAL_HIGH;
 
 	priv->init_done = 1;
+	priv->reg_cache = 1;
 
 err:
 	if (rc < 0)
