@@ -682,23 +682,23 @@ SDR_Scanner::init()
 	return SCANNER_OK;
 }
 
-    void 
-	SDR_Scanner::compute_fft_window_corrections(double (*window_fn)(int, int), int num_samples)
-    {
-		double sum = 0;
-		double rms = 0;
-		double inv_num_samples = 1. / num_samples;
-		for (int i = 0; i < num_samples; i++)
-		{
-			double val = window_fn(i, num_samples);
-			sum += val;
-			rms += val*val;
-		}
+void 
+SDR_Scanner::compute_fft_window_corrections(double (*window_fn)(int, int), int num_samples)
+{
+	double sum = 0;
+	double rms = 0;
+	double inv_num_samples = 1. / num_samples;
+	for (int i = 0; i < num_samples; i++)
+	{
+		double val = window_fn(i, num_samples);
+		sum += val;
+		rms += val*val;
+	}
 
-		// Normalization
-		m_window_amplitude_correction = 1.0 / (sum * inv_num_samples);
-		m_window_energy_correction = 1.0 / sqrt(rms * inv_num_samples);
-    }
+	// Normalization
+	m_window_amplitude_correction = 1.0 / (sum * inv_num_samples);
+	m_window_energy_correction = 1.0 / sqrt(rms * inv_num_samples);
+}
 
 void
 SDR_Scanner::compute_fft(Scan_result& res, Tuning_state* ts)
@@ -737,7 +737,7 @@ SDR_Scanner::compute_fft(Scan_result& res, Tuning_state* ts)
 		dbm  = (double)ts->avg[i];
 		dbm /= (double)ts->rate;
 		dbm /= (double)ts->samples;
-		dbm  = 10 * log10(dbm);
+		dbm  = 10 * log10(dbm * m_window_amplitude_correction);
 		res.buffer[count++] = dbm;
 	}
 	dbm = (double)ts->avg[i2] / ((double)ts->rate * (double)ts->samples);
