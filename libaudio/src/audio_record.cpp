@@ -142,6 +142,10 @@ void audioRecorder::read_callback(SoundIoInStream *instream, int frame_count_min
 
 bool audioRecorder::start()
 {
+    if (m_instream == nullptr)
+    {
+        return false;
+    }
     int err;
     if ((err = soundio_instream_start(m_instream))) {
         fprintf(stderr, "unable to start input device: %s", soundio_strerror(err));
@@ -152,6 +156,10 @@ bool audioRecorder::start()
 
 bool audioRecorder::pause(bool p)
 {
+    if (m_instream == nullptr)
+    {
+        return false;
+    }
     int err;
     if ((err = soundio_instream_pause(m_instream, p))) {
         fprintf(stderr, "unable to pause input device: %s\n", soundio_strerror(err));

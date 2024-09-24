@@ -16,14 +16,14 @@ struct impl{
 
 #define BUFFER_DUMP	(1<<12)
 
-Rtl_dev::Rtl_dev()
+RTL_Device::RTL_Device()
 {
 	m_device_id = RTL_CONNECTION_ERROR;
 	m_impl = new impl;
 	m_impl->device = NULL;
 }
 
-Rtl_dev::~Rtl_dev()
+RTL_Device::~RTL_Device()
 {
 	if (m_device_id >= 0){
 
@@ -32,13 +32,13 @@ Rtl_dev::~Rtl_dev()
 }
 
 int
-Rtl_dev::get_device_count()
+RTL_Device::get_device_count()
 {
 	return rtlsdr_get_device_count();
 }
 
 int
-Rtl_dev::open_device(int dev_idx)
+RTL_Device::open_device(int dev_idx)
 {
 	int r = rtlsdr_open(&m_impl->device, (uint32_t)dev_idx);
 	if (r < 0){
@@ -51,7 +51,7 @@ Rtl_dev::open_device(int dev_idx)
 }
 
 void
-Rtl_dev::close_device()
+RTL_Device::close_device()
 {
 	if (m_device_id >= 0 && m_impl->device)
 		rtlsdr_close(m_impl->device);
@@ -61,7 +61,7 @@ Rtl_dev::close_device()
 }
 
 std::vector<int>
-Rtl_dev::get_tuner_gains()
+RTL_Device::get_tuner_gains()
 {
 	std::vector<int> gains;
 	if (m_device_id >= 0 && m_impl->device){
@@ -77,7 +77,7 @@ Rtl_dev::get_tuner_gains()
 }
 
 int
-Rtl_dev::set_sample_rate(int rate)
+RTL_Device::set_sample_rate(int rate)
 {
 	if (m_device_id >= 0 && m_impl->device){
 		int status = rtlsdr_set_sample_rate(m_impl->device, (uint32_t)rate);
@@ -89,7 +89,7 @@ Rtl_dev::set_sample_rate(int rate)
 }
 
 int
-Rtl_dev::retune(int freq)
+RTL_Device::retune(int freq)
 {
 	if (m_device_id >= 0 && m_impl->device){
 		uint8_t dump[BUFFER_DUMP];
@@ -107,7 +107,7 @@ Rtl_dev::retune(int freq)
 }
 
 int
-Rtl_dev::get_center_frequency()
+RTL_Device::get_center_frequency()
 {
 	if (m_device_id >= 0 && m_impl->device){
 		int f = (int)rtlsdr_get_center_freq(m_impl->device);
@@ -119,7 +119,7 @@ Rtl_dev::get_center_frequency()
 }
 
 int
-Rtl_dev::read_sync(void *buf, int len, int *n_read)
+RTL_Device::read_sync(void *buf, int len, int *n_read)
 {
 	if (m_device_id >= 0 && m_impl->device){
 		rtlsdr_read_sync(m_impl->device, buf, len, n_read);
@@ -131,7 +131,7 @@ Rtl_dev::read_sync(void *buf, int len, int *n_read)
 }
 
 int
-Rtl_dev::set_direct_sampling(rtl_sampling_mode mode)
+RTL_Device::set_direct_sampling(rtl_sampling_mode mode)
 {
 	if (m_device_id >= 0 && m_impl->device){
 		int r = rtlsdr_set_direct_sampling(m_impl->device, (int)mode);
@@ -144,7 +144,7 @@ Rtl_dev::set_direct_sampling(rtl_sampling_mode mode)
 }
 
 int
-Rtl_dev::set_offet_tuning_on()
+RTL_Device::set_offet_tuning_on()
 {
 	if (m_device_id >= 0 && m_impl->device){
 		int r = rtlsdr_set_offset_tuning(m_impl->device, 1);
@@ -157,7 +157,7 @@ Rtl_dev::set_offet_tuning_on()
 }
 
 int
-Rtl_dev::set_offet_tuning_off()
+RTL_Device::set_offet_tuning_off()
 {
 	if (m_device_id >= 0 && m_impl->device){
 		int r = rtlsdr_set_offset_tuning(m_impl->device, 0);
@@ -170,7 +170,7 @@ Rtl_dev::set_offet_tuning_off()
 }
 
 int
-Rtl_dev::set_auto_gain()
+RTL_Device::set_auto_gain()
 {
 	if (m_device_id >= 0 && m_impl->device){
 		int r = rtlsdr_set_tuner_gain_mode(m_impl->device, 0);
@@ -183,7 +183,7 @@ Rtl_dev::set_auto_gain()
 }
 
 int
-Rtl_dev::set_gain(int gain)
+RTL_Device::set_gain(int gain)
 {
 	if (m_device_id >= 0 && m_impl->device){
 		int r = rtlsdr_set_tuner_gain_mode(m_impl->device, 1);
@@ -200,7 +200,7 @@ Rtl_dev::set_gain(int gain)
 }
 
 int
-Rtl_dev::set_ppm(int ppm_error)
+RTL_Device::set_ppm(int ppm_error)
 {
 	if (m_device_id >= 0 && m_impl->device){
 		int r = rtlsdr_set_freq_correction(m_impl->device, ppm_error);
@@ -213,7 +213,7 @@ Rtl_dev::set_ppm(int ppm_error)
 }
 
 int
-Rtl_dev::reset_buffer()
+RTL_Device::reset_buffer()
 {
 	if (m_device_id >= 0 && m_impl->device){
 		int r = rtlsdr_reset_buffer(m_impl->device);
@@ -226,7 +226,7 @@ Rtl_dev::reset_buffer()
 }
 
 int
-Rtl_dev::device_connected()
+RTL_Device::device_connected()
 {
 	if (m_device_id >= 0 && m_impl->device){
 		return 1;
@@ -235,7 +235,7 @@ Rtl_dev::device_connected()
 }
 
 std::string
-Rtl_dev::get_tuner_type()
+RTL_Device::get_tuner_type()
 {
 	rtlsdr_tuner tuner = rtlsdr_get_tuner_type(m_impl->device);
 	switch(tuner){
@@ -259,7 +259,7 @@ Rtl_dev::get_tuner_type()
 }
 
 std::string
-Rtl_dev::get_name()
+RTL_Device::get_name()
 {
 	if (m_device_id >= 0 && m_impl->device){
 		return rtlsdr_get_device_name(m_device_id);

@@ -213,7 +213,7 @@ int e4k_rf_filter_set(struct e4k_state *e4k)
 {
 	int rc;
 
-	rc = choose_rf_filter(e4k->band, e4k->vco.flo);
+	rc = choose_rf_filter(e4k->band, e4k->vco.intended_flo);
 	if (rc < 0)
 		return rc;
 
@@ -338,16 +338,17 @@ int e4k_if_filter_bw_get(struct e4k_state *e4k, enum e4k_if_filter filter)
 /***********************************************************************
  * Frequency Control */
 
-#define E4K_FVCO_MIN_KHZ	2600000	/* 2.6 GHz */
-#define E4K_FVCO_MAX_KHZ	3900000	/* 3.9 GHz */
 #define E4K_PLL_Y		65536
 
 #ifdef OUT_OF_SPEC
-#define E4K_FLO_MIN_MHZ		50
-#define E4K_FLO_MAX_MHZ		2200UL
+#define E4K_FVCO_MIN_KHZ	2400000UL /* 2.4 GHz; min FLO is 2400/48 = 50MHz */
+#define E4K_FVCO_MAX_KHZ	4400000UL /* 4.4 GHz; max FLO is 4400/2  = 2200MHz  */
 #else
-#define E4K_FLO_MIN_MHZ		64
-#define E4K_FLO_MAX_MHZ		1700
+/* NB: Datasheet values for RF input and LO ranges are 64 - 1700MHz.
+ * The values below are from the slightly wider VCO ranges.
+ */
+#define E4K_FVCO_MIN_KHZ	2600000UL /* 2.6 GHz; min FLO is 2600/48 = 54MHz */
+#define E4K_FVCO_MAX_KHZ	3900000UL /* 3.9 GHz; max FLO is 3900/2 = 1950MHz */
 #endif
 
 struct pll_settings {
@@ -505,6 +506,11 @@ uint32_t e4k_compute_pll_params(struct e4k_pll_params *oscp, uint32_t fosc, uint
 
 	/* flo(max) = 1700MHz, R(max) = 48, we need 64bit! */
 	intended_fvco = (uint64_t)intended_flo * r;
+	if (intended_fvco < KHZ(E4K_FVCO_MIN_KHZ)) {
+		intended_fvco = KHZ(E4K_FVCO_MIN_KHZ);
+	} else if (intended_fvco > KHZ(E4K_FVCO_MAX_KHZ)) {
+		intended_fvco = KHZ(E4K_FVCO_MAX_KHZ);
+	}
 
 	/* compute integral component of multiplier */
 	z = intended_fvco / fosc;
@@ -545,11 +551,11 @@ int e4k_tune_params(struct e4k_state *e4k, struct e4k_pll_params *p)
 	memcpy(&e4k->vco, p, sizeof(e4k->vco));
 
 	/* set the band */
-	if (e4k->vco.flo < MHZ(140))
+	if (e4k->vco.intended_flo < MHZ(140))
 		e4k_band_set(e4k, E4K_BAND_VHF2);
-	else if (e4k->vco.flo < MHZ(350))
+	else if (e4k->vco.intended_flo < MHZ(350))
 		e4k_band_set(e4k, E4K_BAND_VHF3);
-	else if (e4k->vco.flo < MHZ(1135))
+	else if (e4k->vco.intended_flo < MHZ(1135))
 		e4k_band_set(e4k, E4K_BAND_UHF);
 	else
 		e4k_band_set(e4k, E4K_BAND_L);
@@ -567,9 +573,10 @@ int e4k_tune_params(struct e4k_state *e4k, struct e4k_pll_params *p)
  *
  *  \param[in] e4k reference to tuner
  *  \param[in] freq frequency in Hz
- *  \returns actual tuned frequency, negative in case of error
+ *  \param[out] lo_freq if non-NULL, set to actually tuned frequency in Hz
+ *  \returns zero on success, negative on error
  */
-int e4k_tune_freq(struct e4k_state *e4k, uint32_t freq)
+int e4k_tune_freq(struct e4k_state *e4k, uint32_t freq, uint32_t *lo_freq)
 {
 	uint32_t rc;
 	struct e4k_pll_params p;
@@ -588,6 +595,9 @@ int e4k_tune_freq(struct e4k_state *e4k, uint32_t freq)
 		fprintf(stderr, "[E4K] PLL not locked for %u Hz!\n", freq);
 		return -1;
 	}
+
+	if (lo_freq)
+		*lo_freq = e4k->vco.flo;
 
 	return 0;
 }

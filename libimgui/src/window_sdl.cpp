@@ -177,6 +177,7 @@ Window_SDL::~Window_SDL()
 	for (auto win: _impl->widgets){
 		delete win;
 	}
+	delete _impl;
 }
 
 void Window_SDL::get_configuration_int(std::map<std::string, int> &cnf)
@@ -779,7 +780,8 @@ void* App_SDL::get_ref_imgui_context()
 
 std::string App_SDL::get_app_path()
 {
-	return SDL_GetBasePath();
+	char* basepath = SDL_GetBasePath();
+	return basepath;
 }
 
 void App_SDL::add_thread(Thread* thread)
