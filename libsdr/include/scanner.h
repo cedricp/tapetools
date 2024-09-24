@@ -8,6 +8,7 @@
 #define SCANNER_H
 #include <unistd.h>
 #include <stdint.h>
+#include <thread.h>
 #include "rtldev.h"
 
 /* 3000 is enough for 3GHz b/w worst case */
@@ -28,7 +29,7 @@ enum window_types {
 #define SCANNER_DEVICE_CONNECTION	-2
 #define SCANNER_NOK					-3
 #define SCANNER_MEMORY_ERROR		-4
-#define SCANNER_RESET				-5
+#define SCANNER_RESET				1
 
 #define RTL_GAIN_AUTO -10000
 
@@ -58,9 +59,9 @@ struct scan_info{
 class Scanner_settings{
 public:
 	Scanner_settings(){
-		lower_freq = 88000000;
-		upper_freq = 108000000;
-		step_freq = 1000;
+		lower_freq = 420000000;
+		upper_freq = 440000000;
+		step_freq = 5000;
 		crop = 0.2;
 		rtl_dev_index = 0;
 		direct_sampling = false;
@@ -110,6 +111,7 @@ class Scanner{
 	scan_info	 m_scan_info;
 	Rtl_dev		 m_rtl_device;
 	bool		m_settings_dirty = true;
+	ThreadMutex	m_mutex;
 
 	std::vector<Scan_result> m_scan_results;
 
@@ -139,6 +141,9 @@ public:
 
 	Scanner_settings& get_settings(){return m_settings;}
 	void apply(){m_settings_dirty = true;}
+
+	void lock_mutex(){m_mutex.lock();}
+	void unlock_mutex(){m_mutex.unlock();}
 };
 
 #endif

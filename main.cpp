@@ -45,14 +45,27 @@ public:
         stop();
     }
 
+    void lock_graph()
+    {
+        m_scanner.lock_mutex();
+    }
+
+    void unlock_graph()
+    {
+        m_scanner.unlock_mutex();
+    }
+
     void entry() override
     {
-        if (m_scanner.scan() == SCANNER_NOK)
+        int scanner_ret = m_scanner.scan();
+        if (m_scanner.scan() < SCANNER_OK)
         {
             usleep(500000);
             m_scanner.init();
+        } 
+        if (scanner_ret == 0) {
+            m_data_available = true;
         }
-        m_data_available = true;
     }
 
     bool data_available()
@@ -905,9 +918,10 @@ public:
             // if (m_logscale_frequency){
             //     ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
             // }
-            ImPlot::SetupAxesLimits(88, 108, -60.0, 40.0);
-            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 88, 108);
+            ImPlot::SetupAxesLimits(420, 440, -60.0, 40.0);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 420, 440);
 
+            m_sdr_thread.lock_graph();
             const std::vector<Scan_result> scan_res = m_sdr_thread.get_scan_result();
             if (scan_res.size())
             {
@@ -916,6 +930,7 @@ public:
                     ImPlot::PlotLine("RF FFT", scan_res[i].buffer_x.data(), scan_res[i].buffer.data(), scan_res[i].buffer_x.size());
                 }
             }
+            m_sdr_thread.unlock_graph();
 
             ImPlot::EndPlot();
         }
@@ -2032,6 +2047,11 @@ public:
 
             if (computed) update_ui();
                 return true;
+        }
+
+        if (m_sdr_thread.data_available())
+        {
+            return true;
         }
 
         return false;

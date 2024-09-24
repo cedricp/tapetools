@@ -541,6 +541,7 @@ Scanner::scan()
 			}
 			ts->samples += ds;
 		}
+		lock_mutex();
 		Scan_result& current_result = m_scan_results[i];
 		compute_fft(current_result, ts);
 		current_result.buffer_x.resize(current_result.buffer.size());
@@ -548,6 +549,7 @@ Scanner::scan()
 		{
 			current_result.buffer_x[i] = (current_result.freq_start  + (i * current_result.freq_step)) / 1000000.0;
 		}
+		unlock_mutex();
 	}
 	return SCANNER_OK;
 }
