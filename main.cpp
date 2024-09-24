@@ -501,6 +501,10 @@ public:
     {
         m_sine_generator.destroy();
         destroy_capture();
+        while(App_SDL::get()->get_thread("WFtask"))
+        {
+            App_SDL::get()->release_finished_threads();
+        }
         m_sdr_thread.stop();
     }
 
@@ -1377,8 +1381,8 @@ public:
                 const double max_frequency = current_sample_rate / WOW_FLUTTER_DECIMATION / 2.;
                 ImPlot::SetupAxes("Frequency (Hz)", "Freqency drift (Hz)", 0, ImPlotAxisFlags_Lock);
                 ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_SymLog);
-                ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0.001, max_frequency);
-                ImPlot::SetupAxisLimits(ImAxis_X1, 0.001, max_frequency, 0);
+                ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0.1, max_frequency);
+                ImPlot::SetupAxisLimits(ImAxis_X1, 0.1, max_frequency, 0);
                 ImPlot::SetupAxisLimits(ImAxis_Y1, 0, max_fft_freq, ImPlotCond_Always);
 
                 if (ImPlot::IsAxisHovered(ImAxis_Y1) || ImPlot::IsAxisHovered(ImAxis_Y2)){
