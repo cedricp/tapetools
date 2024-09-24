@@ -514,15 +514,17 @@ public:
     {
         m_sine_generator.destroy();
         destroy_capture();
-        while(App_SDL::get()->get_thread("WFtask"))
-        {
-            App_SDL::get()->release_finished_threads();
-        }
         m_sdr_thread.stop();
     }
 
     void destroy_capture()
     {
+        // Wait WowAndFlutter thread to finish before releasing memory
+        while(App_SDL::get()->get_thread("WFtask"))
+        {
+            App_SDL::get()->release_finished_threads();
+        }
+
         if (m_fftplanr) fftw_destroy_plan(m_fftplanr);
         if (m_fftplanl) fftw_destroy_plan(m_fftplanl);
         if (m_fftplanwow) fftw_destroy_plan(m_fftplanwow);
@@ -1307,25 +1309,22 @@ public:
             ImGui::ToggleButton("FFT view", &fft_view);
             ImGui::EndChild();
 
-            if (!fft_view)
+            ImGui::SameLine();
+            ImGui::BeginChild("ChildWFControl", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
+            ImGui::SetNextItemWidth(80);
+            ImGui::Combo("Reference frequency", &m_wow_test_frequency, ref_freq_presets, 3);
+            if (m_wow_test_frequency == 2)
             {
                 ImGui::SameLine();
-                ImGui::BeginChild("ChildWFControl", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
-                ImGui::SetNextItemWidth(80);
-                ImGui::Combo("Reference frequency", &m_wow_test_frequency, ref_freq_presets, 3);
-                if (m_wow_test_frequency == 2)
-                {
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(100);
-                    ImGui::InputInt("Custom frequency", &m_wow_test_frequency_custom, 1, 100);
-                    if (m_wow_test_frequency_custom < 1000) m_wow_test_frequency_custom = 1000;
-                    if (m_wow_test_frequency_custom > 10000) m_wow_test_frequency_custom = 10000;
-                }
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(160);
-                ImGui::Combo("Low pass filter (Hz)", &m_wf_filter_freq_combo, filter_presets, 4);
-                ImGui::EndChild();
+                ImGui::SetNextItemWidth(100);
+                ImGui::InputInt("Custom frequency", &m_wow_test_frequency_custom, 1, 100);
+                if (m_wow_test_frequency_custom < 1000) m_wow_test_frequency_custom = 1000;
+                if (m_wow_test_frequency_custom > 10000) m_wow_test_frequency_custom = 10000;
             }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(160);
+            ImGui::Combo("Low pass filter (Hz)", &m_wf_filter_freq_combo, filter_presets, 4);
+            ImGui::EndChild();
 
             if (channelcount > 1)
             {
@@ -1396,15 +1395,15 @@ public:
                 const double max_frequency = current_sample_rate / WOW_FLUTTER_DECIMATION / 2.;
                 ImPlot::SetupAxes("Frequency (Hz)", "Freqency drift (Hz)", 0, ImPlotAxisFlags_Lock);
                 ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_SymLog);
-                ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0.1, max_frequency);
-                ImPlot::SetupAxisLimits(ImAxis_X1, 0.1, max_frequency, 0);
+                ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0.2, max_frequency);
+                ImPlot::SetupAxisLimits(ImAxis_X1, 0.2, max_frequency, 0);
                 ImPlot::SetupAxisLimits(ImAxis_Y1, 0, max_fft_freq, ImPlotCond_Always);
 
                 if (ImPlot::IsAxisHovered(ImAxis_Y1) || ImPlot::IsAxisHovered(ImAxis_Y2)){
                     // Zoom Y axis in/out
-                    max_fft_freq += ImGui::GetIO().MouseWheel * -10;
-                    if (max_freq < 10) max_fft_freq = 10;
-                    if (max_freq > 500) max_fft_freq = 500;
+                    max_fft_freq += ImGui::GetIO().MouseWheel * -5;
+                    if (max_fft_freq < 5) max_fft_freq = 5;
+                    if (max_fft_freq > 500) max_fft_freq = 500;
                 }
 
                 m_wow_data_mutex.lock();
