@@ -1,5 +1,6 @@
-#include "audio_sine_gen.h"
+#define _USE_MATH_DEFINES
 
+#include "audio_sine_gen.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +25,6 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
     SoundIoChannelArea *areas;
     int err;
     
-
     int frames_left = frame_count_max;
     double pitch = udata->m_pitch;
 
@@ -40,8 +40,13 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
 
         const SoundIoChannelLayout *layout = &outstream->layout;
         for (int frame = 0; frame < frame_count; ++frame) {
-            double radians_per_second = pitch * 2.0 * M_PI; 
-            double sample = udata->m_volume * sin((udata->m_seconds_offset + frame * seconds_per_frame) * radians_per_second);
+            double curr_time = udata->m_seconds_offset + (frame * seconds_per_frame);
+
+            //double fm_freq = 20.;
+            //double fm_test = sin(2.0 * M_PI * fm_freq * curr_time) / fm_freq * 10;
+            double fm_test = 0;
+            double sample = udata->m_volume * sin((2.0 * M_PI * (pitch) * curr_time) + fm_test);
+            
             for (int channel = 0; channel < layout->channel_count; channel += 1) {
                 write_sample(areas[channel].ptr, sample);
                 areas[channel].ptr += areas[channel].step;

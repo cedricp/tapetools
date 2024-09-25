@@ -235,7 +235,9 @@ void AudioToolWindow::compute_wow_and_flutter()
 
             // Append captured audio data to get them
     int audio_capture_length = WOW_FLUTTER_ANALYSIS_TIME * samplerate;
-    int sampled_audio_length = m_sound_data1.size();
+    std::vector<double> &audio_channel = m_fft_channel_left ? m_sound_data1 : m_sound_data2;
+
+    int sampled_audio_length = audio_channel.size();
 
     m_wow_data_mutex.lock();
     if (m_longterm_audio.empty())
@@ -245,13 +247,13 @@ void AudioToolWindow::compute_wow_and_flutter()
 
     if (m_longterm_audio.size() < audio_capture_length)
     {
-        m_longterm_audio.insert(m_longterm_audio.end(), m_sound_data1.begin(), m_sound_data1.end());
+        m_longterm_audio.insert(m_longterm_audio.end(), audio_channel.begin(), audio_channel.end());
     }
     else
     {
         int move_size = audio_capture_length - sampled_audio_length;
         memcpy(&m_longterm_audio[0], &m_longterm_audio[sampled_audio_length], move_size*sizeof(double));
-        memcpy(&m_longterm_audio[move_size], &m_sound_data1[0], sampled_audio_length*sizeof(double));
+        memcpy(&m_longterm_audio[move_size], &audio_channel[0], sampled_audio_length*sizeof(double));
     }
     m_wow_data_mutex.unlock();
 
@@ -273,7 +275,7 @@ void AudioToolWindow::compute_wow_and_flutter()
 
     // Launch thread
     WowAndFluterThread* wt = new WowAndFluterThread(samplerate, m_longterm_audio,
-        m_wow_flutter_data, m_wow_flutter_data_x, m_fft_channel_left ? m_sound_data1 : m_sound_data2, reference_frequency,
+        m_wow_flutter_data, m_wow_flutter_data_x, reference_frequency,
         m_wow_data_mutex, WOW_FLUTTER_ANALYSIS_TIME, m_wf_filter_freq_combo,
         m_wow_peak_detection, m_wow_mean, WOW_FLUTTER_DECIMATION, m_fftdrawwow, m_fftoutwow, m_fftwowdrawfreqs, m_fftplanwow);
     wt->start();

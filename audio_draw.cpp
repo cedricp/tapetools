@@ -169,7 +169,7 @@ void AudioToolWindow::draw_lcd(const float value, const ImVec2 size, const int l
 
 void AudioToolWindow::draw_audio_time_domain_widget(int plotheight, int current_sample_rate, int channelcount)
 {
-    if (ImPlot::BeginPlot("Audio", ImVec2(m_show_wow_flutter ? width()-plotheight*1.5-10 : -1, -1)))
+    if (ImPlot::BeginPlot("Audio", ImVec2(m_show_wow_flutter ? width()-plotheight*1.8-10 : -1, -1)))
     {
         double x_limit = 1.0f / m_scopezoom;
         double xmax = current_sample_rate > 0 ? float(m_capture_size) * (1.0 / (current_sample_rate * 0.001)) : INFINITY;
@@ -244,7 +244,8 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
     ImGui::SameLine();
     ImGui::BeginChild("ChildWFControl", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
     ImGui::SetNextItemWidth(80);
-    ImGui::Combo("Reference frequency", &m_wow_test_frequency, ref_freq_presets, 3);
+    ImGui::Combo("Ref. frequency", &m_wow_test_frequency, ref_freq_presets, 3);
+    ImGui::SetItemTooltip("Set reference frequency");
     if (m_wow_test_frequency == 2)
     {
         ImGui::SameLine();
@@ -255,7 +256,8 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(160);
-    ImGui::Combo("Low pass filter (Hz)", &m_wf_filter_freq_combo, filter_presets, 4);
+    ImGui::Combo("LPF (Hz)", &m_wf_filter_freq_combo, filter_presets, 4);
+    ImGui::SetItemTooltip("Set low pass filter frequency");
     ImGui::EndChild();
 
     if (channelcount > 1)
@@ -266,6 +268,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         {
             m_fft_channel_right = !m_fft_channel_left;
         }
+        ImGui::SetItemTooltip("Analyse left channel");
         ImGui::SameLine();
         if (ImGui::Checkbox("right", &m_fft_channel_right) )
         {
@@ -275,8 +278,8 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         ImGui::EndChild();
     }
 
-    static float max_freq = 200;
-    static float max_fft_freq = 50;
+    static float max_freq = 100;
+    static float max_fft_freq = 20;
 
     if (m_wow_test_frequency == 0) frequency = 3000;
     else if (m_wow_test_frequency == 1) frequency = 3150;
@@ -284,7 +287,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
 
     float max_percent = (max_freq / frequency) * 100.;
 
-    if(!fft_view && ImPlot::BeginPlot("Wow and flutter analysis (unweighted)", ImVec2(plotheight*1.5, -1)))
+    if(!fft_view && ImPlot::BeginPlot("Wow and flutter analysis (unweighted)", ImVec2(plotheight*1.8, -1)))
     {
         ImPlot::SetupAxes("Time (seconds)", "Freqency drift (Hz)", 0, ImPlotAxisFlags_Lock);
         ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0., 5.);
@@ -322,7 +325,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         ImPlot::EndPlot();
     }
     else
-    if (ImPlot::BeginPlot("Wow and flutter FFT analysis", ImVec2(plotheight*1.5, -1)))
+    if (ImPlot::BeginPlot("Wow and flutter FFT analysis", ImVec2(plotheight*1.8, -1)))
     {
         const double max_frequency = current_sample_rate / WOW_FLUTTER_DECIMATION / 2.;
         ImPlot::SetupAxes("Frequency (Hz)", "Freqency drift (Hz)", 0, ImPlotAxisFlags_Lock);

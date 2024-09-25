@@ -12,7 +12,6 @@ class WowAndFluterThread : public ASyncTask
     std::vector<double> &m_longterm_audio;
     std::vector<double> &m_wow_flutter_data;
     std::vector<double> &m_wow_flutter_data_x;
-    std::vector<double> m_incomimg_sound_data;
     std::vector<double> m_signal_i;
     std::vector<double> m_signal_q;
     float &m_wow_peak;
@@ -34,12 +33,12 @@ class WowAndFluterThread : public ASyncTask
     ThreadMutex& m_mutex;
 public:
     WowAndFluterThread(int sr, std::vector<double>& longtermaudio, std::vector<double> &wow_flutter_data,
-        std::vector<double> &wow_flutter_data_x, std::vector<double> incoming_data, int frequency, ThreadMutex& mutex,
+        std::vector<double> &wow_flutter_data_x, int frequency, ThreadMutex& mutex,
         float analysis_time_s, int filter_freq, float& wow_peak, float& wow_mean, int decimation, std::vector<double>& wow_fftdrawout,
         fftw_complex* wow_fftout, std::vector<double>& wow_fftfreqs, fftw_plan& fft_plan)
          : m_longterm_audio(longtermaudio), m_samplerate(sr), m_analysis_time_s(analysis_time_s),
         m_wow_flutter_data(wow_flutter_data), m_wow_flutter_data_x(wow_flutter_data_x),
-        m_incomimg_sound_data(incoming_data), m_reference_frequency(frequency), m_mutex(mutex), m_wow_peak(wow_peak),
+        m_reference_frequency(frequency), m_mutex(mutex), m_wow_peak(wow_peak),
         m_wow_mean(wow_mean), m_decimation(decimation), m_wowfftplan(fft_plan), m_wow_fftdrawout(wow_fftdrawout),
         m_wow_fftout(wow_fftout), m_wow_fftfreqs(wow_fftfreqs), ASyncTask("WFtask")
     {
@@ -65,8 +64,8 @@ private:
         m_mutex.lock();
             int actual_audio_length = m_longterm_audio.size();
             double current_samplerate = m_samplerate;
-            double inv_current_samplerate = 1. / current_samplerate;
-            double twopif_over_sr = 2. * M_PI / current_samplerate;
+            double inv_current_samplerate = 1. / m_samplerate;
+            double twopif_over_sr = 2. * M_PI / m_samplerate;
 
             m_signal_i.resize(actual_audio_length);
             m_signal_q.resize(actual_audio_length);
@@ -84,7 +83,8 @@ private:
         m_iq_lowpass_filter.process(actual_audio_length, lp_chans);
 
         int decimated_size = actual_audio_length / m_decimation;
-        double phase_to_hz = (current_samplerate / (M_PI * 2.));
+        int decimated_samplerate = m_samplerate / WOW_FLUTTER_DECIMATION;
+        double phase_to_hz = (m_samplerate / (M_PI * 2.));
 
         m_mutex.lock();  
             for (int i = 1; i < decimated_size; i++)
@@ -123,9 +123,9 @@ private:
 
             fftw_execute(m_wowfftplan);
 
-            const int fftdraw_size = (m_samplerate / WOW_FLUTTER_DECIMATION * (WOW_FLUTTER_ANALYSIS_TIME - 0.5f)) / 2.;
+            const int fftdraw_size = (decimated_samplerate * (WOW_FLUTTER_ANALYSIS_TIME - 0.5f)) / 2.;
             const double inv_fft_capture_size = 1./fftdraw_size;
-            const double fft_step = (m_samplerate / WOW_FLUTTER_DECIMATION / 2.) * inv_fft_capture_size;
+            const double fft_step = (decimated_samplerate / 2.) * inv_fft_capture_size;
 
             for(int i = 0; i < fftdraw_size; ++i)
             {
@@ -133,6 +133,9 @@ private:
                 m_wow_fftdrawout[i] = fftout;
                 m_wow_fftfreqs[i] = fft_step * i;
             }
+
+            // Normalize DC component
+            m_wow_fftdrawout[0] *= 0.5;
         m_mutex.unlock();
     }
 };
