@@ -24,8 +24,8 @@ class WowAndFluterThread : public ASyncTask
     int   m_decimation;
 
     fftw_plan& m_wowfftplan;
-    double* m_wow_fftdrawout;
-    double* m_wow_fftfreqs;
+    std::vector<double>& m_wow_fftdrawout;
+    std::vector<double>& m_wow_fftfreqs;
     fftw_complex* m_wow_fftout;
 
     // Objects
@@ -35,8 +35,8 @@ class WowAndFluterThread : public ASyncTask
 public:
     WowAndFluterThread(int sr, std::vector<double>& longtermaudio, std::vector<double> &wow_flutter_data,
         std::vector<double> &wow_flutter_data_x, std::vector<double> incoming_data, int frequency, ThreadMutex& mutex,
-        float analysis_time_s, int filter_freq, float& wow_peak, float& wow_mean, int decimation, double* wow_fftdrawout,
-        fftw_complex* wow_fftout, double* wow_fftfreqs, fftw_plan& fft_plan)
+        float analysis_time_s, int filter_freq, float& wow_peak, float& wow_mean, int decimation, std::vector<double>& wow_fftdrawout,
+        fftw_complex* wow_fftout, std::vector<double>& wow_fftfreqs, fftw_plan& fft_plan)
          : m_longterm_audio(longtermaudio), m_samplerate(sr), m_analysis_time_s(analysis_time_s),
         m_wow_flutter_data(wow_flutter_data), m_wow_flutter_data_x(wow_flutter_data_x),
         m_incomimg_sound_data(incoming_data), m_reference_frequency(frequency), m_mutex(mutex), m_wow_peak(wow_peak),
@@ -123,7 +123,7 @@ private:
 
             fftw_execute(m_wowfftplan);
 
-            const int fftdraw_size = decimated_size / 2;
+            const int fftdraw_size = (m_samplerate / WOW_FLUTTER_DECIMATION * (WOW_FLUTTER_ANALYSIS_TIME - 0.5f)) / 2.;
             const double inv_fft_capture_size = 1./fftdraw_size;
             const double fft_step = (m_samplerate / WOW_FLUTTER_DECIMATION / 2.) * inv_fft_capture_size;
 

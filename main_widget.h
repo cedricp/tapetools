@@ -52,9 +52,9 @@ class AudioToolWindow : public Widget
     double *m_rms_fft = nullptr;
     double *m_fftdrawl = nullptr;
     double *m_fftdrawr = nullptr;
-    double *m_fftdrawwow = nullptr;
     double *m_fftfreqs = nullptr;
-    double *m_fftwowdrawfreqs = nullptr;
+    std::vector<double> m_fftwowdrawfreqs;
+    std::vector<double> m_fftdrawwow;
     int m_capture_size = 0;
     double m_audio_gain = 1.0f;
     int m_combo_in = 0;
@@ -402,6 +402,12 @@ public:
     void draw_sdr();
     void draw_lcd(const float value, const ImVec2 size, const int lcd_digits_size);
     void draw_rt_analysis_tab();
+
+    void draw_audio_time_domain_widget(int plotheight, int current_sample_rate, int channelcount);
+    void draw_wow_flutter_widget(int channelcount, int current_samplerate, int plotheight);
+    void draw_voltmeter_widget(int channel_count);
+    void draw_audio_fft_widget(int channelcount, int current_sample_rate, int plotheight);
+    void draw_channels_phase_widget(int plotheight);
 
     void draw_tools_windows()
     {

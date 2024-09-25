@@ -457,9 +457,11 @@ void AudioToolWindow::init_capture()
     
     destroy_capture();
     m_capture_size = capture_size;
-    m_wow_flutter_capture_size = samplerate / WOW_FLUTTER_DECIMATION * WOW_FLUTTER_ANALYSIS_TIME;
     int fft_capture_size = capture_size / 2;
-    int wow_fft_capture_size = m_wow_flutter_capture_size / 2;
+
+    m_wow_flutter_capture_size = samplerate / WOW_FLUTTER_DECIMATION * WOW_FLUTTER_ANALYSIS_TIME;
+    int wow_capture_size = samplerate / WOW_FLUTTER_DECIMATION * (WOW_FLUTTER_ANALYSIS_TIME - 0.5f);
+    int wow_start_capture = m_wow_flutter_capture_size - wow_capture_size;
     
     m_fftinl = new double[capture_size];
     m_fftoutl = new fftw_complex[capture_size];
@@ -471,10 +473,9 @@ void AudioToolWindow::init_capture()
     m_rms_fft = new double[fft_capture_size];
     m_current_window_cache = new double[capture_size];
 
-    m_fftwowdrawfreqs = new double[wow_fft_capture_size]; 
-    m_fftdrawwow = new double[wow_fft_capture_size];
-
-    m_fftoutwow = new fftw_complex[m_wow_flutter_capture_size];
+    m_fftwowdrawfreqs.resize(wow_capture_size/2); 
+    m_fftdrawwow.resize(wow_capture_size/2);
+    m_fftoutwow = new fftw_complex[wow_capture_size];
 
     m_wow_flutter_data.resize(m_wow_flutter_capture_size);
     m_wow_flutter_data_x.resize(m_wow_flutter_capture_size);
@@ -490,7 +491,7 @@ void AudioToolWindow::init_capture()
 
     m_fftplanr   = fftw_plan_dft_r2c_1d(capture_size, m_fftinr, m_fftoutr, fft_flags);
     m_fftplanl   = fftw_plan_dft_r2c_1d(capture_size, m_fftinl, m_fftoutl, fft_flags);
-    m_fftplanwow = fftw_plan_dft_r2c_1d(m_wow_flutter_capture_size, m_wow_flutter_data.data(), m_fftoutwow, fft_flags | FFTW_PRESERVE_INPUT);
+    m_fftplanwow = fftw_plan_dft_r2c_1d(wow_capture_size, &m_wow_flutter_data[wow_start_capture], m_fftoutwow, fft_flags | FFTW_PRESERVE_INPUT);
 
     compute_fft_window_cache();
 }
@@ -514,11 +515,9 @@ void AudioToolWindow::destroy_capture()
     delete[] m_fftdrawl;
     delete[] m_fftdrawr;
     delete[] m_fftfreqs;
-    delete[] m_fftwowdrawfreqs;
     delete[] m_fftoutwow;
     delete[] m_rms_fft;
     delete[] m_current_window_cache;
-    delete[] m_fftdrawwow;
     m_sound_data_x.clear();
 
     m_fftinl = nullptr;
@@ -528,11 +527,9 @@ void AudioToolWindow::destroy_capture()
     m_fftdrawl = nullptr;
     m_fftdrawr = nullptr;
     m_fftfreqs = nullptr;
-    m_fftwowdrawfreqs = nullptr;
     m_fftplanr = nullptr;
     m_fftplanl = nullptr;
     m_fftoutwow = nullptr;
-    m_fftdrawwow = nullptr;
     m_current_window_cache = nullptr;
     m_rms_fft = nullptr;
     m_fftplanwow = nullptr;
