@@ -11,6 +11,89 @@ void AudioToolWindow::compute_fft_window_cache()
     for(int i = 0; i < m_capture_size; ++i) m_current_window_cache[i] = m_window_fn(i, m_capture_size);
 }
 
+void AudioToolWindow::set_window_fn(bool compute_cache)
+{
+    switch (m_fft_window_fn_index)
+    {
+        case 0:
+            m_window_fn = rectangle_fft_window;
+            break;
+        case 1:
+            m_window_fn = hamming_fft_window;
+            break;
+        case 2:
+            m_window_fn = hann_poisson_fft_window;
+            break;
+        case 3:
+            m_window_fn = blackman_fft_window;
+            break;
+        case 4:
+            m_window_fn = blackman_harris_fft_window;
+            break;
+        case 5:
+            m_window_fn = hann_fft_window;
+            break;
+        case 6:
+            m_window_fn = kaiser5_fft_window;
+            break;
+        case 7:
+            m_window_fn = kaiser7_fft_window;
+            break;
+        default:
+            m_window_fn = rectangle_fft_window;
+            break;
+    }
+
+    if (compute_cache) compute_fft_window_cache();
+}
+
+void AudioToolWindow::detect_periods(){
+    double timestep = 1. / (double)m_audiorecorder.get_current_samplerate();
+    double *audio_data = m_sound_data1.data();
+    std::vector<double> frequencies;
+
+    int previous_idx = 0;
+    double lastzerocross = 0;
+    double previous = audio_data[0];
+    double previous_time = 0;
+    double freq_mean = 0;
+
+    for (int i = 1; i < m_capture_size; ++i)
+    {
+        double current = audio_data[i];
+        
+        if (previous < 0 && current > 0)
+        {
+            double a[2] = {timestep * ((double)i-1.), previous};
+            double b[2] = {timestep * (double)i, current};
+            double zcrosstime = zerocross(a,b);
+            if (lastzerocross > 0)
+            {
+                double freq = 1.0 / (zcrosstime - lastzerocross);
+                frequencies.push_back(freq);
+                freq_mean += freq;
+            }
+            lastzerocross = zcrosstime;
+        }
+        previous = current;
+    }
+
+    if (frequencies.size() < 2)
+    {
+        m_frequency_counter = 0;
+        return;
+    }
+
+    freq_mean /= (double)frequencies.size();
+    m_frequency_counter = freq_mean;
+    double last = frequencies[0];
+    double maxdeviation = 0;
+    for (int i = 1; i < frequencies.size();++i){
+        double diff = fabs(last - frequencies[i]);
+        if (diff > maxdeviation) maxdeviation = diff;
+    }
+}
+
 void AudioToolWindow::compute_fft_window_corrections(int num_samples)
 {
     int tmp = m_fft_window_fn_index;
@@ -410,6 +493,49 @@ void AudioToolWindow::init_capture()
     m_fftplanwow = fftw_plan_dft_r2c_1d(m_wow_flutter_capture_size, m_wow_flutter_data.data(), m_fftoutwow, fft_flags | FFTW_PRESERVE_INPUT);
 
     compute_fft_window_cache();
+}
+
+void AudioToolWindow::destroy_capture()
+{
+    // Wait WowAndFlutter thread to finish before releasing memory
+    while(App_SDL::get()->get_thread("WFtask"))
+    {
+        App_SDL::get()->release_finished_threads();
+    }
+
+    if (m_fftplanr) fftw_destroy_plan(m_fftplanr);
+    if (m_fftplanl) fftw_destroy_plan(m_fftplanl);
+    if (m_fftplanwow) fftw_destroy_plan(m_fftplanwow);
+
+    delete[] m_fftinl;
+    delete[] m_fftoutl;
+    delete[] m_fftinr;
+    delete[] m_fftoutr;
+    delete[] m_fftdrawl;
+    delete[] m_fftdrawr;
+    delete[] m_fftfreqs;
+    delete[] m_fftwowdrawfreqs;
+    delete[] m_fftoutwow;
+    delete[] m_rms_fft;
+    delete[] m_current_window_cache;
+    delete[] m_fftdrawwow;
+    m_sound_data_x.clear();
+
+    m_fftinl = nullptr;
+    m_fftoutl = nullptr;
+    m_fftinr = nullptr;
+    m_fftoutr = nullptr;
+    m_fftdrawl = nullptr;
+    m_fftdrawr = nullptr;
+    m_fftfreqs = nullptr;
+    m_fftwowdrawfreqs = nullptr;
+    m_fftplanr = nullptr;
+    m_fftplanl = nullptr;
+    m_fftoutwow = nullptr;
+    m_fftdrawwow = nullptr;
+    m_current_window_cache = nullptr;
+    m_rms_fft = nullptr;
+    m_fftplanwow = nullptr;
 }
 
 void AudioToolWindow::reinit_recorder()
