@@ -34,7 +34,7 @@ add_subdirectory(resources)
 
 # Executable rules
 
-add_executable(tapetools main.cpp)
+add_executable(tapetools main.cpp audio_draw.cpp audio_compute.cpp)
 target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libsoundio/include" "libaudio/include" "libutils/include" "resources" "libsdr/include")
 
 # Link rules

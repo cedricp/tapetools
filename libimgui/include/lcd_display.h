@@ -10,7 +10,7 @@ uint32_t lcd_bg = IM_COL32(0,0,0,255);
 #define draw_poly(n,i)d->AddConvexPolyFilled(pp,6,(kd[n]>>(6-i))&1 ? lcd_fg : lcd_bg)
 
 char kd[]={0x7E,0x30,0x6D,0x79,0x33,0x5B,0x5F,0x70,0x7F,0x7B};
-void digit(ImDrawList*d,int n,ImVec2 e,ImVec2 p)
+static void digit(ImDrawList*d,int n,ImVec2 e,ImVec2 p)
 {
     ImGuiStyle* style = &ImGui::GetStyle();
     ImVec4* colors = style->Colors;
