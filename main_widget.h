@@ -244,52 +244,7 @@ class AudioToolWindow : public Widget
         reset_sine_generator();
     }
 
-    void detect_periods(){
-        double timestep = 1. / (double)m_audiorecorder.get_current_samplerate();
-        double *audio_data = m_sound_data1.data();
-        std::vector<double> frequencies;
-
-        int previous_idx = 0;
-        double lastzerocross = 0;
-        double previous = audio_data[0];
-        double previous_time = 0;
-        double freq_mean = 0;
-
-        for (int i = 1; i < m_capture_size; ++i)
-        {
-            double current = audio_data[i];
-            
-            if (previous < 0 && current > 0)
-            {
-                double a[2] = {timestep * ((double)i-1.), previous};
-                double b[2] = {timestep * (double)i, current};
-                double zcrosstime = zerocross(a,b);
-                if (lastzerocross > 0)
-                {
-                    double freq = 1.0 / (zcrosstime - lastzerocross);
-                    frequencies.push_back(freq);
-                    freq_mean += freq;
-                }
-                lastzerocross = zcrosstime;
-            }
-            previous = current;
-        }
-
-        if (frequencies.size() < 2)
-        {
-            m_frequency_counter = 0;
-            return;
-        }
-
-        freq_mean /= (double)frequencies.size();
-        m_frequency_counter = freq_mean;
-        double last = frequencies[0];
-        double maxdeviation = 0;
-        for (int i = 1; i < frequencies.size();++i){
-            double diff = fabs(last - frequencies[i]);
-            if (diff > maxdeviation) maxdeviation = diff;
-        }
-    }
+    void detect_periods();
 
 public:
     AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_sweep_timer(m_measure_delay, true)
@@ -319,49 +274,7 @@ public:
         m_sdr_thread.stop();
     }
 
-    void destroy_capture()
-    {
-        // Wait WowAndFlutter thread to finish before releasing memory
-        while(App_SDL::get()->get_thread("WFtask"))
-        {
-            App_SDL::get()->release_finished_threads();
-        }
-
-        if (m_fftplanr) fftw_destroy_plan(m_fftplanr);
-        if (m_fftplanl) fftw_destroy_plan(m_fftplanl);
-        if (m_fftplanwow) fftw_destroy_plan(m_fftplanwow);
-
-        delete[] m_fftinl;
-        delete[] m_fftoutl;
-        delete[] m_fftinr;
-        delete[] m_fftoutr;
-        delete[] m_fftdrawl;
-        delete[] m_fftdrawr;
-        delete[] m_fftfreqs;
-        delete[] m_fftwowdrawfreqs;
-        delete[] m_fftoutwow;
-        delete[] m_rms_fft;
-        delete[] m_current_window_cache;
-        delete[] m_fftdrawwow;
-        m_sound_data_x.clear();
-
-        m_fftinl = nullptr;
-        m_fftoutl = nullptr;
-        m_fftinr = nullptr;
-        m_fftoutr = nullptr;
-        m_fftdrawl = nullptr;
-        m_fftdrawr = nullptr;
-        m_fftfreqs = nullptr;
-        m_fftwowdrawfreqs = nullptr;
-        m_fftplanr = nullptr;
-        m_fftplanl = nullptr;
-        m_fftoutwow = nullptr;
-        m_fftdrawwow = nullptr;
-        m_current_window_cache = nullptr;
-        m_rms_fft = nullptr;
-        m_fftplanwow = nullptr;
-    }
-
+    void destroy_capture();
     void init_capture();
     void reinit_recorder();
     void reset_sine_generator();
@@ -476,86 +389,7 @@ public:
         m_sweep_timer.stop();
     }
 
-    void set_window_fn(bool compute_cache = true)
-    {
-        switch (m_fft_window_fn_index)
-        {
-            case 0:
-                m_window_fn = rectangle_fft_window;
-                break;
-            case 1:
-                m_window_fn = hamming_fft_window;
-                break;
-            case 2:
-                m_window_fn = hann_poisson_fft_window;
-                break;
-            case 3:
-                m_window_fn = blackman_fft_window;
-                break;
-            case 4:
-                m_window_fn = blackman_harris_fft_window;
-                break;
-            case 5:
-                m_window_fn = hann_fft_window;
-                break;
-            case 6:
-                m_window_fn = kaiser5_fft_window;
-                break;
-            case 7:
-                m_window_fn = kaiser7_fft_window;
-                break;
-            default:
-                m_window_fn = rectangle_fft_window;
-                break;
-        }
-
-        if (compute_cache) compute_fft_window_cache();
-    }
-
-    void draw_sweep_tab();
-
-    void draw_sdr()
-    {
-
-        ImGui::BeginChild("ScopesChild1", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
-
-        ImGui::BeginChild("ScopesChild2", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        if (ImGui::Button("Start"))
-        {
-            
-        }
-
-        ImGui::EndChild();
-
-        if (ImPlot::BeginPlot("SDR FFT", ImVec2(-1, -1)))
-        {
-            ImPlot::SetupAxes("Frequency (MHz)", "dBm", 0, ImPlotAxisFlags_Lock);
-            // if (m_logscale_frequency){
-            //     ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
-            // }
-            ImPlot::SetupAxesLimits(420, 440, -60.0, 40.0);
-            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 420, 440);
-
-            m_sdr_thread.lock_graph();
-            const std::vector<SDR_Scanner::Scan_result> scan_res = m_sdr_thread.get_scan_result();
-            if (scan_res.size())
-            {
-                for (int i = 0; i < scan_res.size(); ++i)
-                {
-                    ImPlot::PlotLine("RF FFT", scan_res[i].buffer_x.data(), scan_res[i].buffer.data(), scan_res[i].buffer_x.size());
-                }
-            }
-            m_sdr_thread.unlock_graph();
-
-            ImPlot::EndPlot();
-        }
-
-        ImGui::EndChild();
-    }
-
-    void draw_lcd(const float value, const ImVec2 size, const int lcd_digits_size);
-    void draw_rt_analysis_tab();
-
+    void set_window_fn(bool compute_cache = true);
     bool compute(bool compute_fft = true, bool compute_noise_floor = true);
     void compute_wow_and_flutter();
     void compute_thdn();
@@ -563,6 +397,11 @@ public:
     void compute_channels_phase();
     void compute_fft_window_cache();
     void compute_fft_window_corrections(int num_samples = 1000);
+
+    void draw_sweep_tab();
+    void draw_sdr();
+    void draw_lcd(const float value, const ImVec2 size, const int lcd_digits_size);
+    void draw_rt_analysis_tab();
 
     void draw_tools_windows()
     {
