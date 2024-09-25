@@ -565,6 +565,26 @@ void AudioToolWindow::draw_rt_analysis_tab()
         ImGui::SetItemTooltip("Set the generator intensity");
         ImGui::EndChild();
 
+        static int fm_freq = 0;
+        static float fm_vol = 1;
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildFMTone", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        if (ImGui::SliderInt("FM frequency", &fm_freq, 0, 10000, "%d Hz"))
+        {
+            m_sine_generator.set_fm(fm_freq, fm_vol);
+        }
+        ImGui::SetItemTooltip("Set the FM modulation signal frequency");
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildFMToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        if (ImGui::SliderFloat("FM intensity", &fm_vol, 0, 100))
+        {
+            m_sine_generator.set_fm(fm_freq, fm_vol);
+        }
+        ImGui::SetItemTooltip("Set the FM modulation signal frequency");
+        ImGui::EndChild();
+
         ImGui::EndChild();
     }
 

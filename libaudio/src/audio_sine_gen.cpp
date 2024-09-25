@@ -42,9 +42,7 @@ void audioSineGenerator::write_callback(SoundIoOutStream *outstream, int frame_c
         for (int frame = 0; frame < frame_count; ++frame) {
             double curr_time = udata->m_seconds_offset + (frame * seconds_per_frame);
 
-            //double fm_freq = 20.;
-            //double fm_test = sin(2.0 * M_PI * fm_freq * curr_time) / fm_freq * 10;
-            double fm_test = 0;
+            double fm_test = udata->m_fm_freq > 0 ? sin(2.0 * M_PI * udata->m_fm_freq * curr_time) / udata->m_fm_freq * udata->m_fm_strength : 1;
             double sample = udata->m_volume * sin((2.0 * M_PI * (pitch) * curr_time) + fm_test);
             
             for (int channel = 0; channel < layout->channel_count; channel += 1) {
