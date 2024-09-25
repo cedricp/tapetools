@@ -211,6 +211,9 @@ bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
             }
         }
 
+        m_fftdrawr[0] *= 0.5;
+        m_fftdrawl[0] *= 0.5;
+
         if (compute_noise_floor)
         {
             double mean = sum * inv_fft_capture_size;

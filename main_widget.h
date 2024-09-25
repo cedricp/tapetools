@@ -225,6 +225,7 @@ class AudioToolWindow : public Widget
 
     CALLBACK_METHOD(on_device_changed, AudioToolWindow)
     {
+        reinit_recorder();
         printf("Audio device configuration changed.\n");
     }
 
@@ -233,13 +234,18 @@ class AudioToolWindow : public Widget
         reset_audiomanager();
     }
 
-    void reset_audiomanager()
+    void set_sound_config()
     {
         if (m_input_device.empty()) m_audio_in_idx  = m_audiomanager.get_default_input_device_id();
         if (m_output_device.empty()) m_audio_out_idx = m_audiomanager.get_default_output_device_id();
 
         m_combo_in  = m_audiomanager.get_input_device_reverse_map(m_audio_in_idx);
         m_combo_out = m_audiomanager.get_output_device_reverse_map(m_audio_out_idx);
+    }
+
+    void reset_audiomanager()
+    {
+        set_sound_config();
         reinit_recorder();
         reset_sine_generator();
     }
@@ -295,9 +301,9 @@ public:
     void check_settings_loaded()
     {
         static bool settings_loaded = false;
-        if (!settings_loaded && GImGui->SettingsLoaded)
+        if (!settings_loaded)
         {
-            printf("Settings restored\n");
+            if (GImGui->SettingsLoaded) printf("Settings restored\n");
             settings_loaded = true;
             reset_audiomanager();
         }

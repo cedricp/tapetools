@@ -232,7 +232,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
 {
     const char* ref_freq_presets[] = {"3000","3150", "Custom"};
     const char* filter_presets[] = {"Disabled", "Wow (6Hz)","Flutter low (20Hz)", "Flutter high (100Hz)"};
-    float frequency;
+    float ref_frequency;
     static bool fft_view = false;
     
     ImGui::BeginChild("ChildWF", ImVec2(0, -1), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
@@ -281,11 +281,11 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
     static float max_freq = 100;
     static float max_fft_freq = 20;
 
-    if (m_wow_test_frequency == 0) frequency = 3000;
-    else if (m_wow_test_frequency == 1) frequency = 3150;
-    else if (m_wow_test_frequency == 2) frequency = m_wow_test_frequency_custom;
+    if (m_wow_test_frequency == 0) ref_frequency = 3000;
+    else if (m_wow_test_frequency == 1) ref_frequency = 3150;
+    else if (m_wow_test_frequency == 2) ref_frequency = m_wow_test_frequency_custom;
 
-    float max_percent = (max_freq / frequency) * 100.;
+    float max_percent = (max_freq / ref_frequency) * 100.;
 
     if(!fft_view && ImPlot::BeginPlot("Wow and flutter analysis (unweighted)", ImVec2(plotheight*1.8, -1)))
     {
@@ -309,8 +309,8 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
             double wow_mean_bar[4] = {0., 5., m_wow_mean, m_wow_mean};
             ImPlot::PlotLine("Wow & flutter mean", wow_mean_bar, wow_mean_bar+2, 2);
 
-            float peak_percent = (m_wow_peak_detection / (frequency + m_wow_mean)) * 100.;
-            float freq_drift = (m_wow_mean / frequency) * 100.;
+            float peak_percent = (m_wow_peak_detection / (ref_frequency + m_wow_mean)) * 100.;
+            float freq_drift = (m_wow_mean / ref_frequency) * 100.;
         m_wow_data_mutex.unlock();
 
         char peak_text[64];
@@ -328,11 +328,14 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
     if (ImPlot::BeginPlot("Wow and flutter FFT analysis", ImVec2(plotheight*1.8, -1)))
     {
         const double max_frequency = current_sample_rate / WOW_FLUTTER_DECIMATION / 2.;
+        const double drift_percent = max_fft_freq / ref_frequency * 100.;
         ImPlot::SetupAxes("Frequency (Hz)", "Freqency drift (Hz)", 0, ImPlotAxisFlags_Lock);
         ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_SymLog);
         ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0.2, max_frequency);
         ImPlot::SetupAxisLimits(ImAxis_X1, 0.2, max_frequency, 0);
         ImPlot::SetupAxisLimits(ImAxis_Y1, 0, max_fft_freq, ImPlotCond_Always);
+        ImPlot::SetupAxis(ImAxis_Y2, "Drift %", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
+        ImPlot::SetupAxisLimits(ImAxis_Y2, 0, drift_percent, ImPlotCond_Always);
 
         if (ImPlot::IsAxisHovered(ImAxis_Y1) || ImPlot::IsAxisHovered(ImAxis_Y2)){
             // Zoom Y axis in/out

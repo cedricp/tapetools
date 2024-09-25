@@ -208,7 +208,7 @@ int audioRecorder::get_available_bytes()
 
 int audioRecorder::get_available_samples()
 {
-    if (!m_ring_buffer){
+    if (!m_ring_buffer || m_instream == nullptr){
         return 0;
     }
     return m_ring_buffer->fill_count() / m_instream->bytes_per_sample;
