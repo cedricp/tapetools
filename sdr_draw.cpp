@@ -26,6 +26,9 @@ void AudioToolWindow::draw_sdr()
         else
         {
             m_sdr_thread.stop();
+            // Force interrupt
+            m_sdr_thread.get_scanner().apply();
+            m_sdr_thread.join();
         }
     }
     ImGui::EndChild();
