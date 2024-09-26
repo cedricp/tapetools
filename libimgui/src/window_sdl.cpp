@@ -781,7 +781,9 @@ void* App_SDL::get_ref_imgui_context()
 std::string App_SDL::get_app_path()
 {
 	char* basepath = SDL_GetBasePath();
-	return basepath;
+	std::string ret = basepath;
+	SDL_free(basepath);
+	return ret;
 }
 
 void App_SDL::add_thread(Thread* thread)

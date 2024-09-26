@@ -225,7 +225,7 @@ class AudioToolWindow : public Widget
 
     CALLBACK_METHOD(on_device_changed, AudioToolWindow)
     {
-        reinit_recorder();
+        //reinit_recorder();
         printf("Audio device configuration changed.\n");
     }
 
@@ -269,15 +269,14 @@ public:
 
         m_audiomanager.flush();
         m_sweep_timer.connect_event(STATIC_METHOD(on_timer_event), this);
-
-        //m_sdr_thread.start();
     }
 
     virtual ~AudioToolWindow()
     {
         m_sine_generator.destroy();
-        destroy_capture();
         m_sdr_thread.stop();
+        m_sdr_thread.join();
+        destroy_capture();
     }
 
     void destroy_capture();
@@ -344,8 +343,6 @@ public:
                 }
                 ImGui::PopItemFlag();
                 
-                //if(ImGui::MenuItem("Show Zscore settings", nullptr, nullptr))  m_show_zscore_settings = !m_show_zscore_settings;
-                
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();
@@ -362,7 +359,7 @@ public:
             draw_sweep_tab();
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("SDR analysis"))
+        if (m_sdr_thread.get_scanner().get_rtl_device().get_device_count() && ImGui::BeginTabItem("SDR analysis"))
         {
             draw_sdr();
             ImGui::EndTabItem();
@@ -566,17 +563,18 @@ public:
             bool computed = compute();
             if (computed)
             {
-                if (m_show_thd) compute_thd();
+                if (m_compute_channel_phase || m_show_thd) compute_thd();
                 if (m_show_thd) compute_thdn();
                 if (m_compute_channel_phase) compute_channels_phase();
             }
 
             if (computed) update_ui();
-                return true;
+            return true;
         }
 
         if (m_sdr_thread.data_available())
         {
+            update_ui();
             return true;
         }
 

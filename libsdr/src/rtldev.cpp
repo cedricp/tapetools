@@ -65,9 +65,11 @@ RTL_Device::get_tuner_gains()
 {
 	std::vector<int> gains;
 	if (m_device_id >= 0 && m_impl->device){
-		int *g = NULL;
-		int count = rtlsdr_get_tuner_gains(m_impl->device, g);
-		if (g != NULL){
+		int count = rtlsdr_get_tuner_gains(m_impl->device, NULL);
+		if (count)
+		{
+			std::vector<int> g(count);
+			rtlsdr_get_tuner_gains(m_impl->device, g.data());
 			for (int i = 0; i < count; ++i){
 				gains.push_back(g[i]);
 			}
@@ -94,7 +96,10 @@ RTL_Device::retune(int freq)
 	if (m_device_id >= 0 && m_impl->device){
 		uint8_t dump[BUFFER_DUMP];
 		int n_read;
-		rtlsdr_set_center_freq(m_impl->device, (uint32_t)freq);
+		if (rtlsdr_set_center_freq(m_impl->device, (uint32_t)freq) < RTL_OK)
+		{
+			return RTL_BAD_RETUNE;
+		}
 		/* wait for settling and flush buffer */
 		usleep(5000);
 		rtlsdr_read_sync(m_impl->device, &dump, BUFFER_DUMP, &n_read);

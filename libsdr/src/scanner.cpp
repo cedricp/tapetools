@@ -100,7 +100,7 @@ inline long real_conj(int16_t real, int16_t imag)
 SDR_Scanner::SDR_Scanner()
 {
 	m_boxcar = 1;
-	m_comp_fir_size = 0;
+	m_comp_fir_size = 9;
 	m_peak_hold = 0;
 	m_tune_count = 0;
 	m_sinewave = NULL;
@@ -162,8 +162,9 @@ SDR_Scanner::fix_fft(int16_t iq[], int m)
 	int mr, nn, i, j, l, k, istep, n, shift;
 	int16_t qr, qi, tr, ti, wr, wi;
 	n = 1 << m;
-	if (n > m_nwave)
-		{return -1;}
+
+	if (n > m_nwave) {return -1;}
+
 	mr = 0;
 	nn = n - 1;
 	/* decimation in time - re-order data */
@@ -439,7 +440,7 @@ SDR_Scanner::downsample_iq(int16_t *data, int length)
 int
 SDR_Scanner::scan()
 {
-	if (m_settings_dirty)
+	if (m_settings_dirty || m_tune_count == 0)
 	{
 		init();
 	}
@@ -447,23 +448,23 @@ SDR_Scanner::scan()
 	{
 		m_scan_results.resize(m_tune_count);
 	}
-	int i, j, j2, f, n_read, offset, bin_e, bin_len, buf_len, ds, ds_p;
+	int i, j, j2, f, n_read, offset, bin_e, bin_length, buffer_len, downsample, downsample_passes;
 	int32_t w;
-	struct Tuning_state *ts;
+	struct Tuning_state *tuning_state;
 	bin_e = m_tunes[0].bin_e;
-	bin_len = 1 << bin_e;
-	buf_len = m_tunes[0].buf_len;
+	bin_length = 1 << bin_e;
+	buffer_len = m_tunes[0].buf_len;
 	for (i=0; i<m_tune_count; i++) {
 		if (m_settings_dirty)
 			return SCANNER_NOK;
 
-		ts = &m_tunes[i];
+		tuning_state = &m_tunes[i];
 
 		f = m_rtl_device.get_center_frequency();
 		if (f < 1)
 			fprintf(stderr, "Warning: RTL cannot set center frequency.\n");
-		if (f != ts->freq) {
-			int retune_status = m_rtl_device.retune(ts->freq);
+		if (f != tuning_state->freq) {
+			int retune_status = m_rtl_device.retune(tuning_state->freq);
 			if (retune_status == RTL_BAD_RETUNE){
 				fprintf(stderr, "Warning: bad retune.\n");
 				return SCANNER_NOK;
@@ -475,7 +476,7 @@ SDR_Scanner::scan()
 			}
 		}
 
-		int read_status = m_rtl_device.read_sync(ts->buf8, buf_len, &n_read);
+		int read_status = m_rtl_device.read_sync(tuning_state->buf8, buffer_len, &n_read);
 		if (RTL_OK != read_status){
 			if (read_status == RTL_DROPPED_SAMPLES) {
 				fprintf(stderr, "Warning: dropped samples.\n");
@@ -484,43 +485,42 @@ SDR_Scanner::scan()
 				break;
 		}
 		/* rms */
-		if (bin_len == 1) {
-			rms_power(ts);
+		if (bin_length == 1) {
+			rms_power(tuning_state);
 			continue;
 		}
 		/* prep for fft */
-		for (j=0; j<buf_len; j++) {
-			m_fft_buf[j] = (int16_t)ts->buf8[j] - 127;
+		for (j=0; j<buffer_len; j++) {
+			m_fft_buf[j] = (int16_t)tuning_state->buf8[j] - 127;
 		}
-		ds = ts->downsample;
-		ds_p = ts->downsample_passes;
-		if (m_boxcar && ds > 1) {
+		downsample = tuning_state->downsample;
+		downsample_passes = tuning_state->downsample_passes;
+		if (m_boxcar && downsample > 1) {
 			j=2, j2=0;
-			while (j < buf_len) {
+			while (j < buffer_len) {
 				m_fft_buf[j2]   += m_fft_buf[j];
 				m_fft_buf[j2+1] += m_fft_buf[j+1];
 				m_fft_buf[j] = 0;
 				m_fft_buf[j+1] = 0;
 				j += 2;
-				if (j % (ds*2) == 0) {
+				if (j % (downsample*2) == 0) {
 					j2 += 2;}
 			}
-		} else if (ds_p) {  /* recursive */
-			for (j=0; j < ds_p; j++) {
-				downsample_iq(m_fft_buf, buf_len >> j);
+		} else if (downsample_passes) {  /* recursive */
+			for (j=0; j < downsample_passes; j++) {
+				downsample_iq(m_fft_buf, buffer_len >> j);
 			}
 			/* droop compensation */
-			if (m_comp_fir_size == 9 && ds_p <= CIC_TABLE_MAX) {
-				generic_fir(m_fft_buf, buf_len >> j, cic_9_tables[ds_p]);
-				generic_fir(m_fft_buf+1, (buf_len >> j)-1, cic_9_tables[ds_p]);
+			if (m_comp_fir_size == 9 && downsample_passes <= CIC_TABLE_MAX) {
+				generic_fir(m_fft_buf, buffer_len >> j, cic_9_tables[downsample_passes]);
+				generic_fir(m_fft_buf+1, (buffer_len >> j)-1, cic_9_tables[downsample_passes]);
 			}
 		}
-		remove_dc(m_fft_buf, buf_len / ds);
-		remove_dc(m_fft_buf+1, (buf_len / ds) - 1);
+		remove_dc(m_fft_buf, buffer_len / downsample);
+		remove_dc(m_fft_buf+1, (buffer_len / downsample) - 1);
 		/* window function and fft */
-		for (offset=0; offset<(buf_len/ds); offset+=(2*bin_len)) {
-			// todo, let rect skip this
-			for (j=0; j<bin_len; j++) {
+		for (offset=0; offset<(buffer_len/downsample); offset+=(2*bin_length)) {
+			for (j=0; j<bin_length; j++) {
 				w =  (int32_t)m_fft_buf[offset+j*2];
 				w *= (int32_t)(m_window_coefs[j]);
 				m_fft_buf[offset+j*2]   = (int16_t)w;
@@ -530,19 +530,19 @@ SDR_Scanner::scan()
 			}
 			fix_fft(m_fft_buf+offset, bin_e);
 			if (!m_peak_hold) {
-				for (j=0; j<bin_len; j++) {
-					ts->avg[j] += real_conj(m_fft_buf[offset+j*2], m_fft_buf[offset+j*2+1]);
+				for (j=0; j<bin_length; j++) {
+					tuning_state->avg[j] += real_conj(m_fft_buf[offset+j*2], m_fft_buf[offset+j*2+1]);
 				}
 			} else {
-				for (j=0; j<bin_len; j++) {
-					ts->avg[j] = MAX(real_conj(m_fft_buf[offset+j*2], m_fft_buf[offset+j*2+1]), ts->avg[j]);
+				for (j=0; j<bin_length; j++) {
+					tuning_state->avg[j] = MAX(real_conj(m_fft_buf[offset+j*2], m_fft_buf[offset+j*2+1]), tuning_state->avg[j]);
 				}
 			}
-			ts->samples += ds;
+			tuning_state->samples += downsample;
 		}
 		lock_mutex();
 		Scan_result& current_result = m_scan_results[i];
-		compute_fft(current_result, ts);
+		compute_fft(current_result, tuning_state);
 		current_result.buffer_x.resize(current_result.buffer.size());
 		for (int i = 0; i < current_result.buffer.size(); ++i)
 		{
@@ -586,35 +586,40 @@ SDR_Scanner::init()
 {
 	destroy_tunes_memory();
 
-	double (*window_fn)(int, int);
 	// Setup scanner structure
+
+	if (m_rtl_device.get_device_count() == 0)
+	{
+		return SCANNER_NOK;
+	}
+
 
 	switch (m_settings.window_type){
 	case WINDOW_TYPE_HAMMING:
-		window_fn = hamming_fft_window;
+		m_window_fn = hamming_fft_window;
 		break;
 	case WINDOW_TYPE_BLACKMAN:
-		window_fn = blackman_fft_window;
+		m_window_fn = blackman_fft_window;
 		break;
 	case WINDOW_TYPE_BACKMAN_HARRIS:
-		window_fn = blackman_harris_fft_window;
+		m_window_fn = blackman_harris_fft_window;
 		break;
 	case WINDOW_TYPE_HANN_POISSON:
-		window_fn = hann_poisson_fft_window;
+		m_window_fn = hann_poisson_fft_window;
 		break;
 	case WINDOW_TYPE_YOUSSEF:
-		window_fn = youssef_fft_window;
+		m_window_fn = youssef_fft_window;
 		break;
 	case WINDOW_TYPE_BARTLETT:
-		window_fn = bartlett_fft_window;
+		m_window_fn = bartlett_fft_window;
 		break;
 	case WINDOW_TYPE_RECTANGLE:
 	default:
-		window_fn = rectangle_fft_window;
+		m_window_fn = rectangle_fft_window;
 		break;
 	}
 
-	compute_fft_window_corrections(window_fn);
+	compute_fft_window_corrections(m_window_fn);
 
 	int status;
 
@@ -649,7 +654,7 @@ SDR_Scanner::init()
 		if(status != RTL_OK)
 			return SCANNER_DEVICE_ERROR;
 	} else {
-		status = m_rtl_device.set_gain(m_settings.gain * 10);
+		status = m_rtl_device.set_gain(m_settings.gain);
 		if(status != RTL_OK)
 			return SCANNER_DEVICE_ERROR;
 	}
@@ -676,7 +681,7 @@ SDR_Scanner::init()
 
 	// Compute window coeffs
 	for (int i=0; i < length; i++) {
-		m_window_coefs[i] = (int)(256*window_fn(i, length));
+		m_window_coefs[i] = (int)(256*m_window_fn(i, length));
 	}
 
 	m_settings_dirty = false;
@@ -735,19 +740,26 @@ SDR_Scanner::compute_fft(Scan_result& res, Tuning_state* ts)
 	i2 = (len-1) - (int)((double)len * ts->crop * 0.5);
 	res.buffer.resize(i2 - i1 + 2);
 	int count = 0;
-	for (i=i1; i<=i2; i++) {
+	for (i=i1; i<=i2; i++)
+	{
 		dbm  = (double)ts->avg[i];
 		dbm /= (double)ts->rate;
 		dbm /= (double)ts->samples;
 		dbm  = 10 * log10(dbm * m_window_amplitude_correction);
 		res.buffer[count++] = dbm;
 	}
+	
 	dbm = (double)ts->avg[i2] / ((double)ts->rate * (double)ts->samples);
-	if (ts->bin_e == 0) {
-		dbm = ((double)ts->avg[0] / ((double)ts->rate * (double)ts->samples));}
+	if (ts->bin_e == 0)
+	{
+		dbm = ((double)ts->avg[0] / ((double)ts->rate * (double)ts->samples));
+	}
+	
 	dbm  = 10 * log10(dbm * m_window_amplitude_correction);
 	res.buffer[count++] = dbm;
-	for (i=0; i<len; i++) {
+	
+	for (i=0; i<len; i++)
+	{
 		ts->avg[i] = 0L;
 	}
 	ts->samples = 0;

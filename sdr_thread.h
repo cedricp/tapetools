@@ -16,6 +16,9 @@ public:
         stop();
     }
 
+    SDR_Scanner& get_scanner(){return m_scanner;}
+    SDR_Scanner::Scanner_settings& get_scanner_settings(){return m_scanner.get_settings();}
+
     void lock_graph()
     {
         m_scanner.lock_mutex();
@@ -28,13 +31,14 @@ public:
 
     void entry() override
     {
-        int scanner_ret = m_scanner.scan();
+        int scanner_ret;
         if (m_scanner.scan() < SCANNER_OK)
         {
             usleep(500000);
             m_scanner.init();
-        } 
-        if (scanner_ret == 0) {
+        }
+        else
+        {
             m_data_available = true;
         }
     }

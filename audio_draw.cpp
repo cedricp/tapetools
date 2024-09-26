@@ -504,7 +504,7 @@ void AudioToolWindow::draw_channels_phase_widget(int plotheight)
         ImPlot::SetupAxis(ImAxis_Y2, "dB", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
         ImPlot::SetupAxis(ImAxis_X1, "Time");
 
-        ImPlot::SetupAxesLimits(0.f, m_phase_time.size(), -180.0 * phase_limit_mult, 180.0 * phase_limit_mult, ImPlotCond_Always);
+        ImPlot::SetupAxesLimits(ImAxis_Y1, m_phase_time.size(), -180.0 * phase_limit_mult, 180.0 * phase_limit_mult, ImPlotCond_Always);
         ImPlot::SetupAxisLimits(ImAxis_Y2, -20. * amplitude_limit_mult, 20. * amplitude_limit_mult, ImPlotCond_Always);
 
         if (ImPlot::IsAxisHovered(ImAxis_Y1)){

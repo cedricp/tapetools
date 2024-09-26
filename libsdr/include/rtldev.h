@@ -48,6 +48,7 @@ public:
 	int  set_ppm(int ppm_error);
 	int	 reset_buffer();
 	int  device_connected();
+
 	std::string get_tuner_type();
 	std::string get_name();
 	std::vector<int> get_tuner_gains();

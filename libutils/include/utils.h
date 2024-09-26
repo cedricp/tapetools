@@ -17,10 +17,10 @@ static double zerocross(double a[2], double b[2])
 	return -c / slope;
 }
 
-static float wrap_phase(const float x) {
-    if (x >= (float)M_PI)       return x - 2.0f*(float)M_PI;
-    else if (x <= -(float)M_PI) return x + 2.0f*(float)M_PI;
-    else                        return x;
+static double wrap_phase(const double x) {
+    if (x >= M_PI)       return x - 2.0*M_PI;
+    else if (x <= -M_PI) return x + 2.0*M_PI;
+    else                 return x;
 };
 
 static double rectangle_fft_window(int i, int length)
