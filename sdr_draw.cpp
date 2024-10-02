@@ -45,13 +45,10 @@ void AudioToolWindow::draw_sdr()
 
     if (ImPlot::BeginPlot("SDR FFT", ImVec2(-1, -1)))
     {
-        ImPlot::SetupAxes("Frequency (MHz)", "dBm", 0, ImPlotAxisFlags_Lock);
-        // if (m_logscale_frequency){
-        //     ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
-        // }
-
         float freq_start = m_sdr_thread.get_scanner_settings().lower_freq / 1000000;
         float freq_stop = m_sdr_thread.get_scanner_settings().upper_freq / 1000000;
+        
+        ImPlot::SetupAxes("Frequency (MHz)", "dBm", 0, ImPlotAxisFlags_Lock);
 
         ImPlot::SetupAxesLimits(freq_start, freq_stop, -65.0, 40.0);
         ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, freq_start, freq_stop);

@@ -291,8 +291,8 @@ void AudioToolWindow::compute_channels_phase()
     float fft_capture_size = m_capture_size / 2;
 
     // Get the fundamental frequency FFT result
-    fftw_complex* right_comp = &(m_fftoutl[m_fft_highest_idx[m_fundamental_index]]);
-    fftw_complex* left_comp = &(m_fftoutr[m_fft_highest_idx[m_fundamental_index]]);
+    fftw_complex* right_comp = &(m_fftoutl[m_fft_harmonics_idx[0]]);
+    fftw_complex* left_comp = &(m_fftoutr[m_fft_harmonics_idx[0]]);
 
     // Compute the phase (complex argument) of left and right channels
     double right_phase = wrap_phase(atan2((*right_comp)[1], (*right_comp)[0]));
@@ -340,12 +340,10 @@ void AudioToolWindow::compute_thd()
         }
     }
 
-    m_fundamental_index = 0;
-
     int fundamental_frequency = m_fftfreqs[fundamental_index]; 
 
-    m_fft_highest_idx[0] = fundamental_index;
-    m_fft_highest_pos[0] = m_fftfreqs[fundamental_index];
+    m_fft_harmonics_idx[0] = fundamental_index;
+    m_fft_harmonics_pos[0] = m_fftfreqs[fundamental_index];
 
     for (int i = 1; i < 8; ++i)
     {
@@ -353,8 +351,8 @@ void AudioToolWindow::compute_thd()
         if (i_order_harmonic > fft_capture_size) break;
         m_fft_found_peaks++;
 
-        m_fft_highest_idx[i] = i_order_harmonic;
-        m_fft_highest_pos[i] = m_fftfreqs[i_order_harmonic];
+        m_fft_harmonics_idx[i] = i_order_harmonic;
+        m_fft_harmonics_pos[i] = m_fftfreqs[i_order_harmonic];
     }
 
     // Compute Total Harmonic Distortion
@@ -362,11 +360,11 @@ void AudioToolWindow::compute_thd()
     if (m_fft_found_peaks)
     {
         m_thd = 0;
-        double fundamental_db = current_fft_draw[m_fft_highest_idx[0]];
+        double fundamental_db = current_fft_draw[m_fft_harmonics_idx[0]];
         double totdbc = 0;
         for (int i = 1; i < m_fft_found_peaks; ++i)
         {
-            double dBc = current_fft_draw[m_fft_highest_idx[i]] - fundamental_db;
+            double dBc = current_fft_draw[m_fft_harmonics_idx[i]] - fundamental_db;
             totdbc += pow(10.0, dBc / 10.0);
         }
 
@@ -402,7 +400,6 @@ void AudioToolWindow::compute_thdn()
         }
     }
     m_fft_rms = sqrt(m_fft_rms) * invsqrt2 * inv_capture_size;
-    //printf("RMS = %f\n", total_rms);
 
     // Find FFT fundamental range
     double tmp = max_val;

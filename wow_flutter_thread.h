@@ -60,7 +60,6 @@ private:
         m_iq_lowpass_filter.setup(4, m_samplerate, 700, 0.1);
 
         // We need ~5 seconds of audio recording
-
         m_mutex.lock();
             int actual_audio_length = m_longterm_audio.size();
             double current_samplerate = m_samplerate;
@@ -92,8 +91,9 @@ private:
                 int step_i = i * m_decimation;
                 // Start graph a little later to hide LPF settle time
                 int step_i_x = (i - (decimated_size / 10)) * m_decimation;
-                double phase = wrap_phase(atan2(m_signal_q[step_i-1], m_signal_i[step_i-1]) - atan2(m_signal_q[step_i], m_signal_i[step_i]));
-                m_wow_flutter_data[i] = phase * phase_to_hz;
+                double phase_diff = wrap_phase(atan2(m_signal_q[step_i-1], m_signal_i[step_i-1]) - atan2(m_signal_q[step_i], m_signal_i[step_i]));
+                // Convert phase difference to Hertz
+                m_wow_flutter_data[i] = phase_diff * phase_to_hz;
                 m_wow_flutter_data_x[i] = (double)step_i_x * inv_current_samplerate;
             }
 

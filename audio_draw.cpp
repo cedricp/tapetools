@@ -403,7 +403,6 @@ void AudioToolWindow::draw_voltmeter_widget(int channelcount)
         }
 
         ImGui::BeginChild("ScopesChildFreqCounter", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
-        //double freq = m_fftfreqs ? m_fftfreqs[m_fft_highest_idx[m_fundamental_index]] / 1000. : 0.0;
         TextCenter("Frequency KHz");
         lcd_fg = IM_COL32(0,200,0,255);
         draw_lcd(m_frequency_counter / 1000., ImVec2(180, 60), 6);
@@ -457,11 +456,11 @@ if (ImPlot::BeginPlot("Audio FFT", ImVec2(m_compute_channel_phase ? width() - pl
             snprintf(thdtext, 32, "Total RMS : %.4f", m_fft_rms * m_rms_calibration_scale);
             ImPlot::PlotText(thdtext, pnt.x, pnt.y);
 
-            for (int i = m_fundamental_index; i < m_fft_found_peaks; ++i)
+            for (int i = 0; i < m_fft_found_peaks; ++i)
             {
-                double fund[4] = {m_fft_highest_pos[i], m_fft_highest_pos[i], 40.0, -200.0};
+                double fund[4] = {m_fft_harmonics_pos[i], m_fft_harmonics_pos[i], 40.0, -200.0};
                 ImPlot::PlotLine("Peaks", fund, fund+2, 2);
-                double y_pos = fft_draw[m_fft_highest_idx[i]];
+                double y_pos = fft_draw[m_fft_harmonics_idx[i]];
                 if (!calibration_active)
                 {
                     snprintf(thdtext, 16, "%.4fdB", y_pos);
@@ -471,10 +470,10 @@ if (ImPlot::BeginPlot("Audio FFT", ImVec2(m_compute_channel_phase ? width() - pl
                     double y_pos2 = y_pos + diffdb;
                     snprintf(thdtext, 16, "%.4fdBu", y_pos2);
                 } 
-                ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos+40 * plot_to_pix_graph);
-                double freq = m_fftfreqs[m_fft_highest_idx[i]] / 1000.0;
+                ImPlot::PlotText(thdtext, m_fft_harmonics_pos[i], y_pos+40 * plot_to_pix_graph);
+                double freq = m_fftfreqs[m_fft_harmonics_idx[i]] / 1000.0;
                 snprintf(thdtext, 16, "%.4fKHz", freq);
-                ImPlot::PlotText(thdtext, m_fft_highest_pos[i], y_pos+20 * plot_to_pix_graph);
+                ImPlot::PlotText(thdtext, m_fft_harmonics_pos[i], y_pos+20 * plot_to_pix_graph);
             }
 
         }

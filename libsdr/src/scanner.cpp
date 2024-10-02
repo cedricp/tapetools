@@ -163,7 +163,10 @@ SDR_Scanner::fix_fft(int16_t iq[], int m)
 	int16_t qr, qi, tr, ti, wr, wi;
 	n = 1 << m;
 
-	if (n > m_nwave) {return -1;}
+	if (n > m_nwave)
+	{
+		return -1;
+	}
 
 	mr = 0;
 	nn = n - 1;
@@ -249,7 +252,7 @@ SDR_Scanner::frequency_range(double crop, int upper, int lower, int max_size)
 /* flesh out the tunes[] for scanning */
 // do we want the fewest ranges (easy) or the fewest bins (harder)?
 {
-	int i, j, bw_seen, bw_used, bin_e, buf_len;
+	int i, j, bw_seen, bandwidth_used, bin_e, buffer_length;
 	int downsample, downsample_passes;
 	double bin_size;
 	Tuning_state *ts;
@@ -261,53 +264,60 @@ SDR_Scanner::frequency_range(double crop, int upper, int lower, int max_size)
 	downsample_passes = 0;
 	/* evenly sized ranges, as close to MAXIMUM_RATE as possible */
 	// todo, replace loop with algebra
-	for (i=1; i<1500; i++) {
+	for (i=1; i < 1500; i++)
+	{
 		bw_seen = (upper - lower) / i;
-		bw_used = (int)((double)(bw_seen) / (1.0 - crop));
-		if (bw_used > MAXIMUM_RATE)
+		bandwidth_used = (int)((double)(bw_seen) / (1.0 - crop));
+		if (bandwidth_used > MAXIMUM_RATE)
 			continue;
 		m_tune_count = i;
 		break;
 	}
 	/* unless small bandwidth */
-	if (bw_used < MINIMUM_RATE) {
+	if (bandwidth_used < MINIMUM_RATE)
+	{
 		m_tune_count = 1;
-		downsample = MAXIMUM_RATE / bw_used;
-		bw_used = bw_used * downsample;
+		downsample = MAXIMUM_RATE / bandwidth_used;
+		bandwidth_used = bandwidth_used * downsample;
 	}
-	if (!m_boxcar && downsample > 1) {
+	if (!m_boxcar && downsample > 1)
+	{
 		downsample_passes = (int)log2(downsample);
 		downsample = 1 << downsample_passes;
-		bw_used = (int)((double)(bw_seen * downsample) / (1.0 - crop));
+		bandwidth_used = (int)((double)(bw_seen * downsample) / (1.0 - crop));
 	}
 	/* number of bins is power-of-two, bin size is under limit */
 	// todo, replace loop with log2
-	for (i=1; i<=21; i++) {
+	for (i=1; i<=21; i++)
+	{
 		bin_e = i;
-		bin_size = (double)bw_used / (double)((1<<i) * downsample);
-		if (bin_size <= (double)max_size) {
-			break;}
+		bin_size = (double)bandwidth_used / (double)((1<<i) * downsample);
+		if (bin_size <= (double)max_size) break;
 	}
 	/* unless giant bins */
-	if (max_size >= MINIMUM_RATE) {
+	if (max_size >= MINIMUM_RATE) 
+	{
 		bw_seen = max_size;
-		bw_used = max_size;
+		bandwidth_used = max_size;
 		m_tune_count = (upper - lower) / bw_seen;
 		bin_e = 0;
 		crop = 0;
 	}
-	if (m_tune_count > MAX_TUNES) {
+	if (m_tune_count > MAX_TUNES) 
+	{
 		return SCANNER_NOK;
 	}
-	buf_len = 2 * (1<<bin_e) * downsample;
-	if (buf_len < DEFAULT_BUF_LENGTH) {
-		buf_len = DEFAULT_BUF_LENGTH;
+	buffer_length = 2 * (1<<bin_e) * downsample;
+	if (buffer_length < DEFAULT_BUF_LENGTH) 
+	{
+		buffer_length = DEFAULT_BUF_LENGTH;
 	}
 	/* build the array */
-	for (i=0; i<m_tune_count; i++) {
+	for (i=0; i<m_tune_count; i++)
+	{
 		ts = &m_tunes[i];
 		ts->freq = lower + i*bw_seen + bw_seen/2;
-		ts->rate = bw_used;
+		ts->rate = bandwidth_used;
 		ts->bin_e = bin_e;
 		ts->samples = 0;
 		ts->crop = crop;
@@ -320,17 +330,17 @@ SDR_Scanner::frequency_range(double crop, int upper, int lower, int max_size)
 		for (j=0; j<(1<<bin_e); j++) {
 			ts->avg[j] = 0L;
 		}
-		ts->buf8 = (uint8_t*)malloc(buf_len * sizeof(uint8_t));
+		ts->buf8 = (uint8_t*)malloc(buffer_length * sizeof(uint8_t));
 		if (!ts->buf8) {
 			return SCANNER_MEMORY_ERROR;
 		}
-		ts->buf_len = buf_len;
+		ts->buf_len = buffer_length;
 	}
 
-	m_scan_info.buffer_size_bytes 	=  buf_len;
-	m_scan_info.buffer_size_ms 		= 1000 * 0.5 * (float)buf_len / (float)bw_used;
+	m_scan_info.buffer_size_bytes 	= buffer_length;
+	m_scan_info.buffer_size_ms 		= 1000 * 0.5 * (float)buffer_length / (float)bandwidth_used;
 	m_scan_info.cropping_percent	= crop*100;
-	m_scan_info.dongle_bw_hz		= bw_used;
+	m_scan_info.dongle_bw_hz		= bandwidth_used;
 	m_scan_info.downsampling		= downsample;
 	m_scan_info.fft_bin_size_hz		= bin_size;
 	m_scan_info.logged_fft_bins		= (int)((double)(m_tune_count * (1<<bin_e)) * (1.0-crop));
@@ -370,7 +380,8 @@ SDR_Scanner::fifth_order(int16_t *data, int length)
 	data[0] = ((a+b)*10 + (c+d)*5 + d + f) >> 4;
 	data[2] = ((b+c)*10 + (a+d)*5 + e + f) >> 4;
 	data[4] = (a + (b+e)*5 + (c+d)*10 + f) >> 4;
-	for (i=12; i<length; i+=4) {
+	for (i=12; i<length; i+=4) 
+	{
 		a = c;
 		b = d;
 		c = e;
@@ -388,13 +399,16 @@ SDR_Scanner::remove_dc(int16_t *data, int length)
 	int i;
 	int16_t ave;
 	long sum = 0L;
-	for (i=0; i < length; i+=2) {
+	for (i=0; i < length; i+=2) 
+	{
 		sum += data[i];
 	}
+	
 	ave = (int16_t)(sum / (long)(length));
-	if (ave == 0) {
-		return;}
-	for (i=0; i < length; i+=2) {
+	if (ave == 0) return;
+
+	for (i=0; i < length; i+=2) 
+	{
 		data[i] -= ave;
 	}
 }
@@ -406,10 +420,12 @@ SDR_Scanner::generic_fir(int16_t *data, int length, int *fir)
 	int d, temp, sum;
 	int hist[9] = {0,};
 	/* cheat on the beginning, let it go unfiltered */
-	for (d=0; d<18; d+=2) {
+	for (d=0; d<18; d+=2)
+	{
 		hist[d/2] = data[d];
 	}
-	for (d=18; d<length; d+=2) {
+	for (d=18; d<length; d+=2)
+	{
 		temp = data[d];
 		sum = 0;
 		sum += (hist[0] + hist[8]) * fir[1];
@@ -448,13 +464,16 @@ SDR_Scanner::scan()
 	{
 		m_scan_results.resize(m_tune_count);
 	}
-	int i, j, j2, f, n_read, offset, bin_e, bin_length, buffer_len, downsample, downsample_passes;
+
+	int i, j, j2, f, n_read, offset, bin_e, bin_length, buffer_length, downsample, downsample_passes;
 	int32_t w;
 	struct Tuning_state *tuning_state;
 	bin_e = m_tunes[0].bin_e;
 	bin_length = 1 << bin_e;
-	buffer_len = m_tunes[0].buf_len;
-	for (i=0; i<m_tune_count; i++) {
+	buffer_length = m_tunes[0].buf_len;
+
+	for (i=0; i < m_tune_count; i++) 
+	{
 		if (m_settings_dirty)
 			return SCANNER_NOK;
 
@@ -463,7 +482,8 @@ SDR_Scanner::scan()
 		f = m_rtl_device.get_center_frequency();
 		if (f < 1)
 			fprintf(stderr, "Warning: RTL cannot set center frequency.\n");
-		if (f != tuning_state->freq) {
+		if (f != tuning_state->freq) 
+		{
 			int retune_status = m_rtl_device.retune(tuning_state->freq);
 			if (retune_status == RTL_BAD_RETUNE){
 				fprintf(stderr, "Warning: bad retune.\n");
@@ -476,51 +496,62 @@ SDR_Scanner::scan()
 			}
 		}
 
-		int read_status = m_rtl_device.read_sync(tuning_state->buf8, buffer_len, &n_read);
-		if (RTL_OK != read_status){
-			if (read_status == RTL_DROPPED_SAMPLES) {
+		int read_status = m_rtl_device.read_sync(tuning_state->buf8, buffer_length, &n_read);
+		if (RTL_OK != read_status)
+		{
+			if (read_status == RTL_DROPPED_SAMPLES) 
+			{
 				fprintf(stderr, "Warning: dropped samples.\n");
 			}
 			if (read_status == RTL_CONNECTION_ERROR)
 				break;
 		}
 		/* rms */
-		if (bin_length == 1) {
+		if (bin_length == 1)
+		{
 			rms_power(tuning_state);
 			continue;
 		}
 		/* prep for fft */
-		for (j=0; j<buffer_len; j++) {
+		for (j=0; j<buffer_length; j++)
+		{
 			m_fft_buf[j] = (int16_t)tuning_state->buf8[j] - 127;
 		}
 		downsample = tuning_state->downsample;
 		downsample_passes = tuning_state->downsample_passes;
-		if (m_boxcar && downsample > 1) {
+		if (m_boxcar && downsample > 1)
+		{
 			j=2, j2=0;
-			while (j < buffer_len) {
+			while (j < buffer_length) 
+			{
 				m_fft_buf[j2]   += m_fft_buf[j];
 				m_fft_buf[j2+1] += m_fft_buf[j+1];
 				m_fft_buf[j] = 0;
 				m_fft_buf[j+1] = 0;
 				j += 2;
-				if (j % (downsample*2) == 0) {
-					j2 += 2;}
+				if (j % (downsample*2) == 0) j2 += 2;
 			}
-		} else if (downsample_passes) {  /* recursive */
+		}
+		else if (downsample_passes) 
+		{  /* recursive */
 			for (j=0; j < downsample_passes; j++) {
-				downsample_iq(m_fft_buf, buffer_len >> j);
+				downsample_iq(m_fft_buf, buffer_length >> j);
 			}
 			/* droop compensation */
 			if (m_comp_fir_size == 9 && downsample_passes <= CIC_TABLE_MAX) {
-				generic_fir(m_fft_buf, buffer_len >> j, cic_9_tables[downsample_passes]);
-				generic_fir(m_fft_buf+1, (buffer_len >> j)-1, cic_9_tables[downsample_passes]);
+				generic_fir(m_fft_buf, buffer_length >> j, cic_9_tables[downsample_passes]);
+				generic_fir(m_fft_buf+1, (buffer_length >> j)-1, cic_9_tables[downsample_passes]);
 			}
 		}
-		remove_dc(m_fft_buf, buffer_len / downsample);
-		remove_dc(m_fft_buf+1, (buffer_len / downsample) - 1);
+
+		remove_dc(m_fft_buf, buffer_length / downsample);
+		remove_dc(m_fft_buf+1, (buffer_length / downsample) - 1);
+
 		/* window function and fft */
-		for (offset=0; offset<(buffer_len/downsample); offset+=(2*bin_length)) {
-			for (j=0; j<bin_length; j++) {
+		for (offset=0; offset<(buffer_length/downsample); offset+=(2*bin_length))
+		{
+			for (j=0; j < bin_length; j++) 
+			{
 				w =  (int32_t)m_fft_buf[offset+j*2];
 				w *= (int32_t)(m_window_coefs[j]);
 				m_fft_buf[offset+j*2]   = (int16_t)w;
@@ -528,26 +559,33 @@ SDR_Scanner::scan()
 				w *= (int32_t)(m_window_coefs[j]);
 				m_fft_buf[offset+j*2+1] = (int16_t)w;
 			}
+
 			fix_fft(m_fft_buf+offset, bin_e);
-			if (!m_peak_hold) {
-				for (j=0; j<bin_length; j++) {
+			
+			if (!m_peak_hold) 
+			{
+				for (j=0; j<bin_length; j++) 
+				{
 					tuning_state->avg[j] += real_conj(m_fft_buf[offset+j*2], m_fft_buf[offset+j*2+1]);
 				}
-			} else {
-				for (j=0; j<bin_length; j++) {
+			}
+			else
+			{
+				for (j=0; j<bin_length; j++) 
+				{
 					tuning_state->avg[j] = MAX(real_conj(m_fft_buf[offset+j*2], m_fft_buf[offset+j*2+1]), tuning_state->avg[j]);
 				}
 			}
 			tuning_state->samples += downsample;
 		}
 		lock_mutex();
-		Scan_result& current_result = m_scan_results[i];
-		compute_fft(current_result, tuning_state);
-		current_result.buffer_x.resize(current_result.buffer.size());
-		for (int i = 0; i < current_result.buffer.size(); ++i)
-		{
-			current_result.buffer_x[i] = (current_result.freq_start  + (i * current_result.freq_step)) / 1000000.0;
-		}
+			Scan_result& current_result = m_scan_results[i];
+			compute_fft(current_result, tuning_state);
+			current_result.buffer_x.resize(current_result.buffer.size());
+			for (int i = 0; i < current_result.buffer.size(); ++i)
+			{
+				current_result.buffer_x[i] = (current_result.freq_start  + (i * current_result.freq_step)) / 1000000.0;
+			}
 		unlock_mutex();
 	}
 	return SCANNER_OK;
@@ -708,61 +746,65 @@ SDR_Scanner::compute_fft_window_corrections(double (*window_fn)(int, int), int n
 }
 
 void
-SDR_Scanner::compute_fft(Scan_result& res, Tuning_state* ts)
+SDR_Scanner::compute_fft(Scan_result& scan_result, Tuning_state* tuning_state)
 {
-	int i, len, ds, i1, i2, bw2, bin_count;
+	int i, bin_length, downsample, i1, i2, half_bandwidth, bin_count;
 	long tmp;
 	double dbm;
-	len = 1 << ts->bin_e;
-	ds = ts->downsample;
+	bin_length = 1 << tuning_state->bin_e;
+	downsample = tuning_state->downsample;
 	/* fix FFT stuff quirks */
-	if (ts->bin_e > 0) {
+	if (tuning_state->bin_e > 0)
+	{
 		/* nuke DC component (not effective for all windows) */
-		ts->avg[0] = ts->avg[1];
+		tuning_state->avg[0] = tuning_state->avg[1];
 		/* FFT is translated by 180 degrees */
-		for (i=0; i<len/2; i++) {
-			tmp = ts->avg[i];
-			ts->avg[i] = ts->avg[i+len/2];
-			ts->avg[i+len/2] = tmp;
+		for (i=0; i < bin_length/2; i++)
+		{
+			tmp = tuning_state->avg[i];
+			tuning_state->avg[i] = tuning_state->avg[i+bin_length/2];
+			tuning_state->avg[i+bin_length/2] = tmp;
 		}
 	}
 	/* Hz low, Hz high, Hz step, samples, dbm, dbm, ... */
-	bin_count = (int)((double)len * (1.0 - ts->crop));
-	bw2 = (int)(((double)ts->rate * (double)bin_count) / (len * 2 * ds));
+	bin_count = (int)((double)bin_length * (1.0 - tuning_state->crop));
+	half_bandwidth = (int)(((double)tuning_state->rate * (double)bin_count) / (bin_length * 2 * downsample));
 
-	res.freq_start = ts->freq - bw2;
-	res.freq_stop  = ts->freq + bw2;
-	res.freq_step  = (float)ts->rate / (double)(len*ds);
-	res.num_samples = ts->samples;
+	scan_result.freq_start = tuning_state->freq - half_bandwidth;
+	scan_result.freq_stop  = tuning_state->freq + half_bandwidth;
+	scan_result.freq_step  = (float)tuning_state->rate / (double)(bin_length*downsample);
+	scan_result.num_samples = tuning_state->samples;
 
 	// something seems off with the dbm math
-	i1 = 0 + (int)((double)len * ts->crop * 0.5);
-	i2 = (len-1) - (int)((double)len * ts->crop * 0.5);
-	res.buffer.resize(i2 - i1 + 2);
+	i1 = 0 + (int)((double)bin_length * tuning_state->crop * 0.5);
+	i2 = (bin_length-1) - (int)((double)bin_length * tuning_state->crop * 0.5);
+	scan_result.buffer.resize(i2 - i1 + 2);
 	int count = 0;
 	for (i=i1; i<=i2; i++)
 	{
-		dbm  = (double)ts->avg[i];
-		dbm /= (double)ts->rate;
-		dbm /= (double)ts->samples;
+		dbm  = (double)tuning_state->avg[i];
+		dbm /= (double)tuning_state->rate;
+		dbm /= (double)tuning_state->samples;
 		dbm  = 10 * log10(dbm * m_window_amplitude_correction);
-		res.buffer[count++] = dbm;
+		scan_result.buffer[count++] = dbm;
 	}
 	
-	dbm = (double)ts->avg[i2] / ((double)ts->rate * (double)ts->samples);
-	if (ts->bin_e == 0)
-	{
-		dbm = ((double)ts->avg[0] / ((double)ts->rate * (double)ts->samples));
-	}
+	// Seems unnecessary 
+	// dbm = (double)tuning_state->avg[i2] / ((double)tuning_state->rate * (double)tuning_state->samples);
+	// if (tuning_state->bin_e == 0)
+	// {
+	// 	dbm = ((double)tuning_state->avg[0] / ((double)tuning_state->rate * (double)tuning_state->samples));
+	// }
 	
-	dbm  = 10 * log10(dbm * m_window_amplitude_correction);
-	res.buffer[count++] = dbm;
+	// dbm  = 10 * log10(dbm * m_window_amplitude_correction);
+	// scan_result.buffer[count++] = dbm;
 	
-	for (i=0; i<len; i++)
-	{
-		ts->avg[i] = 0L;
-	}
-	ts->samples = 0;
+	// for (i=0; i<bin_length; i++)
+	// {
+	// 	tuning_state->avg[i] = 0L;
+	// }
+	memset(tuning_state->avg, 0, bin_length*sizeof(tuning_state->avg));
+	tuning_state->samples = 0;
 }
 
 

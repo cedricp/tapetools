@@ -81,11 +81,10 @@ class AudioToolWindow : public Widget
     bool    m_fft_channel_left = true;
     bool    m_fft_channel_right = false;
     double  m_noise_foor = -100;
-    double  m_fft_highest_pos[20];
-    int     m_fft_highest_idx[20];
+    double  m_fft_harmonics_pos[20];
+    int     m_fft_harmonics_idx[20];
     double  m_fft_highest_val;
     int     m_fft_found_peaks = 0;
-    int     m_fundamental_index = 0;
     int     m_fft_fund_idx_range_min = 0;
     int     m_fft_fund_idx_range_max = 0;
     double  m_thd = 0;
