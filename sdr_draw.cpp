@@ -45,23 +45,22 @@ void AudioToolWindow::draw_sdr()
 
     if (ImPlot::BeginPlot("SDR FFT", ImVec2(-1, -1)))
     {
-        float freq_start = m_sdr_thread.get_scanner_settings().lower_freq / 1000000;
-        float freq_stop = m_sdr_thread.get_scanner_settings().upper_freq / 1000000;
-        
-        ImPlot::SetupAxes("Frequency (MHz)", "dBm", 0, ImPlotAxisFlags_Lock);
-
-        ImPlot::SetupAxesLimits(freq_start, freq_stop, -65.0, 40.0);
-        ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, freq_start, freq_stop);
-
         m_sdr_thread.lock_graph();
-        const std::vector<SDR_Scanner::Scan_result> scan_res = m_sdr_thread.get_scan_result();
-        if (scan_res.size())
-        {
-            for (int i = 0; i < scan_res.size(); ++i)
+            const std::vector<SDR_Scanner::Scan_result> scan_res = m_sdr_thread.get_scan_result();
+            float freq_start = m_sdr_thread.get_scanner_settings().lower_freq / 1e6f;
+            float freq_stop = m_sdr_thread.get_scanner_settings().upper_freq / 1e6f;
+            ImPlot::SetupAxes("Frequency (MHz)", "dBm", 0, ImPlotAxisFlags_Lock);
+
+            ImPlot::SetupAxesLimits(freq_start, freq_stop, -65.0, 40.0);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, freq_start, freq_stop);
+
+            if (scan_res.size())
             {
-                ImPlot::PlotLine("RF FFT", scan_res[i].buffer_x.data(), scan_res[i].buffer.data(), scan_res[i].buffer_x.size() - 1);
+                for (int i = 0; i < scan_res.size(); ++i)
+                {
+                    ImPlot::PlotLine("RF FFT", scan_res[i].buffer_x.data(), scan_res[i].buffer.data(), scan_res[i].buffer_x.size());
+                }
             }
-        }
         m_sdr_thread.unlock_graph();
 
         ImPlot::EndPlot();

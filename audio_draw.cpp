@@ -349,7 +349,8 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         m_wow_data_mutex.unlock();
 
         char peak_text[64];
-        snprintf(peak_text, 32, "Drift: %.3f Hz", m_fftdrawwow[0]);
+        float percent_drift = m_fftdrawwow[0] / ref_frequency * 100.f; 
+        snprintf(peak_text, 32, "Drift: [%.3f Hz] [%.3f %%]", m_fftdrawwow[0], percent_drift);
         ImVec2 plotpos = ImPlot::GetPlotPos();
         ImVec2 plotsize = ImPlot::GetPlotSize();
         ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1)));
@@ -569,22 +570,33 @@ void AudioToolWindow::draw_rt_analysis_tab()
 
         static int fm_freq = 0;
         static float fm_vol = 1;
-        ImGui::SameLine();
-        ImGui::BeginChild("ScopesChildFMTone", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        if (ImGui::SliderInt("FM frequency", &fm_freq, 0, 10000, "%d Hz"))
-        {
-            m_sine_generator.set_fm(fm_freq, fm_vol);
-        }
-        ImGui::SetItemTooltip("Set the FM modulation signal frequency");
-        ImGui::EndChild();
+        static bool fm_enable = false;
 
         ImGui::SameLine();
-        ImGui::BeginChild("ScopesChildFMToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        if (ImGui::SliderFloat("FM intensity", &fm_vol, 0, 100))
+        ImGui::BeginChild("ScopesChildFMTone", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        if (ImGui::ToggleButton("FM", &fm_enable))
         {
-            m_sine_generator.set_fm(fm_freq, fm_vol);
+            if (!fm_enable)
+            {
+                fm_freq = fm_vol = 0;
+            }
         }
-        ImGui::SetItemTooltip("Set the FM modulation signal frequency");
+        if (fm_enable)
+        {
+            ImGui::SameLine();
+            if (ImGui::SliderInt("FM frequency", &fm_freq, 0, 10000, "%d Hz"))
+            {
+                m_sine_generator.set_fm(fm_freq, fm_vol);
+            }
+            ImGui::SetItemTooltip("Set the FM modulation signal frequency");
+
+            ImGui::SameLine();
+            if (ImGui::SliderFloat("FM intensity", &fm_vol, 0, 100))
+            {
+                m_sine_generator.set_fm(fm_freq, fm_vol);
+            }
+            ImGui::SetItemTooltip("Set the FM modulation signal frequency");
+        }
         ImGui::EndChild();
 
         ImGui::EndChild();
@@ -785,7 +797,7 @@ void AudioToolWindow::draw_rt_analysis_tab()
     ImGui::BeginChild("ShowThdChild", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
     if (ImGui::ToggleButton("Show THD", &m_show_thd))
     {
-        static int old_capture_time = 100;
+        /*static int old_capture_time = 100;
         if (m_show_thd){
             old_capture_time = m_recorder_latency_ms;
             if (m_recorder_latency_ms < 500)
@@ -798,7 +810,7 @@ void AudioToolWindow::draw_rt_analysis_tab()
         {
             m_recorder_latency_ms = old_capture_time;
             must_reinit_recorder = true;
-        }
+        }*/
     }
     ImGui::SetItemTooltip("Enable HD overlay");
     ImGui::EndChild();

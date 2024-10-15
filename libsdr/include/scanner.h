@@ -38,16 +38,16 @@ public :
 	class Scanner_settings{
 	public:
 		Scanner_settings(){
-			lower_freq = 7000000;
-			upper_freq = 100000000;
+			lower_freq = 102000000;
+			upper_freq = 107500000;
 			step_freq = 5000;
 			crop = 0.2;
 			rtl_dev_index = 0;
 			direct_sampling = false;
 			offset_tuning = false;
 			ppm_correction = 0;
-			gain = 40;
-			window_type = WINDOW_TYPE_RECTANGLE;
+			gain = 0;
+			window_type = WINDOW_TYPE_HAMMING;
 			int rtl_dev_index;
 		}
 		int lower_freq, upper_freq, step_freq;

@@ -280,7 +280,7 @@ void AudioToolWindow::compute_wow_and_flutter()
     WowAndFluterThread* wt = new WowAndFluterThread(samplerate, m_longterm_audio,
         m_wow_flutter_data, m_wow_flutter_data_x, reference_frequency,
         m_wow_data_mutex, WOW_FLUTTER_ANALYSIS_TIME, m_wf_filter_freq_combo,
-        m_wow_peak_detection, m_wow_mean, WOW_FLUTTER_DECIMATION, m_fftdrawwow, m_fftoutwow, m_fftwowdrawfreqs, m_fftplanwow);
+        m_wow_peak_detection, m_wow_mean, WOW_FLUTTER_DECIMATION, m_fftdrawwow, m_wow_complex_out, m_fftwowdrawfreqs, m_fftplanwow);
     wt->start();
 }
 
@@ -477,7 +477,7 @@ void AudioToolWindow::init_capture()
 
     m_fftwowdrawfreqs.resize(wow_capture_size/2); 
     m_fftdrawwow.resize(wow_capture_size/2);
-    m_fftoutwow = new fftw_complex[wow_capture_size];
+    m_wow_complex_out = new fftw_complex[wow_capture_size];
 
     m_wow_flutter_data.resize(m_wow_flutter_capture_size);
     m_wow_flutter_data_x.resize(m_wow_flutter_capture_size);
@@ -493,7 +493,7 @@ void AudioToolWindow::init_capture()
 
     m_fftplanr   = fftw_plan_dft_r2c_1d(capture_size, m_fftinr, m_fftoutr, fft_flags);
     m_fftplanl   = fftw_plan_dft_r2c_1d(capture_size, m_fftinl, m_fftoutl, fft_flags);
-    m_fftplanwow = fftw_plan_dft_r2c_1d(wow_capture_size, &m_wow_flutter_data[wow_start_capture], m_fftoutwow, fft_flags | FFTW_PRESERVE_INPUT);
+    m_fftplanwow = fftw_plan_dft_r2c_1d(wow_capture_size, &m_wow_flutter_data[wow_start_capture], m_wow_complex_out, fft_flags | FFTW_PRESERVE_INPUT);
 
     compute_fft_window_cache();
 }
@@ -517,7 +517,7 @@ void AudioToolWindow::destroy_capture()
     delete[] m_fftdrawl;
     delete[] m_fftdrawr;
     delete[] m_fftfreqs;
-    delete[] m_fftoutwow;
+    delete[] m_wow_complex_out;
     delete[] m_rms_fft;
     delete[] m_current_window_cache;
     m_sound_data_x.clear();
@@ -531,7 +531,7 @@ void AudioToolWindow::destroy_capture()
     m_fftfreqs = nullptr;
     m_fftplanr = nullptr;
     m_fftplanl = nullptr;
-    m_fftoutwow = nullptr;
+    m_wow_complex_out = nullptr;
     m_current_window_cache = nullptr;
     m_rms_fft = nullptr;
     m_fftplanwow = nullptr;

@@ -748,7 +748,7 @@ SDR_Scanner::compute_fft_window_corrections(double (*window_fn)(int, int), int n
 void
 SDR_Scanner::compute_fft(Scan_result& scan_result, Tuning_state* tuning_state)
 {
-	int i, bin_length, downsample, i1, i2, half_bandwidth, bin_count;
+	int i, bin_length, downsample, i1, i2, half_bandwidth, bin_count, count;
 	long tmp;
 	double dbm;
 	bin_length = 1 << tuning_state->bin_e;
@@ -757,7 +757,17 @@ SDR_Scanner::compute_fft(Scan_result& scan_result, Tuning_state* tuning_state)
 	if (tuning_state->bin_e > 0)
 	{
 		/* nuke DC component (not effective for all windows) */
-		tuning_state->avg[0] = tuning_state->avg[1];
+		if (m_settings.window_type == WINDOW_TYPE_RECTANGLE)
+		{
+			tuning_state->avg[0] = tuning_state->avg[1];
+		}
+		else 
+		{
+			tuning_state->avg[0] = tuning_state->avg[2];
+			tuning_state->avg[1] = tuning_state->avg[2];
+			tuning_state->avg[bin_length-1] = tuning_state->avg[bin_length-3];
+			tuning_state->avg[bin_length-2] = tuning_state->avg[bin_length-3];
+		}
 		/* FFT is translated by 180 degrees */
 		for (i=0; i < bin_length/2; i++)
 		{
@@ -778,32 +788,18 @@ SDR_Scanner::compute_fft(Scan_result& scan_result, Tuning_state* tuning_state)
 	// something seems off with the dbm math
 	i1 = 0 + (int)((double)bin_length * tuning_state->crop * 0.5);
 	i2 = (bin_length-1) - (int)((double)bin_length * tuning_state->crop * 0.5);
-	scan_result.buffer.resize(i2 - i1 + 2);
-	int count = 0;
-	for (i=i1; i<=i2; i++)
+	scan_result.buffer.resize(i2 - i1);
+
+	for (i=i1, count = 0; i<=i2; i++, count++)
 	{
 		dbm  = (double)tuning_state->avg[i];
 		dbm /= (double)tuning_state->rate;
 		dbm /= (double)tuning_state->samples;
 		dbm  = 10 * log10(dbm * m_window_amplitude_correction);
-		scan_result.buffer[count++] = dbm;
+		scan_result.buffer[count] = dbm;
 	}
 	
-	// Seems unnecessary 
-	// dbm = (double)tuning_state->avg[i2] / ((double)tuning_state->rate * (double)tuning_state->samples);
-	// if (tuning_state->bin_e == 0)
-	// {
-	// 	dbm = ((double)tuning_state->avg[0] / ((double)tuning_state->rate * (double)tuning_state->samples));
-	// }
-	
-	// dbm  = 10 * log10(dbm * m_window_amplitude_correction);
-	// scan_result.buffer[count++] = dbm;
-	
-	// for (i=0; i<bin_length; i++)
-	// {
-	// 	tuning_state->avg[i] = 0L;
-	// }
-	memset(tuning_state->avg, 0, bin_length*sizeof(tuning_state->avg));
+	memset(tuning_state->avg, 0, bin_length*sizeof(*tuning_state->avg));
 	tuning_state->samples = 0;
 }
 

@@ -14,6 +14,7 @@ class WowAndFluterThread : public ASyncTask
     std::vector<double> &m_wow_flutter_data_x;
     std::vector<double> m_signal_i;
     std::vector<double> m_signal_q;
+    std::vector<fftw_complex> m_signal_iq;
     float &m_wow_peak;
     float &m_wow_mean;
     int m_samplerate;
@@ -72,8 +73,10 @@ private:
             // real signal to IQ data
             for (int i = 0; i < actual_audio_length; ++i)
             {
-                m_signal_i[i] = m_longterm_audio[i] * cos(m_reference_frequency*double(i) * twopif_over_sr);
-                m_signal_q[i] = m_longterm_audio[i] * sin(m_reference_frequency*double(i) * twopif_over_sr);
+                double I = m_longterm_audio[i] * cos(m_reference_frequency*double(i) * twopif_over_sr);
+                double Q = m_longterm_audio[i] * sin(m_reference_frequency*double(i) * twopif_over_sr);
+                m_signal_i[i] = I;
+                m_signal_q[i] = Q;
             }
         m_mutex.unlock();
 
