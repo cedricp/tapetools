@@ -51,7 +51,7 @@ public:
 
     ~WowAndFluterThread()
     {
-        //m_chrono.print_elapsed_time("WF thread time : ");
+        m_chrono.print_elapsed_time("WF thread time : ");
     }
 
 private:

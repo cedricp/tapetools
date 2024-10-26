@@ -24,14 +24,15 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
 #include <rtl-sdr_export.h>
+#include <stdint.h>
 
 typedef struct rtlsdr_dev rtlsdr_dev_t;
+struct libusb_context;
 
-RTLSDR_API uint32_t rtlsdr_get_device_count(void);
+RTLSDR_API uint32_t rtlsdr_get_device_count(libusb_context* ctx);
 
-RTLSDR_API const char* rtlsdr_get_device_name(uint32_t index);
+RTLSDR_API const char* rtlsdr_get_device_name(uint32_t index, libusb_context* ctx);
 
 /*!
  * Get USB device strings.
@@ -47,7 +48,8 @@ RTLSDR_API const char* rtlsdr_get_device_name(uint32_t index);
 RTLSDR_API int rtlsdr_get_device_usb_strings(uint32_t index,
 					     char *manufact,
 					     char *product,
-					     char *serial);
+					     char *serial,
+						 libusb_context *ctx);
 
 /*!
  * Get device index by USB serial string descriptor.
@@ -58,7 +60,7 @@ RTLSDR_API int rtlsdr_get_device_usb_strings(uint32_t index,
  * \return -2 if no devices were found at all
  * \return -3 if devices were found, but none with matching name
  */
-RTLSDR_API int rtlsdr_get_index_by_serial(const char *serial);
+RTLSDR_API int rtlsdr_get_index_by_serial(const char *serial, libusb_context*);
 
 RTLSDR_API int rtlsdr_open(rtlsdr_dev_t **dev, uint32_t index);
 

@@ -12,6 +12,7 @@
 
 struct impl{
 	rtlsdr_dev_t *device;
+	libusb_context *usbctx;
 };
 
 #define BUFFER_DUMP	(1<<12)
@@ -21,20 +22,22 @@ RTL_Device::RTL_Device()
 	m_device_id = RTL_CONNECTION_ERROR;
 	m_impl = new impl;
 	m_impl->device = NULL;
+	libusb_init(&(m_impl->usbctx));
 }
 
 RTL_Device::~RTL_Device()
 {
 	if (m_device_id >= 0){
-
+		close_device();
 	}
+	libusb_exit(m_impl->usbctx);
 	delete m_impl;
 }
 
 int
 RTL_Device::get_device_count()
 {
-	return rtlsdr_get_device_count();
+	return rtlsdr_get_device_count(m_impl->usbctx);
 }
 
 int
@@ -267,7 +270,7 @@ std::string
 RTL_Device::get_name()
 {
 	if (m_device_id >= 0 && m_impl->device){
-		return rtlsdr_get_device_name(m_device_id);
+		return rtlsdr_get_device_name(m_device_id, m_impl->usbctx);
 	}
 	return "not_connected";
 }

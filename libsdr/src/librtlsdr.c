@@ -1339,16 +1339,13 @@ static rtlsdr_dongle_t *find_known_device(uint16_t vid, uint16_t pid)
 	return device;
 }
 
-uint32_t rtlsdr_get_device_count(void)
+uint32_t rtlsdr_get_device_count(libusb_context *ctx)
 {
 	int i;
-	libusb_context *ctx;
 	libusb_device **list;
 	uint32_t device_count = 0;
 	struct libusb_device_descriptor dd;
 	ssize_t cnt;
-
-	libusb_init(&ctx);
 
 	cnt = libusb_get_device_list(ctx, &list);
 
@@ -1361,22 +1358,18 @@ uint32_t rtlsdr_get_device_count(void)
 
 	libusb_free_device_list(list, 1);
 
-	libusb_exit(ctx);
-
 	return device_count;
 }
 
-const char *rtlsdr_get_device_name(uint32_t index)
+const char *rtlsdr_get_device_name(uint32_t index, libusb_context *ctx)
 {
 	int i;
-	libusb_context *ctx;
+	;
 	libusb_device **list;
 	struct libusb_device_descriptor dd;
 	rtlsdr_dongle_t *device = NULL;
 	uint32_t device_count = 0;
 	ssize_t cnt;
-
-	libusb_init(&ctx);
 
 	cnt = libusb_get_device_list(ctx, &list);
 
@@ -1395,8 +1388,6 @@ const char *rtlsdr_get_device_name(uint32_t index)
 
 	libusb_free_device_list(list, 1);
 
-	libusb_exit(ctx);
-
 	if (device)
 		return device->name;
 	else
@@ -1404,19 +1395,16 @@ const char *rtlsdr_get_device_name(uint32_t index)
 }
 
 int rtlsdr_get_device_usb_strings(uint32_t index, char *manufact,
-				   char *product, char *serial)
+				   char *product, char *serial, libusb_context *ctx)
 {
 	int r = -2;
 	int i;
-	libusb_context *ctx;
 	libusb_device **list;
 	struct libusb_device_descriptor dd;
 	rtlsdr_dongle_t *device = NULL;
 	rtlsdr_dev_t devt;
 	uint32_t device_count = 0;
 	ssize_t cnt;
-
-	libusb_init(&ctx);
 
 	cnt = libusb_get_device_list(ctx, &list);
 
@@ -1444,12 +1432,10 @@ int rtlsdr_get_device_usb_strings(uint32_t index, char *manufact,
 
 	libusb_free_device_list(list, 1);
 
-	libusb_exit(ctx);
-
 	return r;
 }
 
-int rtlsdr_get_index_by_serial(const char *serial)
+int rtlsdr_get_index_by_serial(const char *serial, libusb_context *ctx)
 {
 	int i, cnt, r;
 	char str[256];
@@ -1457,13 +1443,13 @@ int rtlsdr_get_index_by_serial(const char *serial)
 	if (!serial)
 		return -1;
 
-	cnt = rtlsdr_get_device_count();
+	cnt = rtlsdr_get_device_count(ctx);
 
 	if (!cnt)
 		return -2;
 
 	for (i = 0; i < cnt; i++) {
-		r = rtlsdr_get_device_usb_strings(i, NULL, NULL, str);
+		r = rtlsdr_get_device_usb_strings(i, NULL, NULL, str, ctx);
 		if (!r && !strcmp(serial, str))
 			return i;
 	}

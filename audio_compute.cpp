@@ -132,6 +132,11 @@ bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
         return false;
     }
 
+    if (!m_compute_on){
+        // Just consume data, if any
+        return false;
+    }
+
     const int fft_capture_size = m_capture_size / 2;
     const double current_sample_rate = m_audiorecorder.get_current_samplerate();
     const double half_sample_rate = current_sample_rate / 2.0;
@@ -198,7 +203,7 @@ bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
             double fftout = sqrt(m_fftoutl[i][0] * m_fftoutl[i][0] + m_fftoutl[i][1] * m_fftoutl[i][1]) * inv_fft_capture_size;
             fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
             fftout = std::max(20.0 * log10(fftout), -200.0);
-            m_fftdrawl[i] = isnan(fftout) ? -200.f : fftout;
+            m_fftdrawl[i] = std::isnan(fftout) ? -200.f : fftout;
             if (m_fft_channel_left) sum += fftout;
 
             if (channelcount > 1)
@@ -206,7 +211,7 @@ bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
                 double fftout = sqrt(m_fftoutr[i][0] * m_fftoutr[i][0] + m_fftoutr[i][1] * m_fftoutr[i][1]) * inv_fft_capture_size;
                 fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
                 fftout = std::max(20.0 * log10(fftout), -200.0);
-                m_fftdrawr[i] = isnan(fftout) ? -200.f : fftout;
+                m_fftdrawr[i] = std::isnan(fftout) ? -200.f : fftout;
                 if (m_fft_channel_right) sum += fftout;
             }
         }

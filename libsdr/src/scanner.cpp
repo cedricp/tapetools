@@ -787,10 +787,10 @@ SDR_Scanner::compute_fft(Scan_result& scan_result, Tuning_state* tuning_state)
 
 	// something seems off with the dbm math
 	i1 = 0 + (int)((double)bin_length * tuning_state->crop * 0.5);
-	i2 = (bin_length-1) - (int)((double)bin_length * tuning_state->crop * 0.5);
+	i2 = (bin_length-1) - (int)((double)bin_length * tuning_state->crop * 0.5) + 1;
 	scan_result.buffer.resize(i2 - i1);
 
-	for (i=i1, count = 0; i<=i2; i++, count++)
+	for (i=i1, count = 0; i<i2; i++, count++)
 	{
 		dbm  = (double)tuning_state->avg[i];
 		dbm /= (double)tuning_state->rate;
