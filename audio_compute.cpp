@@ -3,6 +3,15 @@
 #include "wow_flutter_thread.h"
 #include <complex>
 
+void wait_wow_thread()
+{
+    App_SDL::get()->release_finished_threads();
+    if(App_SDL::get()->get_thread("WFtask")){
+        // Check is previous thread has terminated, if not, reject these samples to not overload
+        return;
+    }
+}
+
 void AudioToolWindow::compute_fft_window_cache()
 {
     if (m_current_window_cache != nullptr) delete[] m_current_window_cache;
@@ -271,11 +280,7 @@ void AudioToolWindow::compute_wow_and_flutter()
         return;
     }
 
-    App_SDL::get()->release_finished_threads();
-    if(App_SDL::get()->get_thread("WFtask")){
-        // Check is previous thread has terminated, if not, reject these samples to not overload
-        return;
-    }
+    wait_wow_thread();
 
     int reference_frequency = 3000;
     if (m_wow_test_frequency == 1) reference_frequency = 3150;
@@ -461,7 +466,7 @@ void AudioToolWindow::init_capture()
     int capture_size = m_audiorecorder.get_buffer_size(float(m_recorder_latency_ms) / 1000.f, false);
     int samplerate = m_audiorecorder.get_current_samplerate();
     if (capture_size == 0) return;
-    
+
     destroy_capture();
     m_capture_size = capture_size;
     int fft_capture_size = capture_size / 2;
@@ -506,10 +511,7 @@ void AudioToolWindow::init_capture()
 void AudioToolWindow::destroy_capture()
 {
     // Wait WowAndFlutter thread to finish before releasing memory
-    while(App_SDL::get()->get_thread("WFtask"))
-    {
-        App_SDL::get()->release_finished_threads();
-    }
+    wait_wow_thread();
 
     if (m_fftplanr) fftw_destroy_plan(m_fftplanr);
     if (m_fftplanl) fftw_destroy_plan(m_fftplanl);
