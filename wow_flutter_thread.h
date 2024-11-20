@@ -84,7 +84,7 @@ private:
         double *lp_chans[2] = {m_signal_i.data(), m_signal_q.data()};
         m_iq_lowpass_filter.process(actual_audio_length, lp_chans);
 
-        int decimated_size = actual_audio_length / m_decimation;
+        int decimated_size = m_wow_flutter_data.size();
         int decimated_samplerate = m_samplerate / WOW_FLUTTER_DECIMATION;
         double phase_to_hz = (m_samplerate / (M_PI * 2.));
 
@@ -98,6 +98,10 @@ private:
                 // Convert phase difference to Hertz
                 m_wow_flutter_data[i] = phase_diff * phase_to_hz;
                 m_wow_flutter_data_x[i] = (double)step_i_x * inv_current_samplerate;
+                if (i >= m_wow_flutter_data.size()){
+                    int a = 0;
+                    continue;
+                }
             }
 
             if(m_filter_freq > 0)

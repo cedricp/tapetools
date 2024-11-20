@@ -5,10 +5,10 @@
 
 void wait_wow_thread()
 {
-    App_SDL::get()->release_finished_threads();
-    if(App_SDL::get()->get_thread("WFtask")){
+    while(App_SDL::get()->get_thread("WFtask")){
+        App_SDL::get()->release_finished_threads();
         // Check is previous thread has terminated, if not, reject these samples to not overload
-        return;
+        usleep(100000);
     }
 }
 
@@ -280,7 +280,11 @@ void AudioToolWindow::compute_wow_and_flutter()
         return;
     }
 
-    wait_wow_thread();
+    App_SDL::get()->release_finished_threads();
+    if(App_SDL::get()->get_thread("WFtask")){
+        // Check is previous thread has terminated, if not, reject these samples to not overload
+        return;
+    }
 
     int reference_frequency = 3000;
     if (m_wow_test_frequency == 1) reference_frequency = 3150;
@@ -492,6 +496,8 @@ void AudioToolWindow::init_capture()
     m_wow_flutter_data.resize(m_wow_flutter_capture_size);
     m_wow_flutter_data_x.resize(m_wow_flutter_capture_size);
 
+    std::fill(m_wow_flutter_data.begin(), m_wow_flutter_data.end(), 0.);
+
     int fft_flags = FFTW_PRESERVE_INPUT;
 
     if (m_optimized_fft) fft_flags |= FFTW_MEASURE;
@@ -546,6 +552,8 @@ void AudioToolWindow::destroy_capture()
 
 void AudioToolWindow::reinit_recorder()
 {
+    m_audiorecorder.pause(true);
+    
     if (m_audio_in_idx < 0) return;
     if (m_audiomanager.get_input_sample_rates(m_audio_in_idx).empty()) return;
 
@@ -554,14 +562,14 @@ void AudioToolWindow::reinit_recorder()
         m_in_sample_rate_idx = 0;
         printf("Cannot set recorder samplerate to requested value\n");
     }
-    int samplerate = m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate_idx];
 
+    init_capture();
+
+    int samplerate = m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate_idx];
     if (m_audiorecorder.init(float(m_recorder_latency_ms) / 1000.f, m_audio_in_idx, samplerate))
     {
         m_audiorecorder.start();
     }
-
-    init_capture();
 
     m_audiorecorder.pause(!m_compute_on);
 }

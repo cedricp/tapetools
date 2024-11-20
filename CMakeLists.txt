@@ -44,15 +44,19 @@ set(PLATFORM_LIBS shlwapi)
 target_sources(tapetools PRIVATE resources/tapetools.rc)
 endif()
 
-target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} rtlsdr_static dsp_static audio_static imgui_static utils_static $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS})
-
 if(MINGW)
     set(LINKFLAGS "-static-libgcc -static-libstdc++")
     if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
         set(LINKFLAGS "${LINKFLAGS} -mwindows")   
     endif()
     set_target_properties(tapetools PROPERTIES LINK_FLAGS "${LINKFLAGS}")
+else()
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    #set(DBG_LIBS "-lefence")
+    endif()
 endif(MINGW)
+
+target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} rtlsdr_static dsp_static audio_static imgui_static utils_static $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS} ${DBG_LIBS})
 
 # Install rules
 
