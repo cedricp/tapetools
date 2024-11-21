@@ -130,7 +130,7 @@ private:
 
             fftw_execute(m_wowfftplan);
 
-            const int fftdraw_size = (decimated_samplerate * (WOW_FLUTTER_ANALYSIS_TIME - 0.5f)) / 2.;
+            const int fftdraw_size = (decimated_samplerate * (WOW_FLUTTER_ANALYSIS_TIME - 0.5f)) / 2;
             const double inv_fft_capture_size = 1./fftdraw_size;
             const double fft_step = (decimated_samplerate / 2.) * inv_fft_capture_size;
 

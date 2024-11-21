@@ -538,6 +538,12 @@ void AudioToolWindow::draw_rt_analysis_tab()
     float frameh = ImGui::GetFrameHeightWithSpacing();
     float padh = 3.0f * ImGui::GetStyle().FramePadding.y + ImGui::GetStyle().ItemSpacing.y;
 
+    static int gen_mode_idx = 0;
+    const char* generator_presets[] = {"Sine","White noise", "Brown noise"};
+    static int fm_freq = 0;
+    static float fm_vol = 1;
+    static bool fm_enable = false;
+    
     /*
     * Tone Generator
     */
@@ -546,18 +552,27 @@ void AudioToolWindow::draw_rt_analysis_tab()
         ImGui::BeginChild("ScopesChildToneGen", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_None);
 
         ImGui::BeginChild("ScopesChildTonGenSwitch", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::SetNextItemWidth(170);
+        if (ImGui::Combo("Generator type", &gen_mode_idx, generator_presets, 3))
+        {
+            m_sine_generator.set_mode(gen_mode_idx);
+        }
+        ImGui::SameLine();
         if(ImGui::ToggleButton("Tone generator", &m_sine_generator_switch))
         {
             reset_sine_generator();
         }
-        ImGui::SetItemTooltip("Sine generator ON/OFF");
+        ImGui::SetItemTooltip("Waveform generator ON/OFF");
 
-        ImGui::SameLine();
-        if (ImGui::SliderInt("Pitch", &m_pitch, 20, 20000))
+        if (gen_mode_idx == audioWaveformGenerator::SINE)
         {
-            m_sine_generator.set_pitch(m_pitch);
+            ImGui::SameLine();
+            if (ImGui::SliderInt("Pitch", &m_sine_generator_pitch, 20, 20000))
+            {
+                m_sine_generator.set_pitch(m_sine_generator_pitch);
+            }
+            ImGui::SetItemTooltip("Set the pitch of the sine generator");
         }
-        ImGui::SetItemTooltip("Set the pitch of the sine generator");
         ImGui::EndChild();
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
@@ -568,36 +583,39 @@ void AudioToolWindow::draw_rt_analysis_tab()
         ImGui::SetItemTooltip("Set the generator intensity");
         ImGui::EndChild();
 
-        static int fm_freq = 0;
-        static float fm_vol = 1;
-        static bool fm_enable = false;
-
-        ImGui::SameLine();
-        ImGui::BeginChild("ScopesChildFMTone", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        if (ImGui::ToggleButton("FM", &fm_enable))
-        {
-            if (!fm_enable)
-            {
-                fm_freq = fm_vol = 0;
-            }
-        }
-        if (fm_enable)
+        if(gen_mode_idx == audioWaveformGenerator::SINE)
         {
             ImGui::SameLine();
-            if (ImGui::SliderInt("FM frequency", &fm_freq, 0, 10000, "%d Hz"))
+            ImGui::BeginChild("ScopesChildFMTone", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            if (ImGui::ToggleButton("FM", &fm_enable))
             {
-                m_sine_generator.set_fm(fm_freq, fm_vol);
+                if (!fm_enable)
+                {
+                    m_sine_generator.set_fm(0, 0);
+                } else {
+                    m_sine_generator.set_fm(fm_freq, fm_vol);
+                }
             }
-            ImGui::SetItemTooltip("Set the FM modulation signal frequency");
+            if (fm_enable)
+            {
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(80);
+                if (ImGui::SliderInt("FM frequency", &fm_freq, 0, 5000, "%d Hz"))
+                {
+                    m_sine_generator.set_fm(fm_freq, fm_vol);
+                }
+                ImGui::SetItemTooltip("Set the FM modulation signal frequency");
 
-            ImGui::SameLine();
-            if (ImGui::SliderFloat("FM intensity", &fm_vol, 0, 100))
-            {
-                m_sine_generator.set_fm(fm_freq, fm_vol);
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(80);
+                if (ImGui::SliderFloat("FM intensity", &fm_vol, 0, 100))
+                {
+                    m_sine_generator.set_fm(fm_freq, fm_vol);
+                }
+                ImGui::SetItemTooltip("Set the FM modulation signal frequency");
             }
-            ImGui::SetItemTooltip("Set the FM modulation signal frequency");
+            ImGui::EndChild();
         }
-        ImGui::EndChild();
 
         ImGui::EndChild();
     }

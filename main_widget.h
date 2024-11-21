@@ -19,13 +19,13 @@ const int    WOW_FLUTTER_DECIMATION = 20;
 class AudioToolWindow : public Widget
 {
     audioManager        m_audiomanager;
-    audioSineGenerator  m_sine_generator;
+    audioWaveformGenerator  m_sine_generator;
     audioRecorder       m_audiorecorder;
 
     int  m_uitheme = 0;
     
     bool m_sine_generator_switch = false;
-    int  m_pitch = 1000;
+    int  m_sine_generator_pitch = 1000;
     float m_sinegen_latency_s = 0.1f;
     int m_recorder_latency_ms = 100;
     int m_sine_volume_db = 0.f;
@@ -37,6 +37,7 @@ class AudioToolWindow : public Widget
     std::string m_output_device;
     
     std::vector<double> m_sound_data1, m_sound_data2;
+    // 5 seconds buffer for wow/flutter
     std::vector<double> m_longterm_audio;
     std::vector<double> m_wow_flutter_data, m_wow_flutter_data_x;
     std::vector<double> m_sound_data_x;
@@ -121,10 +122,6 @@ class AudioToolWindow : public Widget
     double  m_locked_db_value = 0.0;
     int     m_current_db_target_channel = 0;
 
-    int     m_zscore_lag = 17;
-    float   m_zscore_influence = 0.5;
-    float   m_zscore_threshold = 3.0;
-    bool    m_show_zscore_settings = false;
     bool    m_optimized_fft = false;
 
     int     m_wow_test_frequency = 1;
@@ -556,8 +553,8 @@ public:
 
     bool check_data_buffer()
     {
-        int wanted_buffer = m_capture_size * m_audiorecorder.get_channel_count();
-        if (m_audiorecorder.get_available_samples() >= wanted_buffer)
+        int min_wanted_buffer_size = m_capture_size * m_audiorecorder.get_channel_count();
+        if (m_audiorecorder.get_available_samples() >= min_wanted_buffer_size)
         {
             bool computed = compute();
             if (computed)

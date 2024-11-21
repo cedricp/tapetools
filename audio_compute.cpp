@@ -183,7 +183,7 @@ bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
 
     if (m_show_wow_flutter){
         // Audio data ready, launch W&F measurement as soon as possible in parallel
-            compute_wow_and_flutter();
+        compute_wow_and_flutter();
     }
 
     detect_periods();
@@ -276,13 +276,13 @@ void AudioToolWindow::compute_wow_and_flutter()
 
     if (m_longterm_audio.size() < audio_capture_length)
     {
-        // Wait buffer to be filled
+        // Wait buffer to be completly filled
         return;
     }
 
     App_SDL::get()->release_finished_threads();
     if(App_SDL::get()->get_thread("WFtask")){
-        // Check is previous thread has terminated, if not, reject these samples to not overload
+        // Check is previous thread has terminated, if not, reject these samples to not overload the UI
         return;
     }
 
@@ -497,6 +497,7 @@ void AudioToolWindow::init_capture()
     m_wow_flutter_data_x.resize(m_wow_flutter_capture_size);
 
     std::fill(m_wow_flutter_data.begin(), m_wow_flutter_data.end(), 0.);
+    std::fill(m_fftdrawwow.begin(), m_fftdrawwow.end(), 0.);
 
     int fft_flags = FFTW_PRESERVE_INPUT;
 
@@ -563,13 +564,13 @@ void AudioToolWindow::reinit_recorder()
         printf("Cannot set recorder samplerate to requested value\n");
     }
 
-    init_capture();
-
     int samplerate = m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate_idx];
     if (m_audiorecorder.init(float(m_recorder_latency_ms) / 1000.f, m_audio_in_idx, samplerate))
     {
         m_audiorecorder.start();
     }
+
+    init_capture();
 
     m_audiorecorder.pause(!m_compute_on);
 }
@@ -586,7 +587,7 @@ void AudioToolWindow::reset_sine_generator()
     int current_sine_samplerate = m_audiomanager.get_output_sample_rates(m_audio_out_idx)[m_out_sample_rate_idx];
     m_sine_generator.destroy();
     m_sine_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, m_sinegen_latency_s);
-    m_sine_generator.set_pitch(m_pitch);
+    m_sine_generator.set_pitch(m_sine_generator_pitch);
     m_sine_generator.start();
     m_sine_generator.pause(!m_sine_generator_switch);
 }

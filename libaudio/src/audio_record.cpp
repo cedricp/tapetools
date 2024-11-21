@@ -63,7 +63,6 @@ bool audioRecorder::init(float latency, int device_idx, int samplerate)
 
     int capacity = get_buffer_size(latency) * m_instream->bytes_per_sample;
     m_ring_buffer = m_manager.get_new_ringbuffer(capacity*4);
-    m_actual_capacity = capacity;
 
     return true;
 }
