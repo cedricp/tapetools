@@ -19,16 +19,16 @@ const int    WOW_FLUTTER_DECIMATION = 20;
 class AudioToolWindow : public Widget
 {
     audioManager        m_audiomanager;
-    audioWaveformGenerator  m_sine_generator;
+    audioWaveformGenerator  m_signal_generator;
     audioRecorder       m_audiorecorder;
 
     int  m_uitheme = 0;
     
-    bool m_sine_generator_switch = false;
-    int  m_sine_generator_pitch = 1000;
-    float m_sinegen_latency_s = 0.1f;
+    bool m_signal_generator_switch = false;
+    int  m_signal_generator_pitch = 1000;
+    float m_signalgen_latency_s = 0.1f;
     int m_recorder_latency_ms = 100;
-    int m_sine_volume_db = 0.f;
+    int m_signalgen_volume_db = 0.f;
     
     int m_audio_out_idx = -1;
     int m_audio_in_idx = -1;
@@ -161,9 +161,9 @@ class AudioToolWindow : public Widget
             double newlogfreq = log10(m_sweep_current_frequency) + step;
 
             m_sweep_current_frequency = pow(10., newlogfreq);
-            m_sine_generator.set_pitch(m_sweep_current_frequency);
+            m_signal_generator.set_pitch(m_sweep_current_frequency);
 
-            if (m_sweep_current_frequency >= 20000)
+            if (m_sweep_current_frequency >= 22000)
             {   
                 // We reached the end of the measure
                 stop_sweep_gen();
@@ -176,43 +176,42 @@ class AudioToolWindow : public Widget
             {
                 if (current_fft_draw[i] > fft_max_val)
                 {
-                    // TODO : Check selected channel 
                     fft_max_val = current_fft_draw[i];
                     frequency = double(i) / fft_step;
                 }
             }
-            if (frequency < 0)
+            if (frequency > 0)
             {
-                return;
-            }
-            int sweep_values_index = 0;
-            bool found_bin = false;
-            for (auto freq : m_sweep_freqs)
-            {
-                double freq_low = freq-(freq*0.1);
-                double freq_hi  = freq+(freq*0.1);
-                if (frequency > freq_low && frequency < freq_hi)
+                bool found_bin = false;
+                int sweep_values_index = 0;
+                for (auto freq : m_sweep_freqs)
                 {
-                    if (m_sweep_values[sweep_values_index] < fft_max_val)
-                    m_sweep_values[sweep_values_index] = fft_max_val;
-                    found_bin = true;
-                    break;
+                    double freq_low = freq-(freq*0.1);
+                    double freq_hi  = freq+(freq*0.1);
+                    if (frequency > freq_low && frequency < freq_hi)
+                    {
+                        //if (m_sweep_values[sweep_values_index] < fft_max_val){
+                            m_sweep_values[sweep_values_index] = fft_max_val;
+                            found_bin = true;
+                            break;
+                        //}
+                    }
+                    if (freq > frequency && sweep_values_index >= 0)
+                    {
+                        m_sweep_values.insert(m_sweep_values.begin() + sweep_values_index, fft_max_val);
+                        m_sweep_freqs.insert(m_sweep_freqs.begin() + sweep_values_index, frequency);
+                        found_bin = true;
+                        break;
+                    }
+                    sweep_values_index++;
                 }
-                if (freq > frequency && sweep_values_index >= 0)
+                if (!found_bin)
                 {
-                    m_sweep_values.insert(m_sweep_values.begin() + sweep_values_index, fft_max_val);
-                    m_sweep_freqs.insert(m_sweep_freqs.begin() + sweep_values_index, frequency);
-                    found_bin = true;
-                    break;
+                    m_sweep_values.push_back(fft_max_val);
+                    m_sweep_freqs.push_back(frequency);
                 }
-                sweep_values_index++;
+                m_sweep_last_measure_freq = frequency > m_sweep_last_measure_freq ? frequency : m_sweep_last_measure_freq;
             }
-            if (!found_bin)
-            {
-                m_sweep_values.push_back(fft_max_val);
-                m_sweep_freqs.push_back(frequency);
-            }
-            m_sweep_last_measure_freq = frequency > m_sweep_last_measure_freq ? frequency : m_sweep_last_measure_freq;
         }
         
         m_sweep_timer.start();
@@ -243,7 +242,7 @@ class AudioToolWindow : public Widget
     {
         set_sound_config();
         reinit_recorder();
-        reset_sine_generator();
+        reset_signal_generator();
     }
 
     void detect_periods();
@@ -269,7 +268,7 @@ public:
 
     virtual ~AudioToolWindow()
     {
-        m_sine_generator.destroy();
+        m_signal_generator.destroy();
         m_sdr_thread.stop();
         m_sdr_thread.join();
         destroy_capture();
@@ -278,7 +277,7 @@ public:
     void destroy_capture();
     void init_capture();
     void reinit_recorder();
-    void reset_sine_generator();
+    void reset_signal_generator();
 
     void set_theme()
     {
@@ -373,9 +372,13 @@ public:
         m_sweep_current_frequency = 20;
         m_sweep_freqs.clear();
         m_sweep_values.clear();
-        m_sine_generator_switch = true;
-        reset_sine_generator();
-        m_sine_generator.set_pitch(m_sweep_current_frequency);
+        if (!m_async_sweep)
+        {
+            m_signal_generator_switch = true;
+            reset_signal_generator();
+            m_signal_generator.set_pitch(m_sweep_current_frequency);
+            m_signal_generator.set_mode(audioWaveformGenerator::SINE);
+        }
         m_sweep_timer.start();
         m_sweep_last_measure_freq = 10;
     }
@@ -383,8 +386,8 @@ public:
     void stop_sweep_gen()
     {
         m_sweep_started = false;
-        m_sine_generator_switch = false;
-        m_sine_generator.pause();
+        m_signal_generator_switch = false;
+        m_signal_generator.pause();
         m_sweep_timer.stop();
     }
 
@@ -423,13 +426,13 @@ public:
                 {
                     m_audio_out_idx = m_audiomanager.get_output_device_map(m_combo_out);
                     m_output_device = out_devices[m_combo_out];
-                    reset_sine_generator();
+                    reset_signal_generator();
                 }
                 ImGui::SameLine();
                 const std::vector<std::string> out_samplerate = m_audio_out_idx >= 0 ? m_audiomanager.get_output_sample_rates_str(m_audio_out_idx) : std::vector<std::string>();
                 if (ImGui::Combo("Samplerate##1", &m_out_sample_rate_idx, vector_getter, (void*)&out_samplerate, out_samplerate.size()))
                 {
-                    reset_sine_generator();
+                    reset_signal_generator();
                 }
                 
                 ImGui::SeparatorText("Input device");

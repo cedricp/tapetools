@@ -575,7 +575,7 @@ void AudioToolWindow::reinit_recorder()
     m_audiorecorder.pause(!m_compute_on);
 }
 
-void AudioToolWindow::reset_sine_generator()
+void AudioToolWindow::reset_signal_generator()
 {
     if (m_audiomanager.get_output_sample_rates(m_audio_out_idx).empty()) return;
 
@@ -585,9 +585,9 @@ void AudioToolWindow::reset_sine_generator()
         printf("Cannot set player samplerate to requested value\n");
     }
     int current_sine_samplerate = m_audiomanager.get_output_sample_rates(m_audio_out_idx)[m_out_sample_rate_idx];
-    m_sine_generator.destroy();
-    m_sine_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, m_sinegen_latency_s);
-    m_sine_generator.set_pitch(m_sine_generator_pitch);
-    m_sine_generator.start();
-    m_sine_generator.pause(!m_sine_generator_switch);
+    m_signal_generator.destroy();
+    m_signal_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, m_signalgen_latency_s);
+    m_signal_generator.set_pitch(m_signal_generator_pitch);
+    m_signal_generator.start();
+    m_signal_generator.pause(!m_signal_generator_switch);
 }

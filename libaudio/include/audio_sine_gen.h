@@ -37,4 +37,5 @@ public:
     void set_fm(double pitch,double vol){m_fm_freq = pitch; m_fm_strength = vol;}
 
     void set_mode(int m){m_mode = m;}
+    int& mode(){return m_mode;};
 };
