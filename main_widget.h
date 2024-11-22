@@ -410,6 +410,7 @@ public:
     void draw_voltmeter_widget(int channel_count);
     void draw_audio_fft_widget(int channelcount, int current_sample_rate, int plotheight);
     void draw_channels_phase_widget(int plotheight);
+    void draw_tone_generator();
 
     void draw_tools_windows()
     {

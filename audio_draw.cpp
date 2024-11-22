@@ -25,6 +25,8 @@ void AudioToolWindow::draw_sweep_tab()
 
     ImGui::BeginChild("ScopesChild1", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
 
+    draw_tone_generator();
+
     ImGui::BeginChild("ScopesChild2", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
     if (!m_sweep_started)
     {
@@ -418,7 +420,7 @@ void AudioToolWindow::draw_voltmeter_widget(int channelcount)
 
 void AudioToolWindow::draw_audio_fft_widget(int channelcount, int current_sample_rate, int plotheight)
 {
-if (ImPlot::BeginPlot("Audio FFT", ImVec2(m_compute_channel_phase ? width() - plotheight * 1.5f - 10 : -1, -1)))
+    if (ImPlot::BeginPlot("Audio FFT", ImVec2(m_compute_channel_phase ? width() - plotheight * 1.5f - 10 : -1, -1)))
     {
         bool calibration_active = m_rms_calibration_scale != 1.0;
         double* fft_draw = m_fft_channel_left  ? m_fftdrawl : m_fftdrawr;
@@ -532,26 +534,18 @@ void AudioToolWindow::draw_channels_phase_widget(int plotheight)
     }
 }
 
-void AudioToolWindow::draw_rt_analysis_tab()
+void AudioToolWindow::draw_tone_generator()
 {
-    int channelcount = m_audiorecorder.get_channel_count(); 
-    float current_sample_rate = m_audiorecorder.get_current_samplerate();
-    bool must_reinit_recorder = false;
-
-    float frameh = ImGui::GetFrameHeightWithSpacing();
-    float padh = 3.0f * ImGui::GetStyle().FramePadding.y + ImGui::GetStyle().ItemSpacing.y;
-
+    
     const char* generator_presets[] = {"Sine","White noise", "Brown noise"};
     static int fm_freq = 0;
     static float fm_vol = 1;
     static bool fm_enable = false;
 
-    /*
-    * Tone Generator
-    */
     if (!m_sweep_started || m_async_sweep)
     {
         ImGui::BeginChild("ScopesChildToneGen", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_None);
+        TextCenter("Signal generator");
 
         ImGui::BeginChild("ScopesChildTonGenSwitch", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(170);
@@ -621,11 +615,19 @@ void AudioToolWindow::draw_rt_analysis_tab()
 
         ImGui::EndChild();
     }
+}
 
+void AudioToolWindow::draw_rt_analysis_tab()
+{
+    int channelcount = m_audiorecorder.get_channel_count(); 
+    float current_sample_rate = m_audiorecorder.get_current_samplerate();
+    bool must_reinit_recorder = false;
 
-    /*
-    * Time domain analysis
-    */
+    float frameh = ImGui::GetFrameHeightWithSpacing();
+    float padh = 3.0f * ImGui::GetStyle().FramePadding.y + ImGui::GetStyle().ItemSpacing.y;
+
+    draw_tone_generator();
+
     ImGui::BeginChild("ScopesChildMain", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
     float plotheight = height() / 2.0f - 5.f;
 
