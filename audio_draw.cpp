@@ -332,12 +332,16 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
     else
     if (ImPlot::BeginPlot("Wow and flutter FFT analysis", ImVec2(plotheight*1.8, -1)))
     {
-        const double max_frequency = current_sample_rate / WOW_FLUTTER_DECIMATION / 2.;
+        double max_frequency = current_sample_rate / WOW_FLUTTER_DECIMATION / 2.;
+        if (m_wf_filter_freq_combo == 1) max_frequency = 10.;
+        else if (m_wf_filter_freq_combo == 2) max_frequency = 25.;
+        else if (m_wf_filter_freq_combo == 3) max_frequency = 110;
+
         const double drift_percent = max_fft_freq / ref_frequency * 100.;
         ImPlot::SetupAxes("Frequency (Hz)", "Freqency drift (Hz)", 0, ImPlotAxisFlags_Lock);
         ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_SymLog);
         ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0.2, max_frequency);
-        ImPlot::SetupAxisLimits(ImAxis_X1, 0.2, max_frequency, 0);
+        ImPlot::SetupAxisLimits(ImAxis_X1, 0.2, max_frequency, ImPlotCond_Always);
         ImPlot::SetupAxisLimits(ImAxis_Y1, 0, max_fft_freq, ImPlotCond_Always);
         ImPlot::SetupAxis(ImAxis_Y2, "Drift %", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
         ImPlot::SetupAxisLimits(ImAxis_Y2, 0, drift_percent, ImPlotCond_Always);

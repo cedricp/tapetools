@@ -291,7 +291,7 @@ void AudioToolWindow::compute_wow_and_flutter()
     else if (m_wow_test_frequency == 2) reference_frequency = m_wow_test_frequency_custom;
 
     // Launch thread
-    WowAndFluterThread* wt = new WowAndFluterThread(*this, reference_frequency);
+    WowAndFluterThread* wt = new WowAndFluterThread(*this, reference_frequency, samplerate);
     wt->start();
 }
 

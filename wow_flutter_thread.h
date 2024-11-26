@@ -28,21 +28,21 @@ class WowAndFluterThread : public ASyncTask
 
     fftw_plan& m_wowfftplan;
     std::vector<double>& m_wow_fftdrawout;
-    std::vector<double>& m_wow_fftfreqs;
-    fftw_complex* m_wow_fftout;
+    std::vector<double>& m_wow_fftwowdrawfreqs;
+    fftw_complex* m_wow_complex_fftout;
 
     // Objects
     Dsp::SimpleFilter <Dsp::ChebyshevI::LowPass <4>, 2> m_iq_lowpass_filter;
     Dsp::SimpleFilter <Dsp::ChebyshevI::LowPass <4>, 1> m_wf_lowpass_filter;
     ThreadMutex& m_mutex;
 public:
-    WowAndFluterThread(AudioToolWindow& mainwin, int ref_frequency) : ASyncTask("WFtask"),
+    WowAndFluterThread(AudioToolWindow& mainwin, int ref_frequency, int samplerate) : ASyncTask("WFtask"),
         m_longterm_audio(mainwin.m_longterm_audio), m_wow_flutter_data(mainwin.m_wow_flutter_data),
         m_wow_flutter_data_x(mainwin.m_wow_flutter_data_x), m_wow_peak(mainwin.m_wow_peak_detection),
-        m_samplerate(mainwin.m_capture_size), m_analysis_time_s(WOW_FLUTTER_ANALYSIS_TIME), m_decimation(WOW_FLUTTER_DECIMATION),
+        m_samplerate(samplerate), m_analysis_time_s(WOW_FLUTTER_ANALYSIS_TIME), m_decimation(WOW_FLUTTER_DECIMATION),
         m_reference_frequency(ref_frequency), m_mutex(mainwin.m_wow_data_mutex), m_wow_mean(mainwin.m_wow_mean),
-        m_wowfftplan(mainwin.m_fftplanwow), m_wow_fftdrawout(mainwin.m_fftdrawwow), m_wow_fftout(mainwin.m_wow_complex_out),
-        m_wow_fftfreqs(mainwin.m_fftwowdrawfreqs)
+        m_wowfftplan(mainwin.m_fftplanwow), m_wow_fftdrawout(mainwin.m_fftdrawwow), m_wow_complex_fftout(mainwin.m_wow_complex_out),
+        m_wow_fftwowdrawfreqs(mainwin.m_fftwowdrawfreqs)
     {
         switch (mainwin.m_wf_filter_freq_combo){
             case 1:
@@ -55,7 +55,7 @@ public:
             m_filter_freq = 100;
             break;
             default:
-            m_filter_freq = 6;
+            m_filter_freq = 0;
             break;
         }
     }
@@ -147,9 +147,9 @@ private:
 
             for(int i = 0; i < fftdraw_size; ++i)
             {
-                double fftout = sqrt(m_wow_fftout[i][0] * m_wow_fftout[i][0] + m_wow_fftout[i][1] * m_wow_fftout[i][1]) * inv_fft_capture_size;
+                double fftout = sqrt(m_wow_complex_fftout[i][0] * m_wow_complex_fftout[i][0] + m_wow_complex_fftout[i][1] * m_wow_complex_fftout[i][1]) * inv_fft_capture_size;
                 m_wow_fftdrawout[i] = fftout;
-                m_wow_fftfreqs[i] = fft_step * i;
+                m_wow_fftwowdrawfreqs[i] = fft_step * i;
             }
 
             // Normalize DC component
