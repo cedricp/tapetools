@@ -28,92 +28,92 @@ void AudioToolWindow::draw_sweep_tab()
     draw_tone_generator();
 
     ImGui::BeginChild("ScopesChild2", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-    if (!m_sweep_started)
-    {
-        if (ImGui::Button("Start"))
+        if (!m_sweep_started)
         {
-            start_sweep_gen();
+            if (ImGui::Button("Start"))
+            {
+                start_sweep_gen();
+            }
+            ImGui::SameLine();
+            ImGui::ToggleButton("Async", &m_async_sweep);
+        } else {
+            if (ImGui::Button("Stop"))
+            {
+                stop_sweep_gen();
+            }
         }
-        ImGui::SameLine();
-        ImGui::ToggleButton("Async", &m_async_sweep);
-    } else {
-        if (ImGui::Button("Stop"))
-        {
-            stop_sweep_gen();
-        }
-    }
-    ImGui::SetItemTooltip("Switch between synchronous and asynchronous capture");
+        ImGui::SetItemTooltip("Switch between synchronous and asynchronous capture");
     ImGui::EndChild();
 
     if (!m_async_sweep)
     {
         ImGui::SameLine();
         ImGui::BeginChild("FFTChildToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::SetNextItemWidth(70);
-        if (ImGui::SliderInt("Tone power", &m_signalgen_volume_db, -100, 0, "%d dB"))
-        {
-            m_signal_generator.set_volume(m_signalgen_volume_db);
-        }
-        ImGui::SetItemTooltip("Set audio tone power");
+            ImGui::SetNextItemWidth(70);
+            if (ImGui::SliderInt("Tone power", &m_signalgen_volume_db, -100, 0, "%d dB"))
+            {
+                m_signal_generator.set_volume(m_signalgen_volume_db);
+            }
+            ImGui::SetItemTooltip("Set audio tone power");
         ImGui::EndChild();
     }
 
     ImGui::SameLine();
     ImGui::BeginChild("ScopesChild3", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-    ImGui::ToggleButton("Log scale frequency", &m_logscale_frequency);
-    ImGui::SetItemTooltip("Set log scale frequency axis");
+        ImGui::ToggleButton("Log scale frequency", &m_logscale_frequency);
+        ImGui::SetItemTooltip("Set log scale frequency axis");
     ImGui::EndChild();
 
     if (!m_async_sweep)
     {
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChild4", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::SetNextItemWidth(70);
-        if(ImGui::DragInt("Delay (ms)", &m_measure_delay, 1.f, m_recorder_latency_ms * 2, 3000))
-        {
-            // Set a comfortable time amount to let the FFT settle (at leat 400ms for 200ms latency)
-            m_sweep_timer.set(m_measure_delay);
-        }
-        ImGui::SetItemTooltip("Delay between tone change and capture, not set too low");
+            ImGui::SetNextItemWidth(70);
+            if(ImGui::DragInt("Delay (ms)", &m_measure_delay, 1.f, m_recorder_latency_ms * 2, 3000))
+            {
+                // Set a comfortable time amount to let the FFT settle (at leat 400ms for 200ms latency)
+                m_sweep_timer.set(m_measure_delay);
+            }
+            ImGui::SetItemTooltip("Delay between tone change and capture, not set too low");
         ImGui::EndChild();
 
         ImGui::SameLine();
-        ImGui::BeginChild("ScopesChildSpan", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::SetNextItemWidth(70);
-        ImGui::DragInt("Sweep capture #", &m_sweep_capture_num, 10.f, 10, 500);
-        ImGui::SetItemTooltip("Number of measurement points");
+            ImGui::BeginChild("ScopesChildSpan", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+            ImGui::SetNextItemWidth(70);
+            ImGui::DragInt("Sweep capture #", &m_sweep_capture_num, 10.f, 10, 500);
+            ImGui::SetItemTooltip("Number of measurement points");
         ImGui::EndChild();
     } else {
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildThresholdLevel", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::SetNextItemWidth(70);
-        ImGui::DragFloat("Threshold level (dB)", &m_sweep_threshold_level, 1., -100, 0);
-        ImGui::SetItemTooltip("Number of measurement points");
+            ImGui::SetNextItemWidth(70);
+            ImGui::DragFloat("Threshold level (dB)", &m_sweep_threshold_level, 1., -100, 0);
+            ImGui::SetItemTooltip("Number of measurement points");
         ImGui::EndChild();
     }
 
     ImGui::SameLine();
     ImGui::BeginChild("ScopesChidWindowMode", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-    ImGui::SetNextItemWidth(150);
-    if (ImGui::Combo("Window mode", &m_fft_window_fn_index, vector_getter, (void *)&m_wmodes, m_wmodes.size()))
-    {
-        set_window_fn();
-    }
-    ImGui::SetItemTooltip("Set the FFT window mode");
+        ImGui::SetNextItemWidth(150);
+        if (ImGui::Combo("Window mode", &m_fft_window_fn_index, vector_getter, (void *)&m_wmodes, m_wmodes.size()))
+        {
+            set_window_fn();
+        }
+        ImGui::SetItemTooltip("Set the FFT window mode");
     ImGui::EndChild();
     if (channelcount > 1)
     {
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildChannelSelect", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        if (ImGui::Checkbox("Left", &m_fft_channel_left) )
-        {
-            m_fft_channel_right = !m_fft_channel_left;
-        }
-        ImGui::SameLine();
-        if (ImGui::Checkbox("right", &m_fft_channel_right) )
-        {
-            m_fft_channel_left = !m_fft_channel_right;
-        }
+            if (ImGui::Checkbox("Left", &m_fft_channel_left) )
+            {
+                m_fft_channel_right = !m_fft_channel_left;
+            }
+            ImGui::SameLine();
+            if (ImGui::Checkbox("right", &m_fft_channel_right) )
+            {
+                m_fft_channel_left = !m_fft_channel_right;
+            }
         ImGui::EndChild();
     }
 

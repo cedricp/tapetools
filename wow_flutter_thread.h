@@ -1,8 +1,11 @@
+#pragma once
+
 #include <vector>
 #include <fftw3.h>
 #include <utils.h>
 #include <Dsp.h>
 #include <thread.h>
+#include "main_widget.h"
 
 extern const int WOW_FLUTTER_DECIMATION;
 
@@ -33,20 +36,28 @@ class WowAndFluterThread : public ASyncTask
     Dsp::SimpleFilter <Dsp::ChebyshevI::LowPass <4>, 1> m_wf_lowpass_filter;
     ThreadMutex& m_mutex;
 public:
-    WowAndFluterThread(int sr, std::vector<double>& longtermaudio, std::vector<double> &wow_flutter_data,
-        std::vector<double> &wow_flutter_data_x, int frequency, ThreadMutex& mutex,
-        float analysis_time_s, int filter_freq, float& wow_peak, float& wow_mean, int decimation, std::vector<double>& wow_fftdrawout,
-        fftw_complex* wow_fftout, std::vector<double>& wow_fftfreqs, fftw_plan& fft_plan)
-         : m_longterm_audio(longtermaudio), m_samplerate(sr), m_analysis_time_s(analysis_time_s),
-        m_wow_flutter_data(wow_flutter_data), m_wow_flutter_data_x(wow_flutter_data_x),
-        m_reference_frequency(frequency), m_mutex(mutex), m_wow_peak(wow_peak),
-        m_wow_mean(wow_mean), m_decimation(decimation), m_wowfftplan(fft_plan), m_wow_fftdrawout(wow_fftdrawout),
-        m_wow_fftout(wow_fftout), m_wow_fftfreqs(wow_fftfreqs), ASyncTask("WFtask")
+    WowAndFluterThread(AudioToolWindow& mainwin, int ref_frequency) : ASyncTask("WFtask"),
+        m_longterm_audio(mainwin.m_longterm_audio), m_wow_flutter_data(mainwin.m_wow_flutter_data),
+        m_wow_flutter_data_x(mainwin.m_wow_flutter_data_x), m_wow_peak(mainwin.m_wow_peak_detection),
+        m_samplerate(mainwin.m_capture_size), m_analysis_time_s(WOW_FLUTTER_ANALYSIS_TIME), m_decimation(WOW_FLUTTER_DECIMATION),
+        m_reference_frequency(ref_frequency), m_mutex(mainwin.m_wow_data_mutex), m_wow_mean(mainwin.m_wow_mean),
+        m_wowfftplan(mainwin.m_fftplanwow), m_wow_fftdrawout(mainwin.m_fftdrawwow), m_wow_fftout(mainwin.m_wow_complex_out),
+        m_wow_fftfreqs(mainwin.m_fftwowdrawfreqs)
     {
-        m_filter_freq = 0;
-        if (filter_freq == 1) m_filter_freq = 6;
-        if (filter_freq == 2) m_filter_freq = 20;
-        if (filter_freq == 3) m_filter_freq = 100;
+        switch (mainwin.m_wf_filter_freq_combo){
+            case 1:
+            m_filter_freq = 6;
+            break;
+            case 2:
+            m_filter_freq = 20;
+            break;
+            case 3:
+            m_filter_freq = 100;
+            break;
+            default:
+            m_filter_freq = 6;
+            break;
+        }
     }
 
     ~WowAndFluterThread()

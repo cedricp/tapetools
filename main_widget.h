@@ -1,4 +1,6 @@
 
+#pragma once
+
 #include <SDL.h>
 #include "imgui_internal.h"
 #include "window_sdl.h"
@@ -18,6 +20,8 @@ const int    WOW_FLUTTER_DECIMATION = 20;
 
 class AudioToolWindow : public Widget
 {
+    friend class WowAndFluterThread;
+
     audioManager        m_audiomanager;
     audioWaveformGenerator  m_signal_generator;
     audioRecorder       m_audiorecorder;
@@ -557,7 +561,7 @@ public:
 
     bool check_data_buffer()
     {
-        int min_wanted_buffer_size = m_capture_size * m_audiorecorder.get_channel_count();
+        const int min_wanted_buffer_size = m_capture_size * m_audiorecorder.get_channel_count();
         if (m_audiorecorder.get_available_samples() >= min_wanted_buffer_size)
         {
             bool computed = compute();
