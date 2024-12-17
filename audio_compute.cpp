@@ -351,8 +351,6 @@ void AudioToolWindow::compute_thd()
         }
     }
 
-    int fundamental_frequency = m_fftfreqs[fundamental_index]; 
-
     m_fft_harmonics_idx[0] = fundamental_index;
     m_fft_harmonics_pos[0] = m_fftfreqs[fundamental_index];
 

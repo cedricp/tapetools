@@ -394,7 +394,6 @@ void AudioToolWindow::draw_voltmeter_widget(int channelcount)
         }
         ImGui::EndChild();
 
-        //ImGui::SetCursorPosY(height());
         if (channelcount > 1)
         {
             ImGui::BeginChild("ScopesChildVoltageLcd2", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
@@ -452,18 +451,20 @@ void AudioToolWindow::draw_audio_fft_widget(int channelcount, int current_sample
         {
             ImPlot::PlotShaded("Fundamental detection", (double*)&m_fftfreqs[m_fft_fund_idx_range_min+1], (double*)&fft_draw[m_fft_fund_idx_range_min+1], m_fft_fund_idx_range_max - m_fft_fund_idx_range_min, -200.0);
             
+            float snr = fft_draw[m_fft_harmonics_idx[0]] - m_noise_foor;
+
             char thdtext[64];
-            snprintf(thdtext, 32, "THD : %.3f %%", m_thd);
+            snprintf(thdtext, 32, "THD : %.3f%%", m_thd);
             ImVec2 plotpos = ImPlot::GetPlotPos();
             ImVec2 plotsize = ImPlot::GetPlotSize();
             float plot_to_pix_graph = 140. / plotsize.y;
             ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1)));
             ImPlot::PlotText(thdtext, pnt.x, pnt.y);
             pnt.y -= 20 * plot_to_pix_graph;
-            snprintf(thdtext, 32, "THD+N : %.3f %% (%.2f dB)", m_thdn, m_thddb);
+            snprintf(thdtext, 32, "THD+N : %.3f %% (%.2fdB)", m_thdn, m_thddb);
             ImPlot::PlotText(thdtext, pnt.x, pnt.y);
             pnt.y -= 20 * plot_to_pix_graph;
-            snprintf(thdtext, 32, "Total RMS : %.4f", m_fft_rms * m_rms_calibration_scale);
+            snprintf(thdtext, 32, "Total RMS : %.4fV  SNR : %.2fdB", m_fft_rms * m_rms_calibration_scale, snr);
             ImPlot::PlotText(thdtext, pnt.x, pnt.y);
 
             for (int i = 0; i < m_fft_found_peaks; ++i)
@@ -653,7 +654,7 @@ void AudioToolWindow::draw_rt_analysis_tab()
     ImGui::SameLine();
 
     ImGui::BeginChild("ScopesChildShowWAF", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-    if (ImGui::ToggleButton("W&F", &m_show_wow_flutter))
+    if (ImGui::ToggleButton("Show Wow&Flutter", &m_show_wow_flutter))
     {
         while(App_SDL::get()->get_thread("WFtask"))
         {
@@ -666,11 +667,56 @@ void AudioToolWindow::draw_rt_analysis_tab()
     ImGui::EndChild();
     ImGui::SameLine();
 
+    /*
+    *   0dBu Ref section 
+    */
+
+    ImGui::SameLine();
+    ImGui::BeginChild("ScopesChildShow0db", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+    ImGui::ToggleButton("Show 0dBu Ref", &m_show0db);
+    ImGui::SetItemTooltip("Shows the 0dB (775mV or 1mW/600ohms) on the graph");
+    ImGui::EndChild();
+
+    /*
+    *  X dB target section
+    */
+
+    ImGui::SameLine();
+    ImGui::BeginChild("ScopesChildTargetVolt", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+    const char* items[] = {"left", "right"};
+    ImGui::ToggleButton("dB target", &m_use_targetdb);
+    ImGui::SetItemTooltip("Set a target dB value relative to current measure");
+    if (m_use_targetdb)
+    {
+        if (!m_lockdb)
+        {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(70);
+            ImGui::Combo("Channel", &m_current_db_target_channel, items, 2);
+            ImGui::SetItemTooltip("Which channel to work on");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(70);
+            ImGui::SliderFloat("dB", &m_target_db, -20, 20);
+            ImGui::SetItemTooltip("Target dB value");
+        }
+        ImGui::SameLine();
+        ImGui::ToggleButton("Lock", &m_lockdb);
+        ImGui::SetItemTooltip("Lock the current measure");
+    }
+    ImGui::EndChild();
+
+    /*
+    * Calibration
+    */
+
     ImGui::SameLine();
     ImGui::BeginChild("ScopesChildCalib", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
     static double rms_calibration = 1.0;
     if (m_rms_calibration_scale == 1.0)
     {
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Calibration");
+        ImGui::SameLine();
         ImGui::SetNextItemWidth(70);
         ImGui::InputDouble("Measured RMS", &rms_calibration);
         ImGui::SetItemTooltip("Enter the measured RMS voltage here to calibrate the meters/graph");
@@ -703,44 +749,6 @@ void AudioToolWindow::draw_rt_analysis_tab()
             rms_calibration = 1.0;
         }
         ImGui::SetItemTooltip("Clear the calibration");
-    }
-    ImGui::EndChild();
-
-    /*
-    *   0dBu Ref section 
-    */
-
-    ImGui::SameLine();
-    ImGui::BeginChild("ScopesChildShow0db", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-    ImGui::ToggleButton("Show 0dBu Ref", &m_show0db);
-    ImGui::SetItemTooltip("Shows the 0dB (775mV or 1mW/600ohms) on the graph");
-    ImGui::EndChild();
-
-    /*
-    *  X dB target section
-    */
-
-    ImGui::SameLine();
-    ImGui::BeginChild("ScopesChildTargetVolt", ImVec2(-1, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-    const char* items[] = {"left", "right"};
-    ImGui::ToggleButton("dB target", &m_use_targetdb);
-    ImGui::SetItemTooltip("Set a target dB value relative to current measure");
-    if (m_use_targetdb)
-    {
-        if (!m_lockdb)
-        {
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(70);
-            ImGui::Combo("Channel", &m_current_db_target_channel, items, 2);
-            ImGui::SetItemTooltip("Which channel to work on");
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(70);
-            ImGui::SliderFloat("dB", &m_target_db, -20, 20);
-            ImGui::SetItemTooltip("Target dB value");
-        }
-        ImGui::SameLine();
-        ImGui::ToggleButton("Lock", &m_lockdb);
-        ImGui::SetItemTooltip("Lock the current measure");
     }
     ImGui::EndChild();
 
