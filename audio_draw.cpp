@@ -25,8 +25,6 @@ void AudioToolWindow::draw_sweep_tab()
 
     ImGui::BeginChild("ScopesChild1", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
 
-    draw_tone_generator();
-
     ImGui::BeginChild("ScopesChild2", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         if (!m_sweep_started)
         {
@@ -117,6 +115,32 @@ void AudioToolWindow::draw_sweep_tab()
         ImGui::EndChild();
     }
 
+    if (!m_sweep_values.empty() && !m_sweep_started){
+        static char buffer[64] = "Memory";
+        int i = 1;
+        while (std::find(m_mem_sweeps_names.begin(), m_mem_sweeps_names.end(), buffer) != m_mem_sweeps_names.end())
+        {
+            snprintf(buffer, 64, "Memory #%i", i++);
+        }
+        ImGui::SameLine();
+        ImGui::BeginChild("MemoChild", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::AlignTextToFramePadding();
+        if (ImGui::Button("Memorize this graph"))
+        {
+            if (std::find(m_mem_sweeps_names.begin(), m_mem_sweeps_names.end(), buffer) == m_mem_sweeps_names.end())
+            {
+                m_mem_sweeps_results.push_back(std::pair<std::vector<double>, std::vector<double>>(m_sweep_freqs, m_sweep_values));
+                m_mem_sweeps_names.push_back(buffer);
+                m_sweep_freqs.clear();
+                m_sweep_values.clear();
+            }
+        }
+        ImGui::SameLine();
+        ImGui::InputText("Curve name", buffer, 64);
+        ImGui::EndChild();
+    }
+
+    ImGui::BeginChild("PlotChild", ImVec2(-1, height() - 80), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
     if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1)))
     {
         float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
@@ -133,7 +157,13 @@ void AudioToolWindow::draw_sweep_tab()
             ImPlot::PlotLine("Audio FFT", m_fftfreqs, m_fft_channel_left  ?  m_fftdrawl : m_fftdrawr, m_sound_data_x.size()/2);
             double nf[4] = {0., (current_sample_rate)/2.0, m_noise_foor, m_noise_foor};
             ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
-            ImPlot::PlotLine("Frequency response", m_sweep_freqs.data(), m_sweep_values.data(), m_sweep_freqs.size());
+            ImPlot::PlotLine("Frequency response", m_sweep_freqs.data(), m_sweep_values.data(), m_sweep_values.size());
+        }
+
+        int i = 0;
+        for (auto sweep_result: m_mem_sweeps_results)
+        {
+            ImPlot::PlotLine(m_mem_sweeps_names[i++].c_str(), sweep_result.first.data(), sweep_result.second.data(), sweep_result.second.size());
         }
 
         float sweep_bar[4] = {(float)m_sweep_last_measure_freq, (float)m_sweep_last_measure_freq, 40.0, -200.0};
@@ -141,6 +171,10 @@ void AudioToolWindow::draw_sweep_tab()
         
         ImPlot::EndPlot();
     }
+    ImGui::EndChild();
+
+    draw_tone_generator();
+
     ImGui::EndChild();
 }
 

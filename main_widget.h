@@ -117,6 +117,10 @@ class AudioToolWindow : public Widget
     float   m_sweep_threshold_level = -50;
     std::vector<double> m_sweep_values;
     std::vector<double> m_sweep_freqs;
+
+    std::vector<std::pair< std::vector<double>, std::vector<double>> > m_mem_sweeps_results;
+    std::vector<std::string> m_mem_sweeps_names;
+
     Timer   m_sweep_timer;
     bool    m_compute_on = false;
 
