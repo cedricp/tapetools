@@ -4,7 +4,7 @@
 #include <SDL.h>
 #include "imgui_internal.h"
 #include "window_sdl.h"
-#include "audio_sine_gen.h"
+#include "audio_waveform_gen.h"
 #include "audio_record.h"
 #include "utils.h"
 #include "timer.h"

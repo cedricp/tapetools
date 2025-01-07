@@ -1,6 +1,6 @@
 #define _USE_MATH_DEFINES
 
-#include "audio_sine_gen.h"
+#include "audio_waveform_gen.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

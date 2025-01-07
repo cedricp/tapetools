@@ -722,6 +722,9 @@ void AudioToolWindow::draw_rt_analysis_tab()
     ImGui::SetItemTooltip("Set a target dB value relative to current measure");
     if (m_use_targetdb)
     {
+        ImGui::SameLine();
+        ImGui::ToggleButton("Lock", &m_lockdb);
+        ImGui::SetItemTooltip("Lock the current measure");
         if (!m_lockdb)
         {
             ImGui::SameLine();
@@ -733,9 +736,6 @@ void AudioToolWindow::draw_rt_analysis_tab()
             ImGui::SliderFloat("dB", &m_target_db, -20, 20);
             ImGui::SetItemTooltip("Target dB value");
         }
-        ImGui::SameLine();
-        ImGui::ToggleButton("Lock", &m_lockdb);
-        ImGui::SetItemTooltip("Lock the current measure");
     }
     ImGui::EndChild();
 
