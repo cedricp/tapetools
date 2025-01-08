@@ -572,7 +572,7 @@ void AudioToolWindow::reinit_recorder()
     if (m_audiorecorder.init(float(m_recorder_latency_ms) / 1000.f, m_audio_in_idx, samplerate))
     {
         m_audiorecorder.start();
-        if (!m_audioplayer.set(samplerate, m_recorder_latency_ms/500.f, 4, m_audiorecorder.get_channel_count())){
+        if (m_audio_reroute_out_idx >= 0 && !m_audioplayer.set(samplerate, float(m_recorder_latency_ms)/1000.f, m_audio_reroute_out_idx, m_audiorecorder.get_channel_count())){
             fprintf(stderr, "Unable to set init player\n");
         }
     }
@@ -580,6 +580,7 @@ void AudioToolWindow::reinit_recorder()
     init_capture();
 
     m_audiorecorder.pause(!m_compute_on);
+    m_audioplayer.pause(!m_compute_on | !m_audio_reroute_on);
 }
 
 void AudioToolWindow::reset_signal_generator()

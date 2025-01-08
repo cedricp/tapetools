@@ -25,4 +25,5 @@ public:
     void destroy();
     bool set(int samplerate, float latency, int device_idx, int channels);
     bool add_data(const int16_t data[], int size);
+    void pause(bool pause = true);
 };

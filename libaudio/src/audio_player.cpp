@@ -93,7 +93,7 @@ bool audioPlayer::set(int samplerate, float latency, int device_idx, int channel
             return false;
         }
 
-        m_ringbuffer = new ringBuffer(m_manager.get_soundio(), audiolen);
+        m_ringbuffer = new ringBuffer(m_manager.get_soundio(), audiolen * 2);
 
         m_outstream->write_callback = this->write_callback;
         m_outstream->underflow_callback = this->underflow_callback;
@@ -145,6 +145,14 @@ bool audioPlayer::add_data(const int16_t data[], int size)
         return enough_space;        
     }
     return false;
+}
+
+void audioPlayer::pause(bool pause)
+{
+    if(m_outstream)
+    {
+        soundio_outstream_pause(m_outstream, pause);
+    }
 }
 
 void audioPlayer::destroy()

@@ -512,7 +512,7 @@ void AudioToolWindow::draw_audio_fft_widget(int channelcount, int current_sample
             snprintf(thdtext, 32, "THD+N : %.3f %% (%.2fdB)", m_thdn, m_thddb);
             ImPlot::PlotText(thdtext, pnt.x, pnt.y);
             pnt.y -= 20 * plot_to_pix_graph;
-            snprintf(thdtext, 32, "Total RMS : %.4fV  SNR : %.2fdB", m_fft_rms * m_rms_calibration_scale, snr);
+            snprintf(thdtext, 32, "Total Vrms : %.4f  SNR : %.2fdB", m_fft_rms * m_rms_calibration_scale, snr);
             ImPlot::PlotText(thdtext, pnt.x, pnt.y);
 
             for (int i = 0; i < m_fft_found_peaks; ++i)
@@ -690,8 +690,15 @@ void AudioToolWindow::draw_rt_analysis_tab()
     if (ImGui::ToggleButton("Start", &m_compute_on))
     {
         m_audiorecorder.pause(!m_compute_on);
+        if (m_audio_reroute_on) m_audioplayer.pause(!m_compute_on);
     }
     ImGui::SetItemTooltip("Start realtime capture");
+    ImGui::SameLine();
+    if (ImGui::ToggleButton("Audio loopback", &m_audio_reroute_on))
+    {
+        if (m_compute_on) m_audioplayer.pause(!m_audio_reroute_on);
+    }
+    ImGui::SetItemTooltip("Reroute recorder to audio output");
     ImGui::EndChild();
     ImGui::SameLine();
 

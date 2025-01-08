@@ -39,10 +39,12 @@ class AudioToolWindow : public Widget
     
     int m_audio_out_idx = -1;
     int m_audio_in_idx = -1;
+    int m_audio_reroute_out_idx = -1;
 
     std::string m_input_device;
     std::string m_output_device;
-    
+    std::string m_output_reroute_device;
+
     std::vector<double> m_sound_data1, m_sound_data2;
     // 5 seconds buffer for wow/flutter
     std::vector<double> m_longterm_audio;
@@ -67,6 +69,7 @@ class AudioToolWindow : public Widget
     double m_audio_gain = 1.0f;
     int m_combo_in = 0;
     int m_combo_out = 0;
+    int m_combo_out_reroute = 0;
     int m_in_sample_rate_idx = 0;
     int m_out_sample_rate_idx = 0;
     int m_wow_flutter_capture_size = 0;
@@ -89,8 +92,8 @@ class AudioToolWindow : public Widget
     bool    m_fft_channel_left = true;
     bool    m_fft_channel_right = false;
     double  m_noise_foor = -100;
-    double  m_fft_harmonics_pos[20];
-    int     m_fft_harmonics_idx[20];
+    double  m_fft_harmonics_pos[20] = {0};
+    int     m_fft_harmonics_idx[20] = {0};
     double  m_fft_highest_val;
     int     m_fft_found_peaks = 0;
     int     m_fft_fund_idx_range_min = 0;
@@ -126,6 +129,7 @@ class AudioToolWindow : public Widget
 
     Timer   m_sweep_timer;
     bool    m_compute_on = false;
+    bool    m_audio_reroute_on = false;
 
     bool    m_use_targetdb = false;
     bool    m_lockdb = false;
@@ -295,6 +299,116 @@ public:
         if (m_uitheme == 0) ImGui::StyleColorsDark();   
         else if (m_uitheme == 1) ImGui::StyleColorsLight();   
         else if (m_uitheme == 2) ImGui::StyleColorsClassic();   
+        else if (m_uitheme == 3)
+        {
+            auto &colors = ImGui::GetStyle().Colors;
+            colors[ImGuiCol_WindowBg] = ImVec4{0.1f, 0.1f, 0.13f, 1.0f};
+            colors[ImGuiCol_MenuBarBg] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
+
+            // Border
+            colors[ImGuiCol_Border] = ImVec4{0.44f, 0.37f, 0.61f, 0.29f};
+            colors[ImGuiCol_BorderShadow] = ImVec4{0.0f, 0.0f, 0.0f, 0.24f};
+
+            // Text
+            colors[ImGuiCol_Text] = ImVec4{1.0f, 1.0f, 1.0f, 1.0f};
+            colors[ImGuiCol_TextDisabled] = ImVec4{0.5f, 0.5f, 0.5f, 1.0f};
+
+            // Headers
+            colors[ImGuiCol_Header] = ImVec4{0.13f, 0.13f, 0.17, 1.0f};
+            colors[ImGuiCol_HeaderHovered] = ImVec4{0.19f, 0.2f, 0.25f, 1.0f};
+            colors[ImGuiCol_HeaderActive] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
+
+            // Buttons
+            colors[ImGuiCol_Button] = ImVec4{0.13f, 0.13f, 0.17, 1.0f};
+            colors[ImGuiCol_ButtonHovered] = ImVec4{0.19f, 0.2f, 0.25f, 1.0f};
+            colors[ImGuiCol_ButtonActive] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
+            colors[ImGuiCol_CheckMark] = ImVec4{0.74f, 0.58f, 0.98f, 1.0f};
+
+            // Popups
+            colors[ImGuiCol_PopupBg] = ImVec4{0.1f, 0.1f, 0.13f, 0.92f};
+
+            // Slider
+            colors[ImGuiCol_SliderGrab] = ImVec4{0.44f, 0.37f, 0.61f, 0.54f};
+            colors[ImGuiCol_SliderGrabActive] = ImVec4{0.74f, 0.58f, 0.98f, 0.54f};
+
+            // Frame BG
+            colors[ImGuiCol_FrameBg] = ImVec4{0.13f, 0.13, 0.17, 1.0f};
+            colors[ImGuiCol_FrameBgHovered] = ImVec4{0.19f, 0.2f, 0.25f, 1.0f};
+            colors[ImGuiCol_FrameBgActive] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
+
+            // Tabs
+            colors[ImGuiCol_Tab] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
+            colors[ImGuiCol_TabHovered] = ImVec4{0.24, 0.24f, 0.32f, 1.0f};
+            colors[ImGuiCol_TabActive] = ImVec4{0.2f, 0.22f, 0.27f, 1.0f};
+            colors[ImGuiCol_TabUnfocused] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
+            colors[ImGuiCol_TabUnfocusedActive] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
+
+            // Title
+            colors[ImGuiCol_TitleBg] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
+            colors[ImGuiCol_TitleBgActive] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
+            colors[ImGuiCol_TitleBgCollapsed] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
+
+            // Scrollbar
+            colors[ImGuiCol_ScrollbarBg] = ImVec4{0.1f, 0.1f, 0.13f, 1.0f};
+            colors[ImGuiCol_ScrollbarGrab] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
+            colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4{0.19f, 0.2f, 0.25f, 1.0f};
+            colors[ImGuiCol_ScrollbarGrabActive] = ImVec4{0.24f, 0.24f, 0.32f, 1.0f};
+
+            // Seperator
+            colors[ImGuiCol_Separator] = ImVec4{0.44f, 0.37f, 0.61f, 1.0f};
+            colors[ImGuiCol_SeparatorHovered] = ImVec4{0.74f, 0.58f, 0.98f, 1.0f};
+            colors[ImGuiCol_SeparatorActive] = ImVec4{0.84f, 0.58f, 1.0f, 1.0f};
+
+            // Resize Grip
+            colors[ImGuiCol_ResizeGrip] = ImVec4{0.44f, 0.37f, 0.61f, 0.29f};
+            colors[ImGuiCol_ResizeGripHovered] = ImVec4{0.74f, 0.58f, 0.98f, 0.29f};
+            colors[ImGuiCol_ResizeGripActive] = ImVec4{0.84f, 0.58f, 1.0f, 0.29f};
+        }
+        else if (m_uitheme == 4)
+        {
+            auto &colors = ImGui::GetStyle().Colors;
+
+            colors[ImGuiCol_Text]                  = ImVec4(0.90f, 0.90f, 0.90f, 0.90f);
+            colors[ImGuiCol_TextDisabled]          = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
+            colors[ImGuiCol_WindowBg]              = ImVec4(0.09f, 0.09f, 0.15f, 1.00f);
+            colors[ImGuiCol_ChildBg]               = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+            colors[ImGuiCol_PopupBg]               = ImVec4(0.05f, 0.05f, 0.10f, 0.85f);
+            colors[ImGuiCol_Border]                = ImVec4(0.70f, 0.70f, 0.70f, 0.65f);
+            colors[ImGuiCol_BorderShadow]          = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+            colors[ImGuiCol_FrameBg]               = ImVec4(0.00f, 0.00f, 0.01f, 1.00f);
+            colors[ImGuiCol_FrameBgHovered]        = ImVec4(0.90f, 0.80f, 0.80f, 0.40f);
+            colors[ImGuiCol_FrameBgActive]         = ImVec4(0.90f, 0.65f, 0.65f, 0.45f);
+            colors[ImGuiCol_TitleBg]               = ImVec4(0.00f, 0.00f, 0.00f, 0.83f);
+            colors[ImGuiCol_TitleBgCollapsed]      = ImVec4(0.40f, 0.40f, 0.80f, 0.20f);
+            colors[ImGuiCol_TitleBgActive]         = ImVec4(0.00f, 0.00f, 0.00f, 0.87f);
+            colors[ImGuiCol_MenuBarBg]             = ImVec4(0.01f, 0.01f, 0.02f, 0.80f);
+            colors[ImGuiCol_ScrollbarBg]           = ImVec4(0.20f, 0.25f, 0.30f, 0.60f);
+            colors[ImGuiCol_ScrollbarGrab]         = ImVec4(0.55f, 0.53f, 0.55f, 0.51f);
+            colors[ImGuiCol_ScrollbarGrabHovered]  = ImVec4(0.56f, 0.56f, 0.56f, 1.00f);
+            colors[ImGuiCol_ScrollbarGrabActive]   = ImVec4(0.56f, 0.56f, 0.56f, 0.91f);
+            colors[ImGuiCol_CheckMark]             = ImVec4(0.90f, 0.90f, 0.90f, 0.83f);
+            colors[ImGuiCol_SliderGrab]            = ImVec4(0.70f, 0.70f, 0.70f, 0.62f);
+            colors[ImGuiCol_SliderGrabActive]      = ImVec4(0.30f, 0.30f, 0.30f, 0.84f);
+            colors[ImGuiCol_Button]                = ImVec4(0.48f, 0.72f, 0.89f, 0.49f);
+            colors[ImGuiCol_ButtonHovered]         = ImVec4(0.50f, 0.69f, 0.99f, 0.68f);
+            colors[ImGuiCol_ButtonActive]          = ImVec4(0.80f, 0.50f, 0.50f, 1.00f);
+            colors[ImGuiCol_Header]                = ImVec4(0.30f, 0.69f, 1.00f, 0.53f);
+            colors[ImGuiCol_HeaderHovered]         = ImVec4(0.44f, 0.61f, 0.86f, 1.00f);
+            colors[ImGuiCol_HeaderActive]          = ImVec4(0.38f, 0.62f, 0.83f, 1.00f);
+            colors[ImGuiCol_Separator]             = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
+            colors[ImGuiCol_SeparatorHovered]      = ImVec4(0.70f, 0.60f, 0.60f, 1.00f);
+            colors[ImGuiCol_SeparatorActive]       = ImVec4(0.90f, 0.70f, 0.70f, 1.00f);
+            colors[ImGuiCol_ResizeGrip]            = ImVec4(1.00f, 1.00f, 1.00f, 0.85f);
+            colors[ImGuiCol_ResizeGripHovered]     = ImVec4(1.00f, 1.00f, 1.00f, 0.60f);
+            colors[ImGuiCol_ResizeGripActive]      = ImVec4(1.00f, 1.00f, 1.00f, 0.90f);
+            colors[ImGuiCol_PlotLines]             = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+            colors[ImGuiCol_PlotLinesHovered]      = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
+            colors[ImGuiCol_PlotHistogram]         = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
+            colors[ImGuiCol_PlotHistogramHovered]  = ImVec4(1.00f, 0.60f, 0.00f, 1.00f);
+            colors[ImGuiCol_TextSelectedBg]        = ImVec4(0.00f, 0.00f, 1.00f, 0.35f);
+            colors[ImGuiCol_ModalWindowDimBg]      = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
+        }
+        
         
         ImGui::GetStyle().FrameRounding = 5.0;
         ImGui::GetStyle().ChildRounding = 5.0;
@@ -337,6 +451,16 @@ public:
                     if (ImGui::MenuItem("Classic", nullptr, nullptr))
                     {
                         m_uitheme = 2;
+                        set_theme();
+                    }
+                    if (ImGui::MenuItem("Dracula", nullptr, nullptr))
+                    {
+                        m_uitheme = 3;
+                        set_theme();
+                    }
+                    if (ImGui::MenuItem("Grey", nullptr, nullptr))
+                    {
+                        m_uitheme = 4;
                         set_theme();
                     }
                     ImGui::EndMenu();
@@ -427,7 +551,7 @@ public:
     {
         if (m_sound_setup_open && !m_sweep_started)
         {
-            ImGui::SetNextWindowSize(ImVec2(600, 150));
+            ImGui::SetNextWindowSize(ImVec2(600, 200));
             if(ImGui::Begin("Sound card setup", &m_sound_setup_open))
             {
                 ImVec2 winsize = ImGui::GetWindowSize();
@@ -461,6 +585,13 @@ public:
                 {
                     reinit_recorder();
                 }
+                ImGui::SeparatorText("Output loopback device");
+                if (ImGui::Combo("Output rerouting", &m_combo_out_reroute, vector_getter, (void*)&out_devices, out_devices.size()))
+                {
+                    m_audio_reroute_out_idx = m_audiomanager.get_output_device_map(m_combo_out_reroute);
+                    m_output_reroute_device = out_devices[m_combo_out];
+                    reinit_recorder();
+                }
                 ImGui::PopItemWidth();
             }
             ImGui::End();
@@ -473,9 +604,12 @@ public:
         std::string out_device = out_devices[m_combo_out];
         const std::vector<std::string>& in_devices = m_audiomanager.get_input_devices();
         std::string in_device = in_devices[m_combo_in];
+        const std::vector<std::string>& out_reroute_devices = m_audiomanager.get_output_devices();
+        std::string out_reroute_device = out_devices[m_combo_out_reroute];
 
         cnf["output_device"] = out_device;
         cnf["input_device"] = in_device;
+        cnf["output_reroute_device"] = out_reroute_device;
     }
 
     void get_configuration_string(std::map<std::string, std::string> &cnf) override
@@ -507,6 +641,19 @@ public:
                 m_combo_out = std::distance(out_devices.begin(), it);
                 m_audio_out_idx = m_audiomanager.get_output_device_map(m_combo_out);
                 printf("Restoring saved output dev found [%s] [%i]\n", str.c_str(), m_audio_out_idx);
+                m_output_device = str;
+            }
+        }
+
+        if (s == "output_reroute_device")
+        {
+            const std::vector<std::string>& out_devices = m_audiomanager.get_output_devices();
+            std::vector<std::string>::const_iterator it = std::find(out_devices.begin(), out_devices.end(), str);
+            if (it != out_devices.end())
+            {
+                m_combo_out_reroute = std::distance(out_devices.begin(), it);
+                m_audio_reroute_out_idx = m_audiomanager.get_output_device_map(m_combo_out_reroute);
+                printf("Restoring saved output reroute dev found [%s] [%i]\n", str.c_str(), m_audio_reroute_out_idx);
                 m_output_device = str;
             }
         }
