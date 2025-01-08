@@ -6,6 +6,7 @@
 #include "window_sdl.h"
 #include "audio_waveform_gen.h"
 #include "audio_record.h"
+#include "audio_player.h"
 #include "utils.h"
 #include "timer.h"
 #include <fftw3.h>
@@ -18,6 +19,7 @@
 const double WOW_FLUTTER_ANALYSIS_TIME = 5.5;
 const int    WOW_FLUTTER_DECIMATION = 20;
 
+
 class AudioToolWindow : public Widget
 {
     friend class WowAndFluterThread;
@@ -25,6 +27,7 @@ class AudioToolWindow : public Widget
     audioManager        m_audiomanager;
     audioWaveformGenerator  m_signal_generator;
     audioRecorder       m_audiorecorder;
+    audioPlayer         m_audioplayer;
 
     int  m_uitheme = 0;
     
@@ -256,7 +259,7 @@ class AudioToolWindow : public Widget
     void detect_periods();
 
 public:
-    AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_sweep_timer(m_measure_delay, true)
+    AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_sweep_timer(m_measure_delay, true), m_audioplayer(m_audiomanager)
     {
         set_maximized(true);
         set_movable(false);

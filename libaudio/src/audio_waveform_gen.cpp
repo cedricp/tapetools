@@ -167,10 +167,6 @@ bool audioWaveformGenerator::init(audioManager& manager, int device_idx, int sam
     m_outstream->underflow_callback = this->underflow_callback;
     m_outstream->error_callback = this->error_callback;
 
-    if (m_outstream->layout_error){
-        fprintf(stderr, "unable to set channel layout: %s\n", soundio_strerror(m_outstream->layout_error));
-        return false;
-    }
     return true;
 }
 

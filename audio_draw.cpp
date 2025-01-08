@@ -325,6 +325,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
     else if (m_wow_test_frequency == 2) ref_frequency = m_wow_test_frequency_custom;
 
     float max_percent = (max_freq / ref_frequency) * 100.;
+    bool is_buffering = m_longterm_audio.size() < WOW_FLUTTER_ANALYSIS_TIME * m_audiorecorder.get_current_samplerate();
 
     if(!fft_view && ImPlot::BeginPlot("Wow and flutter analysis (unweighted)", ImVec2(plotheight*1.8, -1)))
     {
@@ -358,7 +359,13 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         ImVec2 plotsize = ImPlot::GetPlotSize();
         ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1)));
         ImPlot::PlotText(peak_text, pnt.x, pnt.y);
-        snprintf(peak_text, 32, "Frequency drift: %.3f %%", freq_drift);
+        if (is_buffering)
+        {
+            snprintf(peak_text, 32, "Buffering...");
+        } else
+        {
+            snprintf(peak_text, 32, "Frequency drift: %.3f %%", freq_drift);
+        }
         pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.2)));
         ImPlot::PlotText(peak_text, pnt.x, pnt.y);
         ImPlot::EndPlot();
@@ -370,6 +377,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         if (m_wf_filter_freq_combo == 1) max_frequency = 10.;
         else if (m_wf_filter_freq_combo == 2) max_frequency = 25.;
         else if (m_wf_filter_freq_combo == 3) max_frequency = 110;
+
 
         const double drift_percent = max_fft_freq / ref_frequency * 100.;
         ImPlot::SetupAxes("Frequency (Hz)", "Freqency drift (Hz)", 0, ImPlotAxisFlags_Lock);
@@ -392,8 +400,14 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         m_wow_data_mutex.unlock();
 
         char peak_text[64];
-        float percent_drift = m_fftdrawwow[0] / ref_frequency * 100.f; 
-        snprintf(peak_text, 32, "Drift: [%.3f Hz] [%.3f %%]", m_fftdrawwow[0], percent_drift);
+        float percent_drift = m_fftdrawwow[0] / ref_frequency * 100.f;
+        if (is_buffering)
+        {
+            snprintf(peak_text, 32, "Buffering...");
+        } else
+        {
+            snprintf(peak_text, 32, "Drift: [%.3f Hz] [%.3f %%]", m_fftdrawwow[0], percent_drift);
+        }
         ImVec2 plotpos = ImPlot::GetPlotPos();
         ImVec2 plotsize = ImPlot::GetPlotSize();
         ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1)));

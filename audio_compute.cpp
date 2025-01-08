@@ -162,6 +162,15 @@ bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
     double twopif_over_sr = 2. * M_PI / current_sample_rate;
 
     // Fill audio waveform
+    std::vector<int16_t> audio_data(m_capture_size * channelcount);
+    for (int i = 0; i < m_capture_size * channelcount; i++)
+    {
+        audio_data[i] = m_raw_buffer[i] * INT16_MAX;
+    }
+    if (!m_audioplayer.add_data(audio_data.data(), m_capture_size * channelcount)){
+        printf("Error adding audio data\n");
+    }
+
     for (int i = 0; i < m_capture_size; i++)
     {
         //double sound_data = .3 * sin(3145.*double(i) * twopif_over_sr);//
@@ -563,6 +572,9 @@ void AudioToolWindow::reinit_recorder()
     if (m_audiorecorder.init(float(m_recorder_latency_ms) / 1000.f, m_audio_in_idx, samplerate))
     {
         m_audiorecorder.start();
+        if (!m_audioplayer.set(samplerate, m_recorder_latency_ms/500.f, 4, m_audiorecorder.get_channel_count())){
+            fprintf(stderr, "Unable to set init player\n");
+        }
     }
 
     init_capture();
