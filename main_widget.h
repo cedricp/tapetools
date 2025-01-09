@@ -39,11 +39,11 @@ class AudioToolWindow : public Widget
     
     int m_audio_out_idx = -1;
     int m_audio_in_idx = -1;
-    int m_audio_reroute_out_idx = -1;
+    int m_audio_loopback_out_idx = -1;
 
     std::string m_input_device;
     std::string m_output_device;
-    std::string m_output_reroute_device;
+    std::string m_output_loopback_device;
 
     std::vector<double> m_sound_data1, m_sound_data2;
     // 5 seconds buffer for wow/flutter
@@ -69,7 +69,7 @@ class AudioToolWindow : public Widget
     double m_audio_gain = 1.0f;
     int m_combo_in = 0;
     int m_combo_out = 0;
-    int m_combo_out_reroute = 0;
+    int m_combo_out_loopback = 0;
     int m_in_sample_rate_idx = 0;
     int m_out_sample_rate_idx = 0;
     int m_wow_flutter_capture_size = 0;
@@ -129,7 +129,7 @@ class AudioToolWindow : public Widget
 
     Timer   m_sweep_timer;
     bool    m_compute_on = false;
-    bool    m_audio_reroute_on = false;
+    bool    m_audio_loopback_on = false;
 
     bool    m_use_targetdb = false;
     bool    m_lockdb = false;
@@ -586,10 +586,10 @@ public:
                     reinit_recorder();
                 }
                 ImGui::SeparatorText("Output loopback device");
-                if (ImGui::Combo("Output rerouting", &m_combo_out_reroute, vector_getter, (void*)&out_devices, out_devices.size()))
+                if (ImGui::Combo("Output", &m_combo_out_loopback, vector_getter, (void*)&out_devices, out_devices.size()))
                 {
-                    m_audio_reroute_out_idx = m_audiomanager.get_output_device_map(m_combo_out_reroute);
-                    m_output_reroute_device = out_devices[m_combo_out];
+                    m_audio_loopback_out_idx = m_audiomanager.get_output_device_map(m_combo_out_loopback);
+                    m_output_loopback_device = out_devices[m_combo_out];
                     reinit_recorder();
                 }
                 ImGui::PopItemWidth();
@@ -605,11 +605,11 @@ public:
         const std::vector<std::string>& in_devices = m_audiomanager.get_input_devices();
         std::string in_device = in_devices[m_combo_in];
         const std::vector<std::string>& out_reroute_devices = m_audiomanager.get_output_devices();
-        std::string out_reroute_device = out_devices[m_combo_out_reroute];
+        std::string out_reroute_device = out_devices[m_combo_out_loopback];
 
         cnf["output_device"] = out_device;
         cnf["input_device"] = in_device;
-        cnf["output_reroute_device"] = out_reroute_device;
+        cnf["output_loopback_device"] = out_reroute_device;
     }
 
     void get_configuration_string(std::map<std::string, std::string> &cnf) override
@@ -645,15 +645,15 @@ public:
             }
         }
 
-        if (s == "output_reroute_device")
+        if (s == "output_loopback_device")
         {
             const std::vector<std::string>& out_devices = m_audiomanager.get_output_devices();
             std::vector<std::string>::const_iterator it = std::find(out_devices.begin(), out_devices.end(), str);
             if (it != out_devices.end())
             {
-                m_combo_out_reroute = std::distance(out_devices.begin(), it);
-                m_audio_reroute_out_idx = m_audiomanager.get_output_device_map(m_combo_out_reroute);
-                printf("Restoring saved output reroute dev found [%s] [%i]\n", str.c_str(), m_audio_reroute_out_idx);
+                m_combo_out_loopback = std::distance(out_devices.begin(), it);
+                m_audio_loopback_out_idx = m_audiomanager.get_output_device_map(m_combo_out_loopback);
+                printf("Restoring saved output loopback dev found [%s] [%i]\n", str.c_str(), m_audio_loopback_out_idx);
                 m_output_device = str;
             }
         }

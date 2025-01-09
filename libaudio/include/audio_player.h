@@ -8,6 +8,7 @@ class audioPlayer
     ringBuffer*m_ringbuffer = nullptr;
     bool m_playing = false;
     int m_numchannels = 0;
+    int m_ringbugger_size = 0;
 
     static void write_callback(SoundIoOutStream *outstream, int frame_count_min, int frame_count_max);
     static void underflow_callback(SoundIoOutStream *outstream);

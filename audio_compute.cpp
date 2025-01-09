@@ -161,14 +161,18 @@ bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
     m_rms_left = m_rms_right = 0.0;
     double twopif_over_sr = 2. * M_PI / current_sample_rate;
 
-    // Fill audio waveform
-    std::vector<int16_t> audio_data(m_capture_size * channelcount);
-    for (int i = 0; i < m_capture_size * channelcount; i++)
+    // Fill audio for audio loopback
+    if (m_audio_loopback_on)
     {
-        audio_data[i] = m_raw_buffer[i] * INT16_MAX;
-    }
-    if (!m_audioplayer.add_data(audio_data.data(), m_capture_size * channelcount)){
-        printf("Error adding audio data\n");
+        std::vector<int16_t> audio_data(m_capture_size * channelcount);
+        for (int i = 0; i < m_capture_size * channelcount; i++)
+        {
+            audio_data[i] = m_raw_buffer[i] * INT16_MAX;
+        }
+
+        if (!m_audioplayer.add_data(audio_data.data(), m_capture_size * channelcount)){
+            printf("Error adding audio data\n");
+        }
     }
 
     for (int i = 0; i < m_capture_size; i++)
@@ -572,7 +576,7 @@ void AudioToolWindow::reinit_recorder()
     if (m_audiorecorder.init(float(m_recorder_latency_ms) / 1000.f, m_audio_in_idx, samplerate))
     {
         m_audiorecorder.start();
-        if (m_audio_reroute_out_idx >= 0 && !m_audioplayer.set(samplerate, float(m_recorder_latency_ms)/1000.f, m_audio_reroute_out_idx, m_audiorecorder.get_channel_count())){
+        if (m_audio_loopback_out_idx >= 0 && !m_audioplayer.set(samplerate, float(m_recorder_latency_ms)/1000.f, m_audio_loopback_out_idx, m_audiorecorder.get_channel_count())){
             fprintf(stderr, "Unable to set init player\n");
         }
     }
@@ -580,7 +584,7 @@ void AudioToolWindow::reinit_recorder()
     init_capture();
 
     m_audiorecorder.pause(!m_compute_on);
-    m_audioplayer.pause(!m_compute_on | !m_audio_reroute_on);
+    m_audioplayer.pause(!m_compute_on | !m_audio_loopback_on);
 }
 
 void AudioToolWindow::reset_signal_generator()

@@ -690,15 +690,15 @@ void AudioToolWindow::draw_rt_analysis_tab()
     if (ImGui::ToggleButton("Start", &m_compute_on))
     {
         m_audiorecorder.pause(!m_compute_on);
-        if (m_audio_reroute_on) m_audioplayer.pause(!m_compute_on);
+        if (m_audio_loopback_on) m_audioplayer.pause(!m_compute_on);
     }
     ImGui::SetItemTooltip("Start realtime capture");
     ImGui::SameLine();
-    if (ImGui::ToggleButton("Audio loopback", &m_audio_reroute_on))
+    if (ImGui::ToggleButton("Audio loopback", &m_audio_loopback_on))
     {
-        if (m_compute_on) m_audioplayer.pause(!m_audio_reroute_on);
+        if (m_compute_on) m_audioplayer.pause(!m_audio_loopback_on);
     }
-    ImGui::SetItemTooltip("Reroute recorder to audio output");
+    ImGui::SetItemTooltip("Audio loopback (send recorder data to output device)");
     ImGui::EndChild();
     ImGui::SameLine();
 
@@ -884,23 +884,8 @@ void AudioToolWindow::draw_rt_analysis_tab()
 
     ImGui::SameLine();
     ImGui::BeginChild("ShowThdChild", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-    if (ImGui::ToggleButton("Show THD", &m_show_thd))
-    {
-        /*static int old_capture_time = 100;
-        if (m_show_thd){
-            old_capture_time = m_recorder_latency_ms;
-            if (m_recorder_latency_ms < 500)
-            {
-                m_recorder_latency_ms = 500;
-                must_reinit_recorder = true;
-            }
-        }
-        else
-        {
-            m_recorder_latency_ms = old_capture_time;
-            must_reinit_recorder = true;
-        }*/
-    }
+    if (ImGui::ToggleButton("Show THD", &m_show_thd)){}
+
     ImGui::SetItemTooltip("Enable HD overlay");
     ImGui::EndChild();
 

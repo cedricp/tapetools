@@ -16,8 +16,6 @@ void audioPlayer::write_callback(SoundIoOutStream *outstream, int frame_count_mi
         return;
     }
     
-    double float_sample_rate = outstream->sample_rate;
-    double seconds_per_frame = 1.0 / float_sample_rate;
     SoundIoChannelArea *areas;
     int err;
     
@@ -56,7 +54,9 @@ void audioPlayer::write_callback(SoundIoOutStream *outstream, int frame_count_mi
 
         if ((err = soundio_outstream_end_write(outstream))) {
             if (err == SoundIoErrorUnderflow)
+            {
                 return;
+            }
             fprintf(stderr, "unrecoverable stream error: %s\n", soundio_strerror(err));
             exit(1);
         }
@@ -80,7 +80,7 @@ bool audioPlayer::set(int samplerate, float latency, int device_idx, int channel
     destroy();
 
     m_numchannels = channels;
-    int audiolen = samplerate * latency * channels * sizeof(int16_t);
+    m_ringbugger_size = samplerate * latency * channels * sizeof(int16_t) * 2;
     int err;
 
     if (m_outstream == nullptr)
@@ -93,7 +93,7 @@ bool audioPlayer::set(int samplerate, float latency, int device_idx, int channel
             return false;
         }
 
-        m_ringbuffer = new ringBuffer(m_manager.get_soundio(), audiolen * 2);
+        m_ringbuffer = m_manager.get_new_ringbuffer(m_ringbugger_size);
 
         m_outstream->write_callback = this->write_callback;
         m_outstream->underflow_callback = this->underflow_callback;
@@ -119,7 +119,6 @@ bool audioPlayer::add_data(const int16_t data[], int size)
         bool enough_space = true;
         if (recv_bytes_size > free_bytes)
         {
-            printf("Not enough space %i/%i\n", free_bytes, recv_bytes_size);
             recv_bytes_size = free_bytes;
             enough_space = false;
         }
@@ -152,6 +151,12 @@ void audioPlayer::pause(bool pause)
     if(m_outstream)
     {
         soundio_outstream_pause(m_outstream, pause);
+        if (pause)
+        {
+            // reset ringbuffer
+            delete m_ringbuffer;
+            m_ringbuffer = m_manager.get_new_ringbuffer(m_ringbugger_size);
+        }
     }
 }
 
