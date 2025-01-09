@@ -16,6 +16,30 @@ void TextCenter(const char* text, ...) {
     ImGui::Text("%s", buffer);
 }
 
+bool manage_slider_mousewheel_int(int &val, int min, int max, int step = 1)
+{
+    ImGui::SetItemUsingMouseWheel();
+    if( ImGui::IsItemHovered() )
+    {
+        float wheel = ImGui::GetIO().MouseWheel;
+        if( wheel )
+        {
+            if( ImGui::IsItemActive() )
+            {
+                ImGui::ClearActiveID();
+            }
+            else
+            {
+                val += step * wheel;
+            }
+        }
+        if (val > max) val = max;
+        if (val < min) val = min;
+        return true;
+    }
+    return false;
+}
+
 void AudioToolWindow::draw_sweep_tab()
 {
     int channelcount = m_audiorecorder.get_channel_count(); 
@@ -48,7 +72,7 @@ void AudioToolWindow::draw_sweep_tab()
         ImGui::SameLine();
         ImGui::BeginChild("FFTChildToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
             ImGui::SetNextItemWidth(70);
-            if (ImGui::SliderInt("Tone power", &m_signalgen_volume_db, -100, 0, "%d dB"))
+            if (ImGui::SliderInt("Tone power", &m_signalgen_volume_db, -100, 0, "%d dB") || manage_slider_mousewheel_int(m_signalgen_volume_db, -100, 0))
             {
                 m_signal_generator.set_volume(m_signalgen_volume_db);
             }
@@ -143,14 +167,22 @@ void AudioToolWindow::draw_sweep_tab()
     ImGui::BeginChild("PlotChild", ImVec2(-1, height() - 80), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
     if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1)))
     {
+        bool calibration_active = m_rms_calibration_scale != 1.0;
         float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
-        ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock);
+        ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock | ImPlotAxisFlags_Opposite);
         if (m_logscale_frequency){
             ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
         }
         ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Linear);
-        ImPlot::SetupAxesLimits(20.f, xfftmax, -130.0, 0.0);
+        ImPlot::SetupAxesLimits(0.f, xfftmax, -120.0, 0.0);
         ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 20.0, 24000.0);
+
+        if (calibration_active)
+        {
+            double diffdb = 20.0 * log10(m_rms_calibration_scale);
+            ImPlot::SetupAxis(ImAxis_Y2, "dBu", 0);
+            ImPlot::SetupAxisLimits(ImAxis_Y2, -120 + diffdb, diffdb, ImPlotCond_Always);
+        }
 
         if (channelcount>0 && m_fftfreqs)
         {
@@ -484,7 +516,7 @@ void AudioToolWindow::draw_audio_fft_widget(int channelcount, int current_sample
             ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
         }
         ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Linear);
-        ImPlot::SetupAxesLimits(20.f, xfftmax, -120.0, 20.0);
+        ImPlot::SetupAxesLimits(20.f, xfftmax, -120.0, 0.0);
         ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 20.f, 24000.f);
 
         double diffdb = 0;
@@ -492,7 +524,7 @@ void AudioToolWindow::draw_audio_fft_widget(int channelcount, int current_sample
         {
             diffdb = 20.0 * log10(m_rms_calibration_scale);
             ImPlot::SetupAxis(ImAxis_Y2, "dBu", 0);
-            ImPlot::SetupAxisLimits(ImAxis_Y2, -120 + diffdb, 20 + diffdb, ImPlotCond_Always);
+            ImPlot::SetupAxisLimits(ImAxis_Y2, -120 + diffdb, diffdb, ImPlotCond_Always);
         }
 
         if (m_fftfreqs && m_show_thd)
@@ -616,7 +648,7 @@ void AudioToolWindow::draw_tone_generator()
         if (m_signal_generator.mode() == audioWaveformGenerator::SINE)
         {
             ImGui::SameLine();
-            if (ImGui::SliderInt("Pitch", &m_signal_generator_pitch, 20, 20000))
+            if (ImGui::SliderInt("Pitch", &m_signal_generator_pitch, 20, 20000) || manage_slider_mousewheel_int(m_signal_generator_pitch, 20, 20000))
             {
                 m_signal_generator.set_pitch(m_signal_generator_pitch);
             }
@@ -625,10 +657,11 @@ void AudioToolWindow::draw_tone_generator()
         ImGui::EndChild();
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        if (ImGui::SliderInt("Intensity", &m_signalgen_volume_db, -100, 0, "%d dB"))
+        if (ImGui::SliderInt("Intensity", &m_signalgen_volume_db, -100, 0, "%d dB") || manage_slider_mousewheel_int(m_signalgen_volume_db, -100, 0))
         {
             m_signal_generator.set_volume(m_signalgen_volume_db);
         }
+        
         ImGui::SetItemTooltip("Set the generator intensity");
         ImGui::EndChild();
 
@@ -649,10 +682,11 @@ void AudioToolWindow::draw_tone_generator()
             {
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(80);
-                if (ImGui::SliderInt("FM frequency", &fm_freq, 0, 5000, "%d Hz"))
+                if (ImGui::SliderInt("FM frequency", &fm_freq, 0, 5000, "%d Hz") || manage_slider_mousewheel_int(fm_freq, 0, 5000))
                 {
                     m_signal_generator.set_fm(fm_freq, fm_vol);
                 }
+                
                 ImGui::SetItemTooltip("Set the FM modulation signal frequency");
 
                 ImGui::SameLine();

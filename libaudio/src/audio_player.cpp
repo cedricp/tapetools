@@ -66,10 +66,12 @@ void audioPlayer::write_callback(SoundIoOutStream *outstream, int frame_count_mi
             break;
     }
 }
+
 void audioPlayer::underflow_callback(SoundIoOutStream *outstream)
 {
     fprintf(stderr, "underflow\n");
 }
+
 void audioPlayer::error_callback(SoundIoOutStream *outstream, int err)
 {
     fprintf(stderr, "audioSineGenerator::error_callback %s\n", soundio_strerror(err));

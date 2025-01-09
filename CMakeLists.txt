@@ -69,7 +69,8 @@ if(MINGW)
     # Find and install needed DLLs
     #
     file(GENERATE OUTPUT
-    "${CONFIG_FILE}" CONTENT [[
+    "${CONFIG_FILE}" CONTENT 
+    [[
     set(TARGET_APP $<TARGET_FILE:tapetools>)
     message(STATUS "path to executable: ${TARGET_APP}")
     message(STATUS "paths to cmake library paths ${CMAKELIBPATH}")
@@ -90,7 +91,8 @@ if(MINGW)
     foreach(dep ${deps_unresolved})
     message(WARNING "Runtime dependency ${dep} could not be resolved.")
     endforeach()
-    ]])
+    ]]
+    )
 
     get_filename_component(MIGGWCC  ${CMAKE_C_COMPILER} PATH)
 	set(MINGWLIBPATH "${MIGGWCC}/")

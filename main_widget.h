@@ -25,9 +25,9 @@ class AudioToolWindow : public Widget
     friend class WowAndFluterThread;
 
     audioManager        m_audiomanager;
-    audioWaveformGenerator  m_signal_generator;
     audioRecorder       m_audiorecorder;
     audioPlayer         m_audioplayer;
+    audioWaveformGenerator  m_signal_generator;
 
     int  m_uitheme = 0;
     
@@ -46,7 +46,6 @@ class AudioToolWindow : public Widget
     std::string m_output_loopback_device;
 
     std::vector<double> m_sound_data1, m_sound_data2;
-    // 5 seconds buffer for wow/flutter
     std::vector<double> m_longterm_audio;
     std::vector<double> m_wow_flutter_data, m_wow_flutter_data_x;
     std::vector<double> m_sound_data_x;
@@ -279,6 +278,10 @@ public:
 
         m_audiomanager.flush();
         m_sweep_timer.connect_event(STATIC_METHOD(on_timer_event), this);
+
+        ImPlotStyle& s = ImPlot::GetStyle();
+        s.LineWeight = 1.5f;
+        s.PlotBorderSize = 2.f;
     }
 
     virtual ~AudioToolWindow()
@@ -410,8 +413,8 @@ public:
         }
         
         
-        ImGui::GetStyle().FrameRounding = 5.0;
-        ImGui::GetStyle().ChildRounding = 5.0;
+        ImGui::GetStyle().FrameRounding = 4.0;
+        ImGui::GetStyle().ChildRounding = 4.0;
         ImGui::GetStyle().WindowRounding = 4.0;
         ImGui::GetStyle().GrabRounding = 4.0;
         ImGui::GetStyle().GrabMinSize = 4.0;
