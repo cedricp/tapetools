@@ -49,6 +49,7 @@ void AudioToolWindow::draw_sweep_tab()
 
     ImGui::BeginChild("ScopesChild1", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
 
+
     ImGui::BeginChild("ScopesChild2", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         if (!m_sweep_started)
         {
@@ -164,7 +165,9 @@ void AudioToolWindow::draw_sweep_tab()
         ImGui::EndChild();
     }
 
-    ImGui::BeginChild("PlotChild", ImVec2(-1, height() - 80), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+    draw_tone_generator();
+
+    ImGui::BeginChild("PlotChild", ImVec2(-1, height()), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
     if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1)))
     {
         bool calibration_active = m_rms_calibration_scale != 1.0;
@@ -204,8 +207,6 @@ void AudioToolWindow::draw_sweep_tab()
         ImPlot::EndPlot();
     }
     ImGui::EndChild();
-
-    draw_tone_generator();
 
     ImGui::EndChild();
 }
@@ -432,13 +433,14 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         m_wow_data_mutex.unlock();
 
         char peak_text[64];
-        float percent_drift = m_fftdrawwow[0] / ref_frequency * 100.f;
+        double wow_zero = m_fftdrawwow.size() ? m_fftdrawwow[0] : 0;
+        float percent_drift = wow_zero / ref_frequency * 100.f;
         if (is_buffering)
         {
             snprintf(peak_text, 32, "Buffering...");
         } else
         {
-            snprintf(peak_text, 32, "Drift: [%.3f Hz] [%.3f %%]", m_fftdrawwow[0], percent_drift);
+            snprintf(peak_text, 32, "Drift: [%.3f Hz] [%.3f %%]", wow_zero, percent_drift);
         }
         ImVec2 plotpos = ImPlot::GetPlotPos();
         ImVec2 plotsize = ImPlot::GetPlotSize();
