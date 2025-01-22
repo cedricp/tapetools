@@ -15,8 +15,8 @@ class WowAndFluterThread : public ASyncTask
     std::vector<double> &m_longterm_audio;
     std::vector<double> &m_wow_flutter_data;
     std::vector<double> &m_wow_flutter_data_x;
-    std::vector<double> m_signal_i;
-    std::vector<double> m_signal_q;
+    std::vector<double> &m_signal_i;
+    std::vector<double> &m_signal_q;
     std::vector<fftw_complex> m_signal_iq;
     float &m_wow_peak;
     float &m_wow_mean;
@@ -42,7 +42,7 @@ public:
         m_samplerate(samplerate), m_analysis_time_s(WOW_FLUTTER_ANALYSIS_TIME), m_decimation(WOW_FLUTTER_DECIMATION),
         m_reference_frequency(ref_frequency), m_mutex(mainwin.m_wow_data_mutex), m_wow_mean(mainwin.m_wow_mean),
         m_wowfftplan(mainwin.m_fftplanwow), m_wow_fftdrawout(mainwin.m_fftdrawwow), m_wow_complex_fftout(mainwin.m_wow_complex_out),
-        m_wow_fftwowdrawfreqs(mainwin.m_fftwowdrawfreqs)
+        m_wow_fftwowdrawfreqs(mainwin.m_fftwowdrawfreqs), m_signal_i(mainwin.m_signal_i), m_signal_q(mainwin.m_signal_q)
     {
         switch (mainwin.m_wf_filter_freq_combo){
             case 1:
@@ -58,6 +58,9 @@ public:
             m_filter_freq = 0;
             break;
         }
+        // Init low pass filter
+        m_iq_lowpass_filter.setup(4, m_samplerate, 700, 0.1);
+        m_wf_lowpass_filter.setup(4, m_samplerate / m_decimation, m_filter_freq, 0.1);
     }
 
     ~WowAndFluterThread()
@@ -68,8 +71,7 @@ public:
 private:
     void entry() override
     {
-        // Init low pass filter
-        m_iq_lowpass_filter.setup(4, m_samplerate, 700, 0.1);
+        m_iq_lowpass_filter.reset();
 
         // We need ~5 seconds of audio recording
         m_mutex.lock();
@@ -84,6 +86,7 @@ private:
             // real signal to IQ data
             for (int i = 0; i < actual_audio_length; ++i)
             {
+                // Convert audio to Inphase/Quatrature data
                 double I = m_longterm_audio[i] * cos(m_reference_frequency*double(i) * twopif_over_sr);
                 double Q = m_longterm_audio[i] * sin(m_reference_frequency*double(i) * twopif_over_sr);
                 m_signal_i[i] = I;
@@ -117,9 +120,10 @@ private:
 
             if(m_filter_freq > 0)
             {
-                m_wf_lowpass_filter.setup(4, m_samplerate / m_decimation, m_filter_freq, 0.1);
+                m_wf_lowpass_filter.reset();
                 lp_chans[0] = m_wow_flutter_data.data();
                 m_wf_lowpass_filter.process(decimated_size, lp_chans);
+                //m_wf_lowpass_filter.processInterleaved(decimated_size, lp_chans);
             }
 
             double max_dev = -1000, min_dev = 1000, mean = 0;

@@ -9,7 +9,6 @@ void TextCenter(const char* text, ...) {
     vsnprintf(buffer, 256, text, args);
     va_end(args);
 
-
     float font_size = ImGui::GetFontSize() * strlen(buffer) / 2;
     ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2 - font_size + (font_size / 2));
 
@@ -18,6 +17,24 @@ void TextCenter(const char* text, ...) {
 
 bool manage_slider_mousewheel_int(int &val, int min, int max, int step = 1)
 {
+    bool shiftdown = ImGui::IsKeyDown(ImGuiKey_ModShift);
+    bool ctrldown = ImGui::IsKeyDown(ImGuiKey_ModCtrl);
+
+    int range = max-min;
+
+    if (shiftdown && ctrldown)
+    {
+        step *= range / 5;
+    }
+    else if (shiftdown)
+    {
+        step *= range / 10;
+    }
+    else if (ctrldown)
+    {
+        step *= range / 100;
+    }
+
     ImGui::SetItemUsingMouseWheel();
     if( ImGui::IsItemHovered() )
     {
@@ -48,6 +65,7 @@ void AudioToolWindow::draw_sweep_tab()
     float padh = 3.0f * ImGui::GetStyle().FramePadding.y + ImGui::GetStyle().ItemSpacing.y;
 
     ImGui::BeginChild("ScopesChild1", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
+
 
     ImGui::BeginChild("ScopesChild2", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         if (!m_sweep_started)
@@ -164,7 +182,9 @@ void AudioToolWindow::draw_sweep_tab()
         ImGui::EndChild();
     }
 
-    ImGui::BeginChild("PlotChild", ImVec2(-1, height() - 80), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+    draw_tone_generator();
+
+    ImGui::BeginChild("PlotChild", ImVec2(-1, height()), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
     if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1)))
     {
         bool calibration_active = m_rms_calibration_scale != 1.0;
@@ -204,8 +224,6 @@ void AudioToolWindow::draw_sweep_tab()
         ImPlot::EndPlot();
     }
     ImGui::EndChild();
-
-    draw_tone_generator();
 
     ImGui::EndChild();
 }
@@ -305,6 +323,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
     const char* filter_presets[] = {"Disabled", "Wow (6Hz)","Flutter low (20Hz)", "Flutter high (100Hz)"};
     float ref_frequency;
     static bool fft_view = false;
+    static bool iq_view = false;
     
     ImGui::BeginChild("ChildWF", ImVec2(0, -1), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
 
@@ -349,6 +368,9 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         ImGui::EndChild();
     }
 
+    ImGui::SameLine();
+    ImGui::ToggleButton("IQ view", &iq_view);
+
     static float max_freq = 100;
     static float max_fft_freq = 20;
 
@@ -367,6 +389,12 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         ImPlot::SetupAxisLimits(ImAxis_Y1, -max_freq, max_freq, ImPlotCond_Always);
         ImPlot::SetupAxis(ImAxis_Y2, "Peak drift %", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
         ImPlot::SetupAxisLimits(ImAxis_Y2, -max_percent, max_percent, ImPlotCond_Always);
+        if (iq_view)
+        {
+            ImPlot::SetupAxis(ImAxis_Y3, "IQ", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
+            ImPlot::SetupAxisLimits(ImAxis_Y3, -1, 1, ImPlotCond_Always);
+        }
+
 
         if (ImPlot::IsAxisHovered(ImAxis_Y1) || ImPlot::IsAxisHovered(ImAxis_Y2)){
             // Zoom Y axis in/out
@@ -376,6 +404,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         }
         
         m_wow_data_mutex.lock();
+            ImPlot::SetAxis(ImAxis_Y1);
             ImPlot::PlotLine("Wow and flutter", m_wow_flutter_data_x.data(), m_wow_flutter_data.data(), m_wow_flutter_data.size());
             
             double wow_mean_bar[4] = {0., 5., m_wow_mean, m_wow_mean};
@@ -383,6 +412,25 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
 
             float peak_percent = (m_wow_peak_detection / (ref_frequency + m_wow_mean)) * 100.;
             float freq_drift = (m_wow_mean / ref_frequency) * 100.;
+            if (iq_view)
+            {
+                std::pair<std::vector<double>, std::vector<double>> plotdatai(m_signal_i, m_wow_flutter_data_x);
+                std::pair<std::vector<double>, std::vector<double>> plotdataq(m_signal_q, m_wow_flutter_data_x);
+                
+                auto offsetter1 = [](int idx, void* data) -> ImPlotPoint { 
+                    auto& slice = *(std::pair<std::vector<double>, std::vector<double>>*)data;
+                    return ImPlotPoint(slice.first[idx] - 0.5, slice.second[idx]);
+                };
+                auto offsetter2 = [](int idx, void* data) -> ImPlotPoint { 
+                    auto& slice = *(std::pair<std::vector<double>, std::vector<double>>*)data;
+                    return ImPlotPoint(slice.first[idx] + 0.5, slice.second[idx]);
+                };
+
+                ImPlot::SetAxis(ImAxis_Y3);
+                ImPlot::PlotLineG("I", offsetter1, &plotdatai, m_wow_flutter_data_x.size());
+                ImPlot::PlotLineG("Q", offsetter2, &plotdataq, m_wow_flutter_data_x.size());
+                ImPlot::SetAxis(ImAxis_Y1);
+            }
         m_wow_data_mutex.unlock();
 
         char peak_text[64];
@@ -432,13 +480,14 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         m_wow_data_mutex.unlock();
 
         char peak_text[64];
-        float percent_drift = m_fftdrawwow[0] / ref_frequency * 100.f;
+        double wow_zero = m_fftdrawwow.size() ? m_fftdrawwow[0] : 0;
+        float percent_drift = wow_zero / ref_frequency * 100.f;
         if (is_buffering)
         {
             snprintf(peak_text, 32, "Buffering...");
         } else
         {
-            snprintf(peak_text, 32, "Drift: [%.3f Hz] [%.3f %%]", m_fftdrawwow[0], percent_drift);
+            snprintf(peak_text, 32, "Drift: [%.3f Hz] [%.3f %%]", wow_zero, percent_drift);
         }
         ImVec2 plotpos = ImPlot::GetPlotPos();
         ImVec2 plotsize = ImPlot::GetPlotSize();
@@ -505,6 +554,7 @@ void AudioToolWindow::draw_audio_fft_widget(int channelcount, int current_sample
 {
     if (ImPlot::BeginPlot("Audio FFT", ImVec2(m_compute_channel_phase ? width() - plotheight * 1.5f - 10 : -1, -1)))
     {
+
         bool calibration_active = m_rms_calibration_scale != 1.0;
         double* fft_draw = m_fft_channel_left  ? m_fftdrawl : m_fftdrawr;
         float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
@@ -566,9 +616,7 @@ void AudioToolWindow::draw_audio_fft_widget(int channelcount, int current_sample
                 snprintf(thdtext, 16, "%.4fKHz", freq);
                 ImPlot::PlotText(thdtext, m_fft_harmonics_pos[i], y_pos+20 * plot_to_pix_graph);
             }
-
         }
-
 
         double nf[4] = {0., (current_sample_rate)/2.0, m_noise_foor, m_noise_foor};
         ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
@@ -578,6 +626,19 @@ void AudioToolWindow::draw_audio_fft_widget(int channelcount, int current_sample
             if (m_fft_channel_left) ImPlot::PlotLine("Audio left FFT", m_fftfreqs, m_fftdrawl, m_sound_data_x.size()/2);
             if (m_fft_channel_right) ImPlot::PlotLine("Audio right FFT", m_fftfreqs, m_fftdrawr, m_sound_data_x.size()/2);
         }
+
+        double *current_draw = m_fft_channel_left ? m_fftdrawl : m_fftdrawr;
+        ImPlotPoint mpos = ImPlot::GetPlotMousePos(IMPLOT_AUTO, ImAxis_Y1);
+        if (ImPlot::IsPlotHovered() && (int)mpos.x < m_sound_data_x.size())
+        {
+            char buffer[64];
+            ImVec2 mposg = ImPlot::PlotToPixels(mpos);
+
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            dl->AddRectFilled(ImVec2(mposg.x-1, mposg.y-1), ImVec2(mposg.x+1, mposg.y+1), IM_COL32_WHITE);
+            snprintf(buffer, 64,  "Freq:%.2fKHz %0.2fdB", m_fftfreqs[(int)mpos.x], current_draw[(int)mpos.x]);
+            ImPlot::PlotText(buffer, mpos.x, mpos.y);
+        } 
 
         ImPlot::EndPlot();
     }
