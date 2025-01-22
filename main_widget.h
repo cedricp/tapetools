@@ -418,6 +418,7 @@ public:
         ImGui::GetStyle().WindowRounding = 4.0;
         ImGui::GetStyle().GrabRounding = 4.0;
         ImGui::GetStyle().GrabMinSize = 4.0;
+        ImGui::GetStyle().WindowPadding = ImVec2(4.0, 4.0);
     }
 
     void check_settings_loaded()

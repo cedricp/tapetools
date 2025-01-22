@@ -15,7 +15,7 @@ static void digit(ImDrawList*d,int n,ImVec2 e,ImVec2 p)
     ImGuiStyle* style = &ImGui::GetStyle();
     ImVec4* colors = style->Colors;
     ImVec4 bg = colors[ImGuiCol_WindowBg];
-    bg.x += 0.12;bg.y += 0.12;bg.z += 0.12;
+    bg.x += 0.09;bg.y += 0.09;bg.z += 0.09;
     lcd_bg = ImGui::ColorConvertFloat4ToU32(bg);
     float r[7][4]={{-1,-1,H,H},{1,-1,-H,H},{1,0,-H,-H},{-1,1,H,-W*1.5},{-1,0,H,-H},{-1,-1,H,H},{-1,0,H,-H},};
     for(int i=0;i<7;i++){
