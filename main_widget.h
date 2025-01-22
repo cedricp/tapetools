@@ -49,6 +49,9 @@ class AudioToolWindow : public Widget
     std::vector<double> m_longterm_audio;
     std::vector<double> m_wow_flutter_data, m_wow_flutter_data_x;
     std::vector<double> m_sound_data_x;
+    // Wow flutter IQ data
+    std::vector<double> m_signal_i;
+    std::vector<double> m_signal_q;
     std::vector<double> m_raw_buffer;
     fftw_plan m_fftplanr = NULL;
     fftw_plan m_fftplanl = NULL;
@@ -156,6 +159,13 @@ class AudioToolWindow : public Widget
 
         if (!m_async_sweep)
         {
+            bool need_stop_sweep = false;
+            if (m_sweep_current_frequency > 20000)
+            {
+                m_sweep_current_frequency = 20000;
+                need_stop_sweep = true;
+            }
+
             int min_freq_idx = std::max(int((m_sweep_current_frequency-50)*fft_step), 0);
             int max_freq_idx = std::min(int((m_sweep_current_frequency+50)*fft_step), m_capture_size / 2);
 
@@ -174,15 +184,15 @@ class AudioToolWindow : public Widget
 
             double newlogfreq = log10(m_sweep_current_frequency) + step;
 
-            m_sweep_current_frequency = pow(10., newlogfreq);
-            m_signal_generator.set_pitch(m_sweep_current_frequency);
-
-            if (m_sweep_current_frequency >= 22000)
+            if (need_stop_sweep)
             {   
                 // We reached the end of the measure
                 stop_sweep_gen();
                 return;
             }
+
+            m_sweep_current_frequency = pow(10., newlogfreq);
+            m_signal_generator.set_pitch(m_sweep_current_frequency);
         } else {
             double fft_max_val = m_sweep_threshold_level;
             double frequency = -1;
@@ -322,9 +332,9 @@ public:
             colors[ImGuiCol_HeaderActive] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
 
             // Buttons
-            colors[ImGuiCol_Button] = ImVec4{0.13f, 0.13f, 0.17, 1.0f};
-            colors[ImGuiCol_ButtonHovered] = ImVec4{0.19f, 0.2f, 0.25f, 1.0f};
-            colors[ImGuiCol_ButtonActive] = ImVec4{0.16f, 0.16f, 0.21f, 1.0f};
+            colors[ImGuiCol_Button] = ImVec4{0.23f, 0.23f, 0.27, 1.0f};
+            colors[ImGuiCol_ButtonHovered] = ImVec4{0.29f, 0.3f, 0.35f, 1.0f};
+            colors[ImGuiCol_ButtonActive] = ImVec4{0.36f, 0.36f, 0.41f, 1.0f};
             colors[ImGuiCol_CheckMark] = ImVec4{0.74f, 0.58f, 0.98f, 1.0f};
 
             // Popups
@@ -504,12 +514,14 @@ public:
 
     void start_sweep_gen()
     {
-        m_compute_on = true;
         reinit_recorder();
+
+        m_compute_on = true;
         m_sweep_started = true;
         m_sweep_current_frequency = 20;
         m_sweep_freqs.clear();
         m_sweep_values.clear();
+
         if (!m_async_sweep)
         {
             m_signal_generator_switch = true;
@@ -517,16 +529,17 @@ public:
             m_signal_generator.set_pitch(m_sweep_current_frequency);
             m_signal_generator.set_mode(audioWaveformGenerator::SINE);
         }
+
         m_sweep_timer.start();
         m_sweep_last_measure_freq = 10;
     }
 
     void stop_sweep_gen()
     {
-        m_sweep_started = false;
         m_signal_generator_switch = false;
         m_signal_generator.pause();
         m_sweep_timer.stop();
+        m_sweep_started = false;
     }
 
     void set_window_fn(bool compute_cache = true);

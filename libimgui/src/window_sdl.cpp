@@ -250,7 +250,7 @@ void Window_SDL::show(bool show)
 		// (Some versions of SDL before <2.0.10 appears to have performance/stalling issues on a minority of Windows systems,
 		// depending on whether SDL_INIT_GAMECONTROLLER is enabled or disabled.. updating to latest version of SDL is recommended!)
 		_impl->_window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-		_impl->_window = SDL_CreateWindow(_impl->_name.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, _width, _height, _impl->_window_flags);
+		_impl->_window = SDL_CreateWindow(_impl->_name.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, _width, _height, _impl->_window_flags);
 		SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
 		_impl->_gl_context = SDL_GL_CreateContext(_impl->_window);
 		SDL_GL_MakeCurrent(_impl->_window, _impl->_gl_context);

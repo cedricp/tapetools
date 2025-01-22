@@ -114,18 +114,81 @@ public:
     }
   }
 
-  void process (int numSamples, float* const* arrayOfChannels)
+    template <typename Sample>
+  void processBlockInterleaved (int numSamples,
+                     Sample* destFramesArray)
+  {
+    const int numChannels = this->getNumChannels();
+
+    // If this goes off it means setup() was never called
+    assert (m_remainingSamples >= 0);
+
+    // first handle any transition samples
+    int remainingSamples = std::min (m_remainingSamples, numSamples);
+
+    if (remainingSamples > 0)
+    {
+      // interpolate parameters for each sample
+      const double t = 1. / m_remainingSamples;
+      double dp[maxParameters];
+      for (int i = 0; i < DesignClass::NumParams; ++i)
+        dp[i] = (this->getParams()[i] - m_transitionParams[i]) * t;
+
+      for (int n = 0; n < remainingSamples; ++n)
+      {
+        for (int i = DesignClass::NumParams; --i >=0;)
+          m_transitionParams[i] += dp[i];
+
+        m_transitionFilter.setParams (m_transitionParams);
+
+        for (int i = numChannels; --i >= 0;)
+        {
+          Sample* dest = destFramesArray + i + n * numChannels;
+          *dest = this->m_state[i].process (*dest, m_transitionFilter);
+        }
+      }
+
+      m_remainingSamples -= remainingSamples;
+
+      if (m_remainingSamples == 0)
+        m_transitionParams = this->getParams();
+    }
+
+    // do what's left
+    if (numSamples - remainingSamples > 0)
+    {
+      // no transition
+      for (int i = 0; i < numChannels; ++i)
+        this->m_design.processInterleaved (numSamples - remainingSamples,
+                          destFramesArray + i + remainingSamples * numChannels,
+                          numChannels,
+                          this->m_state[i]);
+    }
+
+  }
+
+  void process (int numSamples, float* const* arrayOfChannels) override
   {
     processBlock (numSamples, arrayOfChannels);
   }
 
-  void process (int numSamples, double* const* arrayOfChannels)
+  void process (int numSamples, double* const* arrayOfChannels) override
   {
     processBlock (numSamples, arrayOfChannels);
+  }
+
+    void processInterleaved (int numSamples, float* arrayOfFrames) override
+  {
+    processBlockInterleaved (numSamples, arrayOfFrames);
+  }
+
+  void processInterleaved (int numSamples, double* arrayOfFrames) override
+  {
+    processBlockInterleaved (numSamples, arrayOfFrames);
   }
 
 protected:
-  void doSetParams (const Params& parameters)
+  void doSetParams (const Params& parameters) override
   {
     if (m_remainingSamples >= 0)
     {
