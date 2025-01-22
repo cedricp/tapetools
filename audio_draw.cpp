@@ -322,13 +322,12 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
     const char* ref_freq_presets[] = {"3000","3150", "Custom"};
     const char* filter_presets[] = {"Disabled", "Wow (6Hz)","Flutter low (20Hz)", "Flutter high (100Hz)"};
     float ref_frequency;
-    static bool fft_view = false;
     static bool iq_view = false;
     
     ImGui::BeginChild("ChildWF", ImVec2(0, -1), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
 
     ImGui::BeginChild("ChildFFTControl", ImVec2(0, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
-    ImGui::ToggleButton("FFT view", &fft_view);
+    ImGui::ToggleButton("FFT view", &m_show_wf_fft_view);
     ImGui::EndChild();
 
     ImGui::SameLine();
@@ -368,8 +367,20 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         ImGui::EndChild();
     }
 
+    if (!m_show_wf_fft_view)
+    {
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildIQDebug", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::ToggleButton("IQ view", &iq_view);
+        ImGui::SameLine();
+        ImGui::EndChild();
+    }
+
     ImGui::SameLine();
-    ImGui::ToggleButton("IQ view", &iq_view);
+    ImGui::BeginChild("ScopesChildDebug", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("Thread time : %lums", m_wf_compute_time/1000);
+    ImGui::EndChild();
 
     static float max_freq = 100;
     static float max_fft_freq = 20;
@@ -381,7 +392,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
     float max_percent = (max_freq / ref_frequency) * 100.;
     bool is_buffering = m_longterm_audio.size() < WOW_FLUTTER_ANALYSIS_TIME * m_audiorecorder.get_current_samplerate();
 
-    if(!fft_view && ImPlot::BeginPlot("Wow and flutter analysis (unweighted)", ImVec2(plotheight*1.8, -1)))
+    if(!m_show_wf_fft_view && ImPlot::BeginPlot("Wow and flutter analysis (unweighted)", ImVec2(plotheight*1.8, -1)))
     {
         ImPlot::SetupAxes("Time (seconds)", "Freqency drift (Hz)", 0, ImPlotAxisFlags_Lock);
         ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0., 5.);
@@ -412,18 +423,20 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
 
             float peak_percent = (m_wow_peak_detection / (ref_frequency + m_wow_mean)) * 100.;
             float freq_drift = (m_wow_mean / ref_frequency) * 100.;
-            if (iq_view)
+            if (!m_show_wf_fft_view && iq_view && m_signal_i.size() && m_signal_q.size())
             {
-                std::pair<std::vector<double>, std::vector<double>> plotdatai(m_signal_i, m_wow_flutter_data_x);
-                std::pair<std::vector<double>, std::vector<double>> plotdataq(m_signal_q, m_wow_flutter_data_x);
+                std::pair<std::vector<double>, std::vector<double>> plotdatai(m_wow_flutter_data_x, m_signal_i);
+                std::pair<std::vector<double>, std::vector<double>> plotdataq(m_wow_flutter_data_x, m_signal_q);
                 
                 auto offsetter1 = [](int idx, void* data) -> ImPlotPoint { 
+                    int smp_idx = idx * WOW_FLUTTER_DECIMATION;
                     auto& slice = *(std::pair<std::vector<double>, std::vector<double>>*)data;
-                    return ImPlotPoint(slice.first[idx] - 0.5, slice.second[idx]);
+                    return ImPlotPoint(slice.first[idx], slice.second[smp_idx] - 0.5);
                 };
                 auto offsetter2 = [](int idx, void* data) -> ImPlotPoint { 
+                    int smp_idx = idx * WOW_FLUTTER_DECIMATION;
                     auto& slice = *(std::pair<std::vector<double>, std::vector<double>>*)data;
-                    return ImPlotPoint(slice.first[idx] + 0.5, slice.second[idx]);
+                    return ImPlotPoint(slice.first[idx], slice.second[smp_idx] + 0.5);
                 };
 
                 ImPlot::SetAxis(ImAxis_Y3);
@@ -620,24 +633,30 @@ void AudioToolWindow::draw_audio_fft_widget(int channelcount, int current_sample
 
         double nf[4] = {0., (current_sample_rate)/2.0, m_noise_foor, m_noise_foor};
         ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
+
+        double* current_fft_draw = m_fft_channel_left ? m_fftdrawl : m_fftdrawr;
         
         if (channelcount>0 && m_fftfreqs)
         {
-            if (m_fft_channel_left) ImPlot::PlotLine("Audio left FFT", m_fftfreqs, m_fftdrawl, m_sound_data_x.size()/2);
-            if (m_fft_channel_right) ImPlot::PlotLine("Audio right FFT", m_fftfreqs, m_fftdrawr, m_sound_data_x.size()/2);
+            if (m_fft_channel_left) ImPlot::PlotLine("Audio left FFT", m_fftfreqs, current_fft_draw, m_sound_data_x.size()/2);
+            if (m_fft_channel_right) ImPlot::PlotLine("Audio right FFT", m_fftfreqs, current_fft_draw, m_sound_data_x.size()/2);
         }
 
         double *current_draw = m_fft_channel_left ? m_fftdrawl : m_fftdrawr;
-        ImPlotPoint mpos = ImPlot::GetPlotMousePos(IMPLOT_AUTO, ImAxis_Y1);
-        if (ImPlot::IsPlotHovered() && (int)mpos.x < m_sound_data_x.size())
+        if (ImPlot::IsPlotHovered() && m_sound_data_x.size())
         {
+            ImPlotPoint mouse_pos = ImPlot::GetPlotMousePos(IMPLOT_AUTO, ImAxis_Y1);
             char buffer[64];
-            ImVec2 mposg = ImPlot::PlotToPixels(mpos);
-
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            dl->AddRectFilled(ImVec2(mposg.x-1, mposg.y-1), ImVec2(mposg.x+1, mposg.y+1), IM_COL32_WHITE);
-            snprintf(buffer, 64,  "Freq:%.2fKHz %0.2fdB", m_fftfreqs[(int)mpos.x], current_draw[(int)mpos.x]);
-            ImPlot::PlotText(buffer, mpos.x, mpos.y);
+            int mouse_to_index = 0;
+            for(int i = 0; i < m_sound_data_x.size(); i++)
+            {
+                if (mouse_pos.x < m_fftfreqs[i]) break;
+                mouse_to_index = i;
+            }
+            ImVec2 plotpos = ImPlot::GetPlotPos();
+            ImPlotPoint pos = ImPlot::PixelsToPlot(ImVec2(plotpos.x + 110,plotpos.y + 20));
+            snprintf(buffer, 64,  "Freq:%.2fKHz %0.2fdB", mouse_pos.x, current_draw[mouse_to_index]);
+            ImPlot::PlotText(buffer, pos.x, pos.y);
         } 
 
         ImPlot::EndPlot();
@@ -900,6 +919,12 @@ void AudioToolWindow::draw_rt_analysis_tab()
         }
         ImGui::SetItemTooltip("Clear the calibration");
     }
+    ImGui::EndChild();
+
+    ImGui::SameLine();
+    ImGui::BeginChild("ScopesChildComputeInfo", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("Total compute time: %ins", m_total_compute_time);
     ImGui::EndChild();
 
     /*

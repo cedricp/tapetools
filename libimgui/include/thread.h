@@ -27,6 +27,10 @@ public:
 	}
 
 	void print_elapsed_time(const char* prefix);
+    unsigned long get_elapsed_time()
+    {
+        return timestamp() - m_time;
+    }
 };
 
 class ThreadMutex
@@ -100,6 +104,7 @@ protected:
 #endif
     volatile bool m_pause;
     bool m_loop;
+    bool m_started = false;
 
 public:
     Thread(std::string name = "default", bool loop = false, bool managed = true);
@@ -108,6 +113,7 @@ public:
     bool join();
     void usleep(unsigned long us);
     const std::string& name(){return m_name;}
+    bool is_started(){return m_started;}
 
     /*
      * Main thread code

@@ -26,6 +26,7 @@ DWORD WINAPI Thread::run_win32(LPVOID userdata)
     Thread *thread = (Thread *)userdata;
     HRESULT err = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     assert(err == S_OK);
+    thread->m_started = true;
     while (thread->m_running)
     {
         if (!thread->m_pause)
@@ -49,6 +50,7 @@ DWORD WINAPI Thread::run_win32(LPVOID userdata)
 void *Thread::run_posix(void* userdata)
 {
     Thread *thread = (Thread *)userdata;
+    m_started = true;
     while (thread->m_running)
     {
         if (!thread->m_pause)

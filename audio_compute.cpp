@@ -175,6 +175,7 @@ bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
         }
     }
 
+    Chrono chrono;
     for (int i = 0; i < m_capture_size; i++)
     {
         //double sound_data = .3 * sin(3145.*double(i) * twopif_over_sr);//
@@ -255,6 +256,8 @@ bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
         } // compute_noise_floor
     } // compute_fft
 
+    m_total_compute_time = chrono.get_elapsed_time();
+
     return true;
 }
 
@@ -263,7 +266,7 @@ void AudioToolWindow::compute_wow_and_flutter()
 {
     double samplerate = m_audiorecorder.get_current_samplerate();
 
-            // Append captured audio data to get them
+    // Append captured audio data to get them
     int audio_capture_length = WOW_FLUTTER_ANALYSIS_TIME * samplerate;
     std::vector<double> &audio_channel = m_fft_channel_left ? m_sound_data1 : m_sound_data2;
 
@@ -306,6 +309,8 @@ void AudioToolWindow::compute_wow_and_flutter()
     // Create and launch thread
     WowAndFluterThread* wt = new WowAndFluterThread(*this, reference_frequency, samplerate);
     wt->start();
+    // Wait for thread to start
+    while(!wt->is_started()){}
 }
 
 void AudioToolWindow::compute_channels_phase()

@@ -25,11 +25,13 @@ class WowAndFluterThread : public ASyncTask
     float m_analysis_time_s;
     float m_filter_freq;
     int   m_decimation;
+    bool &m_compute_fft;
 
     fftw_plan& m_wowfftplan;
     std::vector<double>& m_wow_fftdrawout;
     std::vector<double>& m_wow_fftwowdrawfreqs;
     fftw_complex* m_wow_complex_fftout;
+    unsigned long &m_time;
 
     // Objects
     Dsp::SimpleFilter <Dsp::ChebyshevI::LowPass <4>, 2> m_iq_lowpass_filter;
@@ -42,7 +44,8 @@ public:
         m_samplerate(samplerate), m_analysis_time_s(WOW_FLUTTER_ANALYSIS_TIME), m_decimation(WOW_FLUTTER_DECIMATION),
         m_reference_frequency(ref_frequency), m_mutex(mainwin.m_wow_data_mutex), m_wow_mean(mainwin.m_wow_mean),
         m_wowfftplan(mainwin.m_fftplanwow), m_wow_fftdrawout(mainwin.m_fftdrawwow), m_wow_complex_fftout(mainwin.m_wow_complex_out),
-        m_wow_fftwowdrawfreqs(mainwin.m_fftwowdrawfreqs), m_signal_i(mainwin.m_signal_i), m_signal_q(mainwin.m_signal_q)
+        m_wow_fftwowdrawfreqs(mainwin.m_fftwowdrawfreqs), m_signal_i(mainwin.m_signal_i), m_signal_q(mainwin.m_signal_q), m_time(mainwin.m_wf_compute_time),
+        m_compute_fft(mainwin.m_show_wf_fft_view)
     {
         switch (mainwin.m_wf_filter_freq_combo){
             case 1:
@@ -58,9 +61,6 @@ public:
             m_filter_freq = 0;
             break;
         }
-        // Init low pass filter
-        m_iq_lowpass_filter.setup(4, m_samplerate, 700, 0.1);
-        m_wf_lowpass_filter.setup(4, m_samplerate / m_decimation, m_filter_freq, 0.1);
     }
 
     ~WowAndFluterThread()
@@ -71,7 +71,10 @@ public:
 private:
     void entry() override
     {
-        m_iq_lowpass_filter.reset();
+        Chrono chrono;
+        // Init low pass filter
+        m_iq_lowpass_filter.setup(4, m_samplerate, 700, 0.1);
+        m_wf_lowpass_filter.setup(4, m_samplerate / m_decimation, m_filter_freq, 0.1);
 
         // We need ~5 seconds of audio recording
         m_mutex.lock();
@@ -92,17 +95,15 @@ private:
                 m_signal_i[i] = I;
                 m_signal_q[i] = Q;
             }
-        m_mutex.unlock();
 
-        // Low pass filter IQ signal to suppress fundamental
-        double *lp_chans[2] = {m_signal_i.data(), m_signal_q.data()};
-        m_iq_lowpass_filter.process(actual_audio_length, lp_chans);
+            // Low pass filter IQ signal to suppress fundamental
+            double *lp_chans[2] = {m_signal_i.data(), m_signal_q.data()};
+            m_iq_lowpass_filter.process(actual_audio_length, lp_chans);
 
-        int decimated_size = m_wow_flutter_data.size();
-        int decimated_samplerate = m_samplerate / WOW_FLUTTER_DECIMATION;
-        double phase_to_hz = (m_samplerate / (M_PI * 2.));
+            int decimated_size = m_wow_flutter_data.size();
+            int decimated_samplerate = m_samplerate / WOW_FLUTTER_DECIMATION;
+            double phase_to_hz = (m_samplerate / (M_PI * 2.));
 
-        m_mutex.lock();  
             for (int i = 1; i < decimated_size; i++)
             {
                 int step_i = i * m_decimation;
@@ -143,21 +144,25 @@ private:
             m_wow_peak = peak_plus > peak_minus ? peak_plus : peak_minus;
             m_wow_mean = mean;
 
-            fftw_execute(m_wowfftplan);
-
-            const int fftdraw_size = (decimated_samplerate * (WOW_FLUTTER_ANALYSIS_TIME - 0.5f)) / 2;
-            const double inv_fft_capture_size = 1./fftdraw_size;
-            const double fft_step = (decimated_samplerate / 2.) * inv_fft_capture_size;
-
-            for(int i = 0; i < fftdraw_size; ++i)
+            if (m_compute_fft)
             {
-                double fftout = sqrt(m_wow_complex_fftout[i][0] * m_wow_complex_fftout[i][0] + m_wow_complex_fftout[i][1] * m_wow_complex_fftout[i][1]) * inv_fft_capture_size;
-                m_wow_fftdrawout[i] = fftout;
-                m_wow_fftwowdrawfreqs[i] = fft_step * i;
-            }
+                fftw_execute(m_wowfftplan);
 
-            // Normalize DC component
-            m_wow_fftdrawout[0] *= 0.5;
+                const int fftdraw_size = (decimated_samplerate * (WOW_FLUTTER_ANALYSIS_TIME - 0.5f)) / 2;
+                const double inv_fft_capture_size = 1./fftdraw_size;
+                const double fft_step = (decimated_samplerate / 2.) * inv_fft_capture_size;
+
+                for(int i = 0; i < fftdraw_size; ++i)
+                {
+                    double fftout = sqrt(m_wow_complex_fftout[i][0] * m_wow_complex_fftout[i][0] + m_wow_complex_fftout[i][1] * m_wow_complex_fftout[i][1]) * inv_fft_capture_size;
+                    m_wow_fftdrawout[i] = fftout;
+                    m_wow_fftwowdrawfreqs[i] = fft_step * i;
+                }
+
+                // Normalize DC component
+                m_wow_fftdrawout[0] *= 0.5;
+            }
         m_mutex.unlock();
+        m_time = chrono.get_elapsed_time();
     }
 };

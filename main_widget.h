@@ -49,6 +49,7 @@ class AudioToolWindow : public Widget
     std::vector<double> m_longterm_audio;
     std::vector<double> m_wow_flutter_data, m_wow_flutter_data_x;
     std::vector<double> m_sound_data_x;
+    unsigned long m_wf_compute_time = 0;
     // Wow flutter IQ data
     std::vector<double> m_signal_i;
     std::vector<double> m_signal_q;
@@ -75,6 +76,7 @@ class AudioToolWindow : public Widget
     int m_in_sample_rate_idx = 0;
     int m_out_sample_rate_idx = 0;
     int m_wow_flutter_capture_size = 0;
+    bool m_show_wf_fft_view = false;
 
     bool m_sound_setup_open = false;
     bool m_compute_channel_phase = false;
@@ -146,8 +148,8 @@ class AudioToolWindow : public Widget
     float   m_wow_peak_detection = 0;
     int     m_wf_filter_freq_combo = 0;
     float   m_wow_mean = 0;
+    unsigned long m_total_compute_time=0;
     ThreadMutex m_wow_data_mutex;
-
     SdrThread m_sdr_thread;
 
     CALLBACK_METHOD(on_timer_event, AudioToolWindow)
