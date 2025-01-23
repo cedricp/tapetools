@@ -148,7 +148,11 @@ class AudioToolWindow : public Widget
     float   m_wow_peak_detection = 0;
     int     m_wf_filter_freq_combo = 0;
     float   m_wow_mean = 0;
+
+    bool    m_debug_info = false;
+
     unsigned long m_total_compute_time=0;
+    unsigned long m_ui_time=0;
     ThreadMutex m_wow_data_mutex;
     SdrThread m_sdr_thread;
 
@@ -448,6 +452,7 @@ public:
     {
         m_audiomanager.flush();
         check_settings_loaded();
+        Chrono chrono;
 
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("Preferences"))
@@ -487,6 +492,7 @@ public:
                 {
                     reinit_recorder();
                 }
+                ImGui::MenuItem("Show timings", nullptr, &m_debug_info);
                 ImGui::PopItemFlag();
                 
                 ImGui::EndMenu();
@@ -513,6 +519,7 @@ public:
         ImGui::EndTabBar();
 
         draw_tools_windows();
+        m_ui_time = chrono.get_elapsed_time();
     }
 
     void start_sweep_gen()
@@ -546,7 +553,7 @@ public:
     }
 
     void set_window_fn(bool compute_cache = true);
-    bool compute(bool compute_fft = true, bool compute_noise_floor = true);
+    bool compute();
     void compute_wow_and_flutter();
     void compute_thdn();
     void compute_thd();

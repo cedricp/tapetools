@@ -128,7 +128,7 @@ void AudioToolWindow::compute_fft_window_corrections(int num_samples)
     m_fft_window_fn_index = tmp;
 }
 
-bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
+bool AudioToolWindow::compute()
 {
     const int channelcount = m_audiorecorder.get_channel_count();
     if (channelcount == 0)
@@ -138,6 +138,7 @@ bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
 
     bool data_available = m_audiorecorder.get_data(m_raw_buffer, m_capture_size * channelcount);
     if (!data_available){
+        // Quick return in no new audio data to compute
         return false;
     }
 
@@ -178,11 +179,9 @@ bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
     Chrono chrono;
     for (int i = 0; i < m_capture_size; i++)
     {
-        //double sound_data = .3 * sin(3145.*double(i) * twopif_over_sr);//
         double sound_data = m_raw_buffer[i*channelcount] * m_audio_gain;
         m_sound_data1[i] = sound_data;
             
-        // THD test for non linear signal by applying small odd harmomics distortion
         m_fftinl[i] = sound_data * m_current_window_cache[i];
         m_sound_data_x[i] = float(i) * inv_current_sample_rate * 1000.0;
 
@@ -211,50 +210,44 @@ bool AudioToolWindow::compute(bool compute_fft, bool compute_noise_floor)
         m_rms_right = sqrt(m_rms_right);
     }
     
-    if (compute_fft)
-    {
-        double* current_fft_draw = m_fft_channel_left  ? m_fftdrawl : m_fftdrawr;
-        // Compute and fill audio FFT
-        ::fftw_execute(m_fftplanl);
-        if (channelcount > 1) ::fftw_execute(m_fftplanr);
+    double* current_fft_draw = m_fft_channel_left  ? m_fftdrawl : m_fftdrawr;
+    // Compute and fill audio FFT
+    ::fftw_execute(m_fftplanl);
+    if (channelcount > 1) ::fftw_execute(m_fftplanr);
 
-        std::vector<double> fftdatal(fft_capture_size);
-        float sum = 0;
-        for (int i = 0; i < fft_capture_size; ++i)
+    std::vector<double> fftdatal(fft_capture_size);
+    float sum = 0;
+    for (int i = 0; i < fft_capture_size; ++i)
+    {
+        m_fftfreqs[i] = fft_step * (double)(i);
+        double fftout = sqrt(m_fftoutl[i][0] * m_fftoutl[i][0] + m_fftoutl[i][1] * m_fftoutl[i][1]) * inv_fft_capture_size;
+        fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
+        fftout = std::max(20.0 * log10(fftout), -200.0);
+        m_fftdrawl[i] = std::isnan(fftout) ? -200.f : fftout;
+        if (m_fft_channel_left) sum += fftout;
+
+        if (channelcount > 1)
         {
-            m_fftfreqs[i] = fft_step * (double)(i);
-            double fftout = sqrt(m_fftoutl[i][0] * m_fftoutl[i][0] + m_fftoutl[i][1] * m_fftoutl[i][1]) * inv_fft_capture_size;
+            double fftout = sqrt(m_fftoutr[i][0] * m_fftoutr[i][0] + m_fftoutr[i][1] * m_fftoutr[i][1]) * inv_fft_capture_size;
             fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
             fftout = std::max(20.0 * log10(fftout), -200.0);
-            m_fftdrawl[i] = std::isnan(fftout) ? -200.f : fftout;
-            if (m_fft_channel_left) sum += fftout;
-
-            if (channelcount > 1)
-            {
-                double fftout = sqrt(m_fftoutr[i][0] * m_fftoutr[i][0] + m_fftoutr[i][1] * m_fftoutr[i][1]) * inv_fft_capture_size;
-                fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
-                fftout = std::max(20.0 * log10(fftout), -200.0);
-                m_fftdrawr[i] = std::isnan(fftout) ? -200.f : fftout;
-                if (m_fft_channel_right) sum += fftout;
-            }
+            m_fftdrawr[i] = std::isnan(fftout) ? -200.f : fftout;
+            if (m_fft_channel_right) sum += fftout;
         }
+    }
 
-        m_fftdrawr[0] *= 0.5;
-        m_fftdrawl[0] *= 0.5;
+    m_fftdrawr[0] *= 0.5;
+    m_fftdrawl[0] *= 0.5;
 
-        if (compute_noise_floor)
-        {
-            double mean = sum * inv_fft_capture_size;
-            double stddev = 0;
-            for (int i = 0; i < fft_capture_size; ++i)
-            {
-                double a = (current_fft_draw[i] - mean);
-                stddev += a * a;
-            }
-            stddev = sqrt(stddev / float(fft_capture_size - 1));
-            m_noise_foor = mean + stddev;
-        } // compute_noise_floor
-    } // compute_fft
+    double mean = sum * inv_fft_capture_size;
+    double stddev = 0;
+    for (int i = 0; i < fft_capture_size; ++i)
+    {
+        double a = (current_fft_draw[i] - mean);
+        stddev += a * a;
+    }
+    stddev = sqrt(stddev / float(fft_capture_size - 1));
+    m_noise_foor = mean + stddev;
 
     m_total_compute_time = chrono.get_elapsed_time();
 
@@ -280,10 +273,12 @@ void AudioToolWindow::compute_wow_and_flutter()
 
     if (m_longterm_audio.size() < audio_capture_length)
     {
+        // Just add audio data to buffer
         m_longterm_audio.insert(m_longterm_audio.end(), audio_channel.begin(), audio_channel.end());
     }
     else
     {
+        // move the buffer backward and replace the end with new data
         int move_size = audio_capture_length - sampled_audio_length;
         memcpy(&m_longterm_audio[0], &m_longterm_audio[sampled_audio_length], move_size*sizeof(double));
         memcpy(&m_longterm_audio[move_size], &audio_channel[0], sampled_audio_length*sizeof(double));
@@ -501,10 +496,10 @@ void AudioToolWindow::init_capture()
     m_fftfreqs = new double[fft_capture_size];   
     m_rms_fft = new double[fft_capture_size];
     m_current_window_cache = new double[capture_size];
+    m_wow_complex_out = new fftw_complex[wow_capture_size];
 
     m_fftwowdrawfreqs.resize(wow_capture_size/2); 
     m_fftdrawwow.resize(wow_capture_size/2);
-    m_wow_complex_out = new fftw_complex[wow_capture_size];
 
     m_wow_flutter_data.resize(m_wow_flutter_capture_size);
     m_wow_flutter_data_x.resize(m_wow_flutter_capture_size);

@@ -138,6 +138,7 @@ enum ImPlotFlags_ {
     ImPlotFlags_NoFrame       = 1 << 6,  // the ImGui frame will not be rendered
     ImPlotFlags_Equal         = 1 << 7,  // x and y axes pairs will be constrained to have the same units/pixel
     ImPlotFlags_Crosshairs    = 1 << 8,  // the default mouse cursor will be replaced with a crosshair when hovered
+    ImPlotFlags_NoCentralMenu = 1 << 9,
     ImPlotFlags_CanvasOnly    = ImPlotFlags_NoTitle | ImPlotFlags_NoLegend | ImPlotFlags_NoMenus | ImPlotFlags_NoBoxSelect | ImPlotFlags_NoMouseText
 };
 
@@ -1008,6 +1009,11 @@ IMPLOT_API void HideNextItem(bool hidden = true, ImPlotCond cond = ImPlotCond_On
 IMPLOT_API bool BeginAlignedPlots(const char* group_id, bool vertical = true);
 // Only call EndAlignedPlots() if BeginAlignedPlots() returns true!
 IMPLOT_API void EndAlignedPlots();
+
+// Begin a custom central plot context menu
+IMPLOT_API bool BeginCustomContext();
+// End a custom central plot context menu
+IMPLOT_API void EndCustomContext(bool include_default = false); // if include_default is true, the normal context menu will be appended
 
 //-----------------------------------------------------------------------------
 // [SECTION] Legend Utils

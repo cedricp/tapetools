@@ -8,7 +8,7 @@ public:
     MainWindow() : Window_SDL("TapeTools", 1200, 900)
     {
         size_t font_data_size = _font_blob_end - _font_blob_start;
-        load_font_from_memory((const char*)_font_blob_start, font_data_size, 15);
+        load_font_from_memory((const char*)_font_blob_start, font_data_size, 13);
         m_audiotool = new AudioToolWindow(this);
     }
 
@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
     app->set_app_name("TapeTools");
     Window_SDL *window = new MainWindow;
 
-    window->set_minimum_window_size(1400, 1000);
+    window->set_minimum_window_size(1800, 1000);
 
     app->add_window(window);
     app->run();

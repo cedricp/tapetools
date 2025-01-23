@@ -185,8 +185,22 @@ void AudioToolWindow::draw_sweep_tab()
     draw_tone_generator();
 
     ImGui::BeginChild("PlotChild", ImVec2(-1, height()), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-    if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1)))
+    if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1), ImPlotFlags_NoCentralMenu | ImPlotFlags_Crosshairs))
     {
+        if (ImPlot::BeginCustomContext())
+        {
+            for (int i = 0; i < m_mem_sweeps_names.size(); ++i)
+            {
+                std::string item_string = "Remove curve " + m_mem_sweeps_names[i];
+                if (ImGui::MenuItem(item_string.c_str()))
+                {
+                    m_mem_sweeps_names.erase(m_mem_sweeps_names.begin() + i);
+                    m_mem_sweeps_results.erase(m_mem_sweeps_results.begin() + i);
+                    break;
+                }
+            }
+            ImPlot::EndCustomContext(false);
+        }
         bool calibration_active = m_rms_calibration_scale != 1.0;
         float xfftmax = current_sample_rate > 0 ? (current_sample_rate)/2.f : INFINITY;
         ImPlot::SetupAxes("Frequency", "dB FullScale", 0, ImPlotAxisFlags_Lock | ImPlotAxisFlags_Opposite);
@@ -376,12 +390,14 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         ImGui::EndChild();
     }
 
-    ImGui::SameLine();
-    ImGui::BeginChild("ScopesChildDebug", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-    ImGui::AlignTextToFramePadding();
-    ImGui::Text("Thread time : %lums", m_wf_compute_time/1000);
-    ImGui::EndChild();
-
+    if (m_debug_info)
+    {
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildDebug", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Thread time : %lums", m_wf_compute_time/1000);
+        ImGui::EndChild();
+    }
     static float max_freq = 100;
     static float max_fft_freq = 20;
 
@@ -565,7 +581,7 @@ void AudioToolWindow::draw_voltmeter_widget(int channelcount)
 
 void AudioToolWindow::draw_audio_fft_widget(int channelcount, int current_sample_rate, int plotheight)
 {
-    if (ImPlot::BeginPlot("Audio FFT", ImVec2(m_compute_channel_phase ? width() - plotheight * 1.5f - 10 : -1, -1)))
+    if (ImPlot::BeginPlot("Audio FFT", ImVec2(m_compute_channel_phase ? width() - plotheight * 1.5f - 10 : -1, -1), ImPlotFlags_Crosshairs))
     {
 
         bool calibration_active = m_rms_calibration_scale != 1.0;
@@ -921,12 +937,20 @@ void AudioToolWindow::draw_rt_analysis_tab()
     }
     ImGui::EndChild();
 
-    ImGui::SameLine();
-    ImGui::BeginChild("ScopesChildComputeInfo", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-    ImGui::AlignTextToFramePadding();
-    ImGui::Text("Total compute time: %ins", m_total_compute_time);
-    ImGui::EndChild();
+    if (m_debug_info)
+    {
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildComputeInfo", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Audio process time: %luns", m_total_compute_time);
+        ImGui::EndChild();
 
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildComputeInfoUI", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("UI draw time : %luns", m_ui_time);
+        ImGui::EndChild();
+    }
     /*
     *   LCD voltmeter
     */
