@@ -180,6 +180,7 @@ bool AudioToolWindow::compute()
     for (int i = 0; i < m_capture_size; i++)
     {
         double sound_data = m_raw_buffer[i*channelcount] * m_audio_gain;
+        //sound_data += .5 * sin(3145.*double(i) * twopif_over_sr);
         m_sound_data1[i] = sound_data;
             
         m_fftinl[i] = sound_data * m_current_window_cache[i];

@@ -400,6 +400,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
     }
     static float max_freq = 100;
     static float max_fft_freq = 20;
+    static float max_iq = 1.;
 
     if (m_wow_test_frequency == 0) ref_frequency = 3000;
     else if (m_wow_test_frequency == 1) ref_frequency = 3150;
@@ -419,7 +420,13 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         if (iq_view)
         {
             ImPlot::SetupAxis(ImAxis_Y3, "IQ", ImPlotAxisFlags_Opposite | ImPlotAxisFlags_NoGridLines);
-            ImPlot::SetupAxisLimits(ImAxis_Y3, -1, 1, ImPlotCond_Always);
+            ImPlot::SetupAxisLimits(ImAxis_Y3, -max_iq, max_iq, ImPlotCond_Always);
+            if (ImPlot::IsAxisHovered(ImAxis_Y3)){
+                // Zoom Y axis in/out
+                max_iq += ImGui::GetIO().MouseWheel * 0.05;
+                if (max_iq < 0.1) max_iq = 0.1;
+                if (max_iq > 1) max_iq = 1;
+            }
         }
 
 
@@ -447,12 +454,12 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
                 auto offsetter1 = [](int idx, void* data) -> ImPlotPoint { 
                     int smp_idx = idx * WOW_FLUTTER_DECIMATION;
                     auto& slice = *(std::pair<std::vector<double>, std::vector<double>>*)data;
-                    return ImPlotPoint(slice.first[idx], slice.second[smp_idx] - 0.5);
+                    return ImPlotPoint(slice.first[idx], slice.second[smp_idx]);
                 };
                 auto offsetter2 = [](int idx, void* data) -> ImPlotPoint { 
                     int smp_idx = idx * WOW_FLUTTER_DECIMATION;
                     auto& slice = *(std::pair<std::vector<double>, std::vector<double>>*)data;
-                    return ImPlotPoint(slice.first[idx], slice.second[smp_idx] + 0.5);
+                    return ImPlotPoint(slice.first[idx], slice.second[smp_idx]);
                 };
 
                 ImPlot::SetAxis(ImAxis_Y3);
@@ -617,12 +624,12 @@ void AudioToolWindow::draw_audio_fft_widget(int channelcount, int current_sample
             ImVec2 plotpos = ImPlot::GetPlotPos();
             ImVec2 plotsize = ImPlot::GetPlotSize();
             float plot_to_pix_graph = 140. / plotsize.y;
-            ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1)));
+            ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.05)));
             ImPlot::PlotText(thdtext, pnt.x, pnt.y);
-            pnt.y -= 20 * plot_to_pix_graph;
+            pnt.y -= 12 * plot_to_pix_graph;
             snprintf(thdtext, 32, "THD+N : %.3f %% (%.2fdB)", m_thdn, m_thddb);
             ImPlot::PlotText(thdtext, pnt.x, pnt.y);
-            pnt.y -= 20 * plot_to_pix_graph;
+            pnt.y -= 12 * plot_to_pix_graph;
             snprintf(thdtext, 32, "Total Vrms : %.4f  SNR : %.2fdB", m_fft_rms * m_rms_calibration_scale, snr);
             ImPlot::PlotText(thdtext, pnt.x, pnt.y);
 
