@@ -411,24 +411,20 @@ ImFont* Window_SDL::load_font_from_memory(const char* data, int memsize, float s
 
 void Window_SDL::draw(bool compute_only)
 {
+	static Chrono chrono;
+
 	if (!_impl->_is_shown)
 		return;
 	set_imgui_context();
-	SDL_GL_MakeCurrent(_impl->_window, _impl->_gl_context);
-	static bool show_demo = true;
+
     ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.00f);
     ImGuiIO& io = ImGui::GetIO();
 
-	static bool start = true;
-	
     // Start the Dear ImGui frame
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
 
-    if (_impl->widgets.empty()){
-    	ImGui::ShowDemoWindow(&show_demo);
-    }
 	for (auto widget: _impl->widgets){
 		widget->draw_widget();
 	}
@@ -436,10 +432,13 @@ void Window_SDL::draw(bool compute_only)
     // Rendering
     ImGui::Render();
 
-	if (compute_only){
+	if (compute_only || chrono.get_elapsed_time() < 25000){
 		return;
 	}
 
+	chrono.reset();
+
+	SDL_GL_MakeCurrent(_impl->_window, _impl->_gl_context);
     glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
     glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
     glClear(GL_COLOR_BUFFER_BIT);
