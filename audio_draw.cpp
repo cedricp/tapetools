@@ -272,7 +272,7 @@ void AudioToolWindow::draw_lcd(const float value, const ImVec2 size, const int l
 
 void AudioToolWindow::draw_audio_time_domain_widget(int plotheight, int current_sample_rate, int channelcount)
 {
-    if (ImPlot::BeginPlot("Audio", ImVec2(m_show_wow_flutter ? width()-plotheight*1.8-10 : -1, -1)))
+    if (ImPlot::BeginPlot("Audio", ImVec2(m_show_wow_flutter ? width()-plotheight*2-10 : -1, -1)))
     {
         double x_limit = 1.0f / m_scopezoom;
         double xmax = current_sample_rate > 0 ? float(m_capture_size) * (1.0 / (current_sample_rate * 0.001)) : INFINITY;
@@ -337,6 +337,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
     const char* filter_presets[] = {"Disabled", "Wow (6Hz)","Flutter low (20Hz)", "Flutter high (100Hz)"};
     float ref_frequency;
     static bool iq_view = false;
+    static float iq_separation = 0.f;
     
     ImGui::BeginChild("ChildWF", ImVec2(0, -1), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX | ImGuiWindowFlags_None);
 
@@ -387,6 +388,8 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         ImGui::BeginChild("ScopesChildIQDebug", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::ToggleButton("IQ view", &iq_view);
         ImGui::SameLine();
+        ImGui::SetNextItemWidth(50);
+        ImGui::SliderFloat("IQ separation", &iq_separation, 0.0, 1);
         ImGui::EndChild();
     }
 
@@ -409,7 +412,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
     float max_percent = (max_freq / ref_frequency) * 100.;
     bool is_buffering = m_longterm_audio.size() < WOW_FLUTTER_ANALYSIS_TIME * m_audiorecorder.get_current_samplerate();
 
-    if(!m_show_wf_fft_view && ImPlot::BeginPlot("Wow and flutter analysis (unweighted)", ImVec2(plotheight*1.8, -1)))
+    if(!m_show_wf_fft_view && ImPlot::BeginPlot("Wow and flutter analysis (unweighted)", ImVec2(plotheight*2, -1)))
     {
         ImPlot::SetupAxes("Time (seconds)", "Freqency drift (Hz)", 0, ImPlotAxisFlags_Lock);
         ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0., 5.);
@@ -425,7 +428,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
                 // Zoom Y axis in/out
                 max_iq += ImGui::GetIO().MouseWheel * 0.05;
                 if (max_iq < 0.1) max_iq = 0.1;
-                if (max_iq > 1) max_iq = 1;
+                if (max_iq > 2) max_iq = 2;
             }
         }
 
@@ -454,12 +457,12 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
                 auto offsetter1 = [](int idx, void* data) -> ImPlotPoint { 
                     int smp_idx = idx * WOW_FLUTTER_DECIMATION;
                     auto& slice = *(std::pair<std::vector<double>, std::vector<double>>*)data;
-                    return ImPlotPoint(slice.first[idx], slice.second[smp_idx]);
+                    return ImPlotPoint(slice.first[idx], slice.second[smp_idx] + iq_separation);
                 };
                 auto offsetter2 = [](int idx, void* data) -> ImPlotPoint { 
                     int smp_idx = idx * WOW_FLUTTER_DECIMATION;
                     auto& slice = *(std::pair<std::vector<double>, std::vector<double>>*)data;
-                    return ImPlotPoint(slice.first[idx], slice.second[smp_idx]);
+                    return ImPlotPoint(slice.first[idx], slice.second[smp_idx] - iq_separation);
                 };
 
                 ImPlot::SetAxis(ImAxis_Y3);
@@ -473,7 +476,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         snprintf(peak_text, 32, "W&F Peak: %.3f %%", peak_percent);
         ImVec2 plotpos = ImPlot::GetPlotPos();
         ImVec2 plotsize = ImPlot::GetPlotSize();
-        ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1)));
+        ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.05)));
         ImPlot::PlotText(peak_text, pnt.x, pnt.y);
         if (is_buffering)
         {
@@ -482,12 +485,12 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         {
             snprintf(peak_text, 32, "Frequency drift: %.3f %%", freq_drift);
         }
-        pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.2)));
+        pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.1)));
         ImPlot::PlotText(peak_text, pnt.x, pnt.y);
         ImPlot::EndPlot();
     }
     else
-    if (ImPlot::BeginPlot("Wow and flutter FFT analysis", ImVec2(plotheight*1.8, -1)))
+    if (ImPlot::BeginPlot("Wow and flutter FFT analysis", ImVec2(plotheight*2, -1)))
     {
         double max_frequency = current_sample_rate / WOW_FLUTTER_DECIMATION / 2.;
         if (m_wf_filter_freq_combo == 1) max_frequency = 10.;
