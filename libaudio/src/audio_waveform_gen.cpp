@@ -52,6 +52,10 @@ static inline void write_sample_float_32bits(char *ptr, double sample) {
     *buf = sample;
 }
 
+const double 
+    radians = (M_PI * 2);
+
+
 void audioWaveformGenerator::write_callback(SoundIoOutStream *outstream, int frame_count_min, int frame_count_max){
     static double smoothdata = 0;
 
@@ -66,7 +70,9 @@ void audioWaveformGenerator::write_callback(SoundIoOutStream *outstream, int fra
     int err;
     
     int frames_left = frame_count_max;
-    double pitch = udata->m_pitch;
+    
+    udata->m_sinewave.sine_wave_frequency_transition(udata->m_pitch, .2);
+    udata->m_sinewave.sine_wave_amplitude_transition(udata->m_volume, .2);
 
     for (;;) {
         int frame_count = frames_left;
@@ -74,19 +80,20 @@ void audioWaveformGenerator::write_callback(SoundIoOutStream *outstream, int fra
             fprintf(stderr, "unrecoverable stream error: %s\n", soundio_strerror(err));
             exit(1);
         }
-
+        
         if (!frame_count)
-            break;
-
+        break;
+        
         const SoundIoChannelLayout *layout = &outstream->layout;
-        for (int frame = 0; frame < frame_count; ++frame) {
+        double t_sweep = frame_count / float_sample_rate;
+        for (int frame = 0; frame < frame_count; ++frame)
+        {
             double sample = 0;
             if (udata->m_mode == SINE)
             {
                 double curr_time = udata->m_seconds_offset + (frame * seconds_per_frame);
-
                 double fm_test = udata->m_fm_freq > 0 ? sin(2.0 * M_PI * udata->m_fm_freq * curr_time) / udata->m_fm_freq * udata->m_fm_strength : 1;
-                sample = udata->m_volume * sin((2.0 * M_PI * (pitch) * curr_time) + fm_test);
+                sample = udata->m_sinewave.sine_wave_sample() + fm_test;
             }
             else if (udata->m_mode == WHITE_NOISE)
             {
@@ -116,7 +123,6 @@ void audioWaveformGenerator::write_callback(SoundIoOutStream *outstream, int fra
         if (frames_left <= 0)
             break;
     }
-    udata->m_oldpitch = udata->m_pitch;
 }
 
 void audioWaveformGenerator::error_callback(SoundIoOutStream *outstream, int err)
@@ -133,7 +139,6 @@ void audioWaveformGenerator::underflow_callback(SoundIoOutStream *outstream) {
 audioWaveformGenerator::audioWaveformGenerator(){
     m_outstream = nullptr;
     m_pitch = 1000;
-    m_oldpitch = 1000;
 }
 
 audioWaveformGenerator::~audioWaveformGenerator(){
@@ -142,7 +147,6 @@ audioWaveformGenerator::~audioWaveformGenerator(){
 
 bool audioWaveformGenerator::init(audioManager& manager, int device_idx, int samplerate, float latency){
     m_pitch = 1000;
-    m_oldpitch = 1000;
 
     if (!manager.valid()){
         fprintf(stderr, "audioSine::init : AudioManager not valid\n");
@@ -166,6 +170,8 @@ bool audioWaveformGenerator::init(audioManager& manager, int device_idx, int sam
     m_outstream->write_callback = this->write_callback;
     m_outstream->underflow_callback = this->underflow_callback;
     m_outstream->error_callback = this->error_callback;
+
+    m_sinewave.set(0, samplerate, 1.);
 
     return true;
 }

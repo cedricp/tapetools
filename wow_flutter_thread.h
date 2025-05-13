@@ -77,7 +77,8 @@ private:
         m_wf_lowpass_filter.setup(4, m_samplerate / m_decimation, m_filter_freq, 0.1);
 
         // We need ~5 seconds of audio recording
-        m_mutex.lock();
+        {
+            ScopedMutex mutex(m_mutex);
             int actual_audio_length = m_longterm_audio.size();
             double current_samplerate = m_samplerate;
             double inv_current_samplerate = 1. / m_samplerate;
@@ -162,7 +163,7 @@ private:
                 // Normalize DC component
                 m_wow_fftdrawout[0] *= 0.5;
             }
-        m_mutex.unlock();
+        }
         m_time = chrono.get_elapsed_time();
     }
 };
