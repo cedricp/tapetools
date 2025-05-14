@@ -13,8 +13,8 @@ static double zerocross(double a[2], double b[2])
 	double a1 = b[0] - a[0];
 	double b1 = b[1] - a[1];
 	double slope = b1 / a1;
-	double c = -(slope * a[0]) + a[1];
-	return -c / slope;
+	double c = (slope * a[0]) - a[1];
+	return c / slope;
 }
 
 static double wrap_phase(const double x) {

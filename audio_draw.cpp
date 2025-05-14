@@ -382,7 +382,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         ImGui::EndChild();
     }
 
-    if (!m_show_wf_fft_view)
+    if (!m_show_wf_fft_view && m_debug_info)
     {
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildIQDebug", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);

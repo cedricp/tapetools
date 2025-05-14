@@ -115,7 +115,6 @@ private:
                 m_wow_flutter_data[i] = phase_diff * phase_to_hz;
                 m_wow_flutter_data_x[i] = (double)step_i_x * inv_current_samplerate;
                 if (i >= m_wow_flutter_data.size()){
-                    int a = 0;
                     continue;
                 }
             }

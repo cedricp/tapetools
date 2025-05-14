@@ -492,8 +492,16 @@ public:
                 {
                     reinit_recorder();
                 }
-                ImGui::MenuItem("Show timings", nullptr, &m_debug_info);
+                ImGui::MenuItem("Show debug info", nullptr, &m_debug_info);
                 ImGui::PopItemFlag();
+
+                ImGui::Separator();
+                if (ImGui::MenuItem("Make a donation", nullptr, nullptr))
+                {
+                    ShellExecute(NULL, TEXT("open"),
+                    TEXT("https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=cedricpaille@gmail.com&lc=CY&item_name=codetronic&currency_code=EUR&bn=PP%2dDonationsBF%3abtn_donateCC_LG.if:NonHosted"),
+                    NULL, NULL, SW_SHOWNORMAL);
+                }
                 
                 ImGui::EndMenu();
             }
