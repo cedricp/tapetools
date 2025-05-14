@@ -149,7 +149,7 @@ class AudioToolWindow : public Widget
     int     m_wf_filter_freq_combo = 0;
     float   m_wow_mean = 0;
 
-    bool    m_trigger_on = false;
+    bool    m_trigger_on = true;
     int     m_trigger_index = 0;
 
     bool    m_debug_info = false;
@@ -537,6 +537,7 @@ public:
     {
         reinit_recorder();
 
+        m_audiorecorder.pause(false);
         m_compute_on = true;
         m_sweep_started = true;
         m_sweep_current_frequency = 20;

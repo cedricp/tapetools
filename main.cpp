@@ -5,7 +5,7 @@ class MainWindow : public Window_SDL
 {   
     AudioToolWindow* m_audiotool;
 public:
-    MainWindow() : Window_SDL("TapeTools", 1200, 900)
+    MainWindow() : Window_SDL("TapeTools", 1800, 1000)
     {
         size_t font_data_size = _font_blob_end - _font_blob_start;
         load_font_from_memory((const char*)_font_blob_start, font_data_size, 13);

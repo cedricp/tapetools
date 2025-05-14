@@ -226,7 +226,7 @@ void audioWaveformGenerator::set_pitch(double pitch)
 void audioWaveformGenerator::set_volume(int db)
 {
     m_volume = pow(10, (double)db/20);   
-    m_sinewave.sine_wave_frequency_transition(m_volume, .1); 
+    m_sinewave.sine_wave_amplitude_transition(m_volume, .1); 
 }
 
 

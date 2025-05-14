@@ -40,7 +40,7 @@ static double hamming_fft_window(int i, int length)
 
 static double hann_fft_window(int i, int length)
 {
-    return 0.5f*(1.0f-cosf(2.0f*M_PI*(double)(i)/(double)(length-1.0f)));
+    return 0.5f*(1.0f-cos(2.0f*M_PI*(double)(i)/(double)(length-1.0f)));
 }
 
 static double hann_poisson_fft_window(int i, int length)
@@ -48,7 +48,7 @@ static double hann_poisson_fft_window(int i, int length)
 	double a, N1, w;
 	a = 2.0;
 	N1 = (double)(length-1);
-	w = 0.5 * (1 - cosf(2*M_PI*i/N1)) * \
+	w = 0.5 * (1 - cos(2*M_PI*i/N1)) * \
 	    pow(M_E, (-a*(double)abs((int)(N1-1-2*i)))/N1);
 	return w;
 }
