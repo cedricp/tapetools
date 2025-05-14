@@ -33,7 +33,7 @@ class AudioToolWindow : public Widget
     
     bool m_signal_generator_switch = false;
     int  m_signal_generator_pitch = 1000;
-    float m_signalgen_latency_s = 0.1f;
+    float m_signalgen_latency_s = 0.01f;
     int m_recorder_latency_ms = 100;
     int m_signalgen_volume_db = 0.f;
     
@@ -149,6 +149,9 @@ class AudioToolWindow : public Widget
     int     m_wf_filter_freq_combo = 0;
     float   m_wow_mean = 0;
 
+    bool    m_trigger_on = false;
+    int     m_trigger_index = 0;
+
     bool    m_debug_info = false;
 
     unsigned long m_total_compute_time=0;
@@ -172,8 +175,8 @@ class AudioToolWindow : public Widget
                 need_stop_sweep = true;
             }
 
-            int min_freq_idx = std::max(int((m_sweep_current_frequency-50)*fft_step), 0);
-            int max_freq_idx = std::min(int((m_sweep_current_frequency+50)*fft_step), m_capture_size / 2);
+            int min_freq_idx = std::max(int((m_sweep_current_frequency-500)*fft_step), 0);
+            int max_freq_idx = std::min(int((m_sweep_current_frequency+500)*fft_step), m_capture_size / 2);
 
             double max_val = m_noise_foor;
             for (int i = min_freq_idx; i < max_freq_idx; ++i)
@@ -579,7 +582,7 @@ public:
     void draw_voltmeter_widget(int channel_count);
     void draw_audio_fft_widget(int channelcount, int current_sample_rate, int plotheight);
     void draw_channels_phase_widget(int plotheight);
-    void draw_tone_generator();
+    void draw_tone_generator_widget();
 
     void draw_tools_windows()
     {

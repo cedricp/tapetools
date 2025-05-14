@@ -71,9 +71,6 @@ void audioWaveformGenerator::write_callback(SoundIoOutStream *outstream, int fra
     
     int frames_left = frame_count_max;
     
-    udata->m_sinewave.sine_wave_frequency_transition(udata->m_pitch, .2);
-    udata->m_sinewave.sine_wave_amplitude_transition(udata->m_volume, .2);
-
     for (;;) {
         int frame_count = frames_left;
         if ((err = soundio_outstream_begin_write(outstream, &areas, &frame_count))) {
@@ -223,11 +220,13 @@ bool audioWaveformGenerator::pause(bool pause)
 void audioWaveformGenerator::set_pitch(double pitch)
 {
     m_pitch = pitch;
+    m_sinewave.sine_wave_frequency_transition(m_pitch, .1);
 }
 
 void audioWaveformGenerator::set_volume(int db)
 {
-    m_volume = pow(10, (double)db/20);    
+    m_volume = pow(10, (double)db/20);   
+    m_sinewave.sine_wave_frequency_transition(m_volume, .1); 
 }
 
 

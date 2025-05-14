@@ -66,6 +66,7 @@ void AudioToolWindow::detect_periods(){
     double previous = audio_data[0];
     double previous_time = 0;
     double freq_mean = 0;
+    m_trigger_index = -1;
 
     for (int i = 1; i < m_capture_size; ++i)
     {
@@ -83,6 +84,9 @@ void AudioToolWindow::detect_periods(){
                 freq_mean += freq;
             }
             lastzerocross = zcrosstime;
+            if (m_trigger_index < 0){
+                m_trigger_index = i;
+            }
         }
         previous = current;
     }

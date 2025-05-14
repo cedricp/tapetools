@@ -182,7 +182,7 @@ void AudioToolWindow::draw_sweep_tab()
         ImGui::EndChild();
     }
 
-    draw_tone_generator();
+    draw_tone_generator_widget();
 
     ImGui::BeginChild("PlotChild", ImVec2(-1, height()), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
     if (ImPlot::BeginPlot("AudioFFT", ImVec2(-1, -1), ImPlotFlags_NoCentralMenu | ImPlotFlags_Crosshairs))
@@ -274,8 +274,17 @@ void AudioToolWindow::draw_audio_time_domain_widget(int plotheight, int current_
 {
     if (ImPlot::BeginPlot("Audio", ImVec2(m_show_wow_flutter ? width()-plotheight*2-10 : -1, -1)))
     {
+        bool triggered = false;
+        const int trigger_space = m_capture_size / 10;
+        int computed_capture_size = m_capture_size;
+        if (m_trigger_on && m_trigger_index > 0 && m_trigger_index < trigger_space)
+        {
+            computed_capture_size -= trigger_space;
+            triggered = true;
+        }
+
         double x_limit = 1.0f / m_scopezoom;
-        double xmax = current_sample_rate > 0 ? float(m_capture_size) * (1.0 / (current_sample_rate * 0.001)) : INFINITY;
+        double xmax = current_sample_rate > 0 ? float(computed_capture_size) * (1.0 / (current_sample_rate * 0.001)) : INFINITY;
         ImPlot::SetupAxisLimits(ImAxis_X1, 0, xmax);
         ImPlot::SetupAxisLimits(ImAxis_Y1, -x_limit, x_limit, ImPlotCond_Always);
 
@@ -294,9 +303,11 @@ void AudioToolWindow::draw_audio_time_domain_widget(int plotheight, int current_
             if (m_scopezoom < 1) m_scopezoom = 1;
             if (m_scopezoom > 50) m_scopezoom = 50;
         }
+        double* left_data = m_sound_data1.data() + (triggered ? m_trigger_index : 0);
+        double* right_data = m_sound_data2.data() + (triggered ? m_trigger_index : 0);
         
-        if (channelcount > 0) ImPlot::PlotLine("Left channel", m_sound_data_x.data(), m_sound_data1.data(), m_sound_data_x.size());
-        if (channelcount > 1) ImPlot::PlotLine("Right channel", m_sound_data_x.data(), m_sound_data2.data(), m_sound_data_x.size());
+        if (channelcount > 0) ImPlot::PlotLine("Left channel", m_sound_data_x.data(), left_data, m_sound_data_x.size());
+        if (channelcount > 1) ImPlot::PlotLine("Right channel", m_sound_data_x.data(), right_data, m_sound_data_x.size());
         
         char rmstext[20];
         ImVec2 plotpos  = ImPlot::GetPlotPos();
@@ -327,6 +338,13 @@ void AudioToolWindow::draw_audio_time_domain_widget(int plotheight, int current_
             ImPlot::PlotLine("0 dB Reference", rms, rms+2, 2);
         }
 
+        if (triggered)
+        {
+            ImVec2 plotpos = ImPlot::GetPlotPos();
+            ImVec2 plotsize = ImPlot::GetPlotSize();
+            ImPlotPoint pnt = ImPlot::PixelsToPlot(ImVec2(plotpos.x + (plotsize.x*0.5), plotpos.y + (plotsize.y*0.05)));
+            ImPlot::PlotText("TRIGGERED", pnt.x, pnt.y);
+        }
         ImPlot::EndPlot();
     }
 }
@@ -725,7 +743,7 @@ void AudioToolWindow::draw_channels_phase_widget(int plotheight)
     }
 }
 
-void AudioToolWindow::draw_tone_generator()
+void AudioToolWindow::draw_tone_generator_widget()
 {
     
     const char* generator_presets[] = {"Sine","White noise", "Brown noise"};
@@ -819,7 +837,7 @@ void AudioToolWindow::draw_rt_analysis_tab()
     float frameh = ImGui::GetFrameHeightWithSpacing();
     float padh = 3.0f * ImGui::GetStyle().FramePadding.y + ImGui::GetStyle().ItemSpacing.y;
 
-    draw_tone_generator();
+    draw_tone_generator_widget();
 
     ImGui::BeginChild("ScopesChildMain", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
     float plotheight = height() / 2.0f - 5.f;
@@ -832,6 +850,8 @@ void AudioToolWindow::draw_rt_analysis_tab()
         m_audiorecorder.pause(!m_compute_on);
         if (m_audio_loopback_on) m_audioplayer.pause(!m_compute_on);
     }
+    ImGui::SameLine();
+    ImGui::ToggleButton("Trigger", &m_trigger_on);
     ImGui::SetItemTooltip("Start realtime capture");
     ImGui::SameLine();
     if (ImGui::ToggleButton("Audio loopback", &m_audio_loopback_on))
