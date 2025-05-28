@@ -50,7 +50,7 @@ DWORD WINAPI Thread::run_win32(LPVOID userdata)
 void *Thread::run_posix(void* userdata)
 {
     Thread *thread = (Thread *)userdata;
-    m_started = true;
+    thread->m_started = true;
     while (thread->m_running)
     {
         if (!thread->m_pause)

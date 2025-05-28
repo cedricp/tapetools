@@ -89,7 +89,7 @@ void audioWaveformGenerator::write_callback(SoundIoOutStream *outstream, int fra
             if (udata->m_mode == SINE)
             {
                 double curr_time = udata->m_seconds_offset + (frame * seconds_per_frame);
-                double fm_test = udata->m_fm_freq > 0 ? sin(2.0 * M_PI * udata->m_fm_freq * curr_time) / udata->m_fm_freq * udata->m_fm_strength : 1;
+                double fm_test = udata->m_fm_freq > 0 ? sin(2.0 * M_PI * udata->m_fm_freq * curr_time) / udata->m_fm_freq * udata->m_fm_strength : 0;
                 sample = udata->m_sinewave.sine_wave_sample() + fm_test;
             }
             else if (udata->m_mode == WHITE_NOISE)
