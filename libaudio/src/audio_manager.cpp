@@ -24,6 +24,8 @@ static int g_samplerates[] = {
     8000
 };
 
+extern void log_message(const char* format, ...);
+
 audioManager::audioManager(SoundIoBackend backend) : device_changed_event("audio_device_changed"), backend_disconnected_event("audio_backend_changed")
 {
     m_backend = backend;
@@ -41,11 +43,11 @@ audioManager::audioManager(SoundIoBackend backend) : device_changed_event("audio
     int err = (m_backend == SoundIoBackendNone) ? soundio_connect(m_soundio) : soundio_connect_backend(m_soundio, m_backend);
 
     if (err) {
-        fprintf(stderr, "Unable to connect to backend: %s\n", soundio_strerror(err));
+        log_message("Unable to connect to backend: %s\n", soundio_strerror(err));
         return;
     }
 
-    fprintf(stderr, "Backend: %s\n", soundio_backend_name(m_soundio->current_backend));
+    log_message("Backend: %s\n", soundio_backend_name(m_soundio->current_backend));
 
     flush();
 
@@ -132,30 +134,30 @@ SoundIoOutStream* audioManager::get_out_stream(double latency, int sample_rate, 
     if (device_id < 0){
         device_id = soundio_default_output_device_index(m_soundio);
     }
-    printf("Device index = %i\n", device_id);
+    log_message("Device index = %i", device_id);
 
     if (device_id < 0) {
-        fprintf(stderr, "Output device not found\n");
+        log_message("Output device not found");
         return nullptr;
     }
 
     m_out_device = soundio_get_output_device(m_soundio, device_id);
     if (!m_out_device) {
-        fprintf(stderr, "out of memory\n");
+        log_message("out of memory");
         return nullptr;
     }
 
-    fprintf(stderr, "Output device: %s\n", m_out_device->name);
+    log_message("Output device: %s", m_out_device->name);
 
     if (m_out_device->probe_error) {
-        fprintf(stderr, "Cannot probe device: %s\n", soundio_strerror(m_out_device->probe_error));
+        log_message("Cannot probe device: %s", soundio_strerror(m_out_device->probe_error));
         return nullptr;
     }
 
     SoundIoOutStream* ostream = soundio_outstream_create(m_out_device);
 
     if (!ostream) {
-        fprintf(stderr, "out of memory\n");
+        log_message("out of memory");
         return nullptr;
     }
 
@@ -173,7 +175,7 @@ SoundIoOutStream* audioManager::get_out_stream(double latency, int sample_rate, 
     ostream->format = format;
 
     if ((err = soundio_outstream_open(ostream))) {
-        fprintf(stderr, "unable to open device: %s", soundio_strerror(err));
+        log_message("unable to open device: %s", soundio_strerror(err));
         release_output_stream(ostream);
         soundio_device_unref(m_out_device);
         m_out_device = nullptr;
@@ -181,7 +183,7 @@ SoundIoOutStream* audioManager::get_out_stream(double latency, int sample_rate, 
     }
 
     if (ostream->layout_error){
-        fprintf(stderr, "unable to set channel layout: %s\n", soundio_strerror(ostream->layout_error));
+        log_message("unable to set channel layout: %s", soundio_strerror(ostream->layout_error));
         release_output_stream(ostream);
         soundio_device_unref(m_out_device);
         m_out_device = nullptr;
@@ -205,27 +207,27 @@ SoundIoInStream* audioManager::get_in_stream(double latency, int sample_rate, So
     }
 
     if (device_id < 0) {
-        fprintf(stderr, "Input device not found\n");
+        log_message("Input device not found");
         return nullptr;
     }
 
     m_in_device = soundio_get_input_device(m_soundio, device_id);
     if (!m_in_device) {
-        fprintf(stderr, "out of memory\n");
+        log_message("out of memory");
         return nullptr;
     }
 
-    fprintf(stderr, "Input device: %s\n", m_in_device->name);
+    log_message("Input device: %s", m_in_device->name);
 
     if (m_in_device->probe_error) {
-        fprintf(stderr, "Cannot probe device: %s\n", soundio_strerror(m_in_device->probe_error));
+        log_message("Cannot probe device: %s", soundio_strerror(m_in_device->probe_error));
         return nullptr;
     }
 
     SoundIoInStream* istream = soundio_instream_create(m_in_device);
 
     if (!istream) {
-        fprintf(stderr, "out of memory\n");
+        log_message("out of memory");
         return nullptr;
     }
 
@@ -243,7 +245,7 @@ SoundIoInStream* audioManager::get_in_stream(double latency, int sample_rate, So
     istream->format = format;
 
     if ((err = soundio_instream_open(istream))) {
-        fprintf(stderr, "unable to open device: %s\n", soundio_strerror(err));
+        log_message("unable to open device: %s", soundio_strerror(err));
         release_input_stream(istream);
         soundio_device_unref(m_in_device);
         m_in_device = nullptr;
@@ -251,7 +253,7 @@ SoundIoInStream* audioManager::get_in_stream(double latency, int sample_rate, So
     }
 
     if (istream->layout_error){
-        fprintf(stderr, "unable to set channel layout: %s\n", soundio_strerror(istream->layout_error));
+        log_message("unable to set channel layout: %s", soundio_strerror(istream->layout_error));
         release_input_stream(istream);
         soundio_device_unref(m_in_device);
         m_in_device = nullptr;

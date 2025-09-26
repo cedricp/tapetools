@@ -176,7 +176,7 @@ bool AudioToolWindow::compute()
         }
 
         if (!m_audioplayer.add_data(audio_data.data(), m_capture_size * channelcount)){
-            printf("Error adding audio data\n");
+            log_message("Error adding audio data\n");
         }
     }
 
@@ -370,7 +370,7 @@ void AudioToolWindow::compute_thd()
     }
 
     m_fft_harmonics_idx[0] = fundamental_index;
-    m_fft_harmonics_pos[0] = m_fftfreqs[fundamental_index];
+    m_fft_harmonics_freq[0] = m_fftfreqs[fundamental_index];
 
     for (int i = 1; i < 8; ++i)
     {
@@ -379,7 +379,7 @@ void AudioToolWindow::compute_thd()
         m_fft_found_peaks++;
 
         m_fft_harmonics_idx[i] = i_order_harmonic;
-        m_fft_harmonics_pos[i] = m_fftfreqs[i_order_harmonic];
+        m_fft_harmonics_freq[i] = m_fftfreqs[i_order_harmonic];
     }
 
     // Compute Total Harmonic Distortion
@@ -485,6 +485,7 @@ void AudioToolWindow::init_capture()
     if (capture_size == 0) return;
 
     destroy_capture();
+
     m_capture_size = capture_size;
     int fft_capture_size = capture_size / 2;
 
@@ -574,7 +575,7 @@ void AudioToolWindow::reinit_recorder()
     if (m_in_sample_rate_idx >= m_audiomanager.get_input_sample_rates(m_audio_in_idx).size())
     {
         m_in_sample_rate_idx = 0;
-        printf("Cannot set recorder samplerate to requested value\n");
+        log_message("Cannot set recorder samplerate to requested value");
     }
 
     int samplerate = m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate_idx];
@@ -582,7 +583,7 @@ void AudioToolWindow::reinit_recorder()
     {
         m_audiorecorder.start();
         if (m_audio_loopback_out_idx >= 0 && !m_audioplayer.set(samplerate, float(m_recorder_latency_ms)/1000.f, m_audio_loopback_out_idx, m_audiorecorder.get_channel_count())){
-            fprintf(stderr, "Unable to set init player\n");
+            log_message("Unable to set init player");
         }
     }
 
@@ -599,7 +600,7 @@ void AudioToolWindow::reset_signal_generator()
     if (m_out_sample_rate_idx >= m_audiomanager.get_output_sample_rates(m_audio_out_idx).size())
     {
         m_out_sample_rate_idx = 0;
-        printf("Cannot set player samplerate to requested value\n");
+        log_message("Cannot set player samplerate to requested value");
     }
     int current_sine_samplerate = m_audiomanager.get_output_sample_rates(m_audio_out_idx)[m_out_sample_rate_idx];
     m_signal_generator.destroy();
