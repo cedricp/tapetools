@@ -15,11 +15,7 @@ public:
 
     bool probe_event() override
     {
-        if(m_audiotool->check_data_buffer())
-        {
-            return true;
-        }
-        return false;
+        return m_audiotool->check_data_buffer() == true;
     }
 
     virtual ~MainWindow()

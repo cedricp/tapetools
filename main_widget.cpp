@@ -1,6 +1,6 @@
 #include "main_widget.h"
 
-AudioToolWindow::AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_sweep_timer(m_measure_delay, true), m_audioplayer(m_audiomanager)
+AudioToolWindow::AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_audioplayer(m_audiomanager)
 {
     set_maximized(true);
     set_movable(false);
@@ -15,7 +15,6 @@ AudioToolWindow::AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m
     m_audiomanager.backend_disconnected_event.connect_event(STATIC_METHOD(on_backend_disconnected), this);
 
     m_audiomanager.flush();
-    m_sweep_timer.connect_event(STATIC_METHOD(on_timer_event), this);
 
     ImPlotStyle& s = ImPlot::GetStyle();
     s.LineWeight = 1.5f;
@@ -25,8 +24,8 @@ AudioToolWindow::AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m
 AudioToolWindow::~AudioToolWindow()
 {
     m_signal_generator.destroy();
-    m_sdr_thread.stop();
-    m_sdr_thread.join();
+    // m_sdr_thread.stop();
+    // m_sdr_thread.join();
     destroy_capture();
 }
 
@@ -277,7 +276,8 @@ void AudioToolWindow::start_sweep_gen()
         m_signal_generator.set_mode(audioWaveformGenerator::SINE);
     }
 
-    m_sweep_timer.start();
+    m_sweep_status = true;
+    m_sweep_timer_chrono.reset();
     m_sweep_last_measure_freq = 10;
 }
 
@@ -285,7 +285,7 @@ void AudioToolWindow::stop_sweep_gen()
 {
     m_signal_generator_switch = false;
     m_signal_generator.pause();
-    m_sweep_timer.stop();
+    m_sweep_status = false;
     m_sweep_started = false;
 }
 
@@ -492,6 +492,10 @@ bool AudioToolWindow::check_data_buffer()
         bool computed = compute();
         if (computed)
         {
+            if (m_sweep_status && m_sweep_timer_chrono.get_elapsed_time() > m_measure_delay * 1000){
+                process_sweep();
+                m_sweep_timer_chrono.reset();
+            }
             if (m_compute_channel_phase || m_show_thd)
                 compute_thd();
             if (m_show_thd)
@@ -505,11 +509,11 @@ bool AudioToolWindow::check_data_buffer()
         return true;
     }
 
-    if (m_sdr_thread.data_available())
-    {
-        update_ui();
-        return true;
-    }
+    // if (m_sdr_thread.data_available())
+    // {
+    //     update_ui();
+    //     return true;
+    // }
 
     return false;
 }
@@ -541,99 +545,4 @@ IMPLEMENT_CALLBACK_METHOD(on_device_changed, AudioToolWindow)
 IMPLEMENT_CALLBACK_METHOD(on_backend_disconnected, AudioToolWindow)
 {
     reset_audiomanager();
-}
-
-IMPLEMENT_CALLBACK_METHOD(on_timer_event, AudioToolWindow)
-{
-
-    float current_sample_rate = m_audiorecorder.get_current_samplerate();
-    float fft_step = m_capture_size / current_sample_rate;
-    double *current_fft_draw = m_fft_channel_left ? m_fftdrawl : m_fftdrawr;
-
-    if (!m_async_sweep)
-    {
-        bool need_stop_sweep = false;
-        if (m_sweep_current_frequency > 20000)
-        {
-            m_sweep_current_frequency = 20000;
-            need_stop_sweep = true;
-        }
-
-        int min_freq_idx = std::max(int((m_sweep_current_frequency - 500) * fft_step), 0);
-        int max_freq_idx = std::min(int((m_sweep_current_frequency + 500) * fft_step), m_capture_size / 2);
-
-        double max_val = m_noise_foor;
-        for (int i = min_freq_idx; i < max_freq_idx; ++i)
-        {
-            if (current_fft_draw[i] > max_val)
-                max_val = current_fft_draw[i];
-        }
-
-        m_sweep_values.push_back(max_val);
-        m_sweep_freqs.push_back(m_sweep_current_frequency);
-
-        double logfreq_min = log10(20.);
-        double logfreq_max = log10(20000.);
-        double step = (logfreq_max - logfreq_min) / m_sweep_capture_num;
-
-        double newlogfreq = log10(m_sweep_current_frequency) + step;
-
-        if (need_stop_sweep)
-        {
-            // We reached the end of the measure
-            stop_sweep_gen();
-            return;
-        }
-
-        m_sweep_current_frequency = pow(10., newlogfreq);
-        m_signal_generator.set_pitch(m_sweep_current_frequency);
-    }
-    else
-    {
-        double fft_max_val = m_sweep_threshold_level;
-        double frequency = -1;
-        for (int i = 1; i < m_capture_size / 2; ++i)
-        {
-            if (current_fft_draw[i] > fft_max_val)
-            {
-                fft_max_val = current_fft_draw[i];
-                frequency = double(i) / fft_step;
-            }
-        }
-        if (frequency > 0)
-        {
-            bool found_bin = false;
-            int sweep_values_index = 0;
-            for (auto freq : m_sweep_freqs)
-            {
-                double freq_low = freq - (freq * 0.1);
-                double freq_hi = freq + (freq * 0.1);
-                if (frequency > freq_low && frequency < freq_hi)
-                {
-                    // if (m_sweep_values[sweep_values_index] < fft_max_val){
-                    m_sweep_values[sweep_values_index] = fft_max_val;
-                    found_bin = true;
-                    break;
-                    //}
-                }
-                if (freq > frequency && sweep_values_index >= 0)
-                {
-                    m_sweep_values.insert(m_sweep_values.begin() + sweep_values_index, fft_max_val);
-                    m_sweep_freqs.insert(m_sweep_freqs.begin() + sweep_values_index, frequency);
-                    found_bin = true;
-                    break;
-                }
-                sweep_values_index++;
-            }
-            if (!found_bin)
-            {
-                m_sweep_values.push_back(fft_max_val);
-                m_sweep_freqs.push_back(frequency);
-            }
-            m_sweep_last_measure_freq = frequency > m_sweep_last_measure_freq ? frequency : m_sweep_last_measure_freq;
-        }
-    }
-
-    m_sweep_timer.start();
-    update_ui();
 }

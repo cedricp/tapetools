@@ -45,7 +45,7 @@ void WowAndFluterThread::entry()
         int actual_audio_length = m_longterm_audio.size();
         double current_samplerate = m_samplerate;
         double inv_current_samplerate = 1. / m_samplerate;
-        double twopif_over_sr = 2. * M_PI / m_samplerate;
+        double twopi_over_sr = 2. * M_PI / m_samplerate;
 
         m_signal_i.resize(actual_audio_length);
         m_signal_q.resize(actual_audio_length);
@@ -53,9 +53,9 @@ void WowAndFluterThread::entry()
         // real signal to IQ data
         for (int i = 0; i < actual_audio_length; ++i)
         {
-            // Convert audio to Inphase/Quatrature data
-            double I = m_longterm_audio[i] * cos(m_reference_frequency*double(i) * twopif_over_sr);
-            double Q = m_longterm_audio[i] * sin(m_reference_frequency*double(i) * twopif_over_sr);
+            // Convert audio to Inphase/Quadrature data
+            double I = m_longterm_audio[i] * cos(m_reference_frequency*double(i) * twopi_over_sr);
+            double Q = m_longterm_audio[i] * sin(m_reference_frequency*double(i) * twopi_over_sr);
             m_signal_i[i] = I;
             m_signal_q[i] = Q;
         }

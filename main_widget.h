@@ -131,7 +131,10 @@ class AudioToolWindow : public Widget
     std::vector<std::pair< std::vector<double>, std::vector<double>> > m_mem_sweeps_results;
     std::vector<std::string> m_mem_sweeps_names;
 
-    Timer   m_sweep_timer;
+    Chrono  m_sweep_timer_chrono;
+    
+    int     m_sweep_time = 0;
+    bool    m_sweep_status = false;
     bool    m_compute_on = false;
     bool    m_audio_loopback_on = false;
 
@@ -159,15 +162,16 @@ class AudioToolWindow : public Widget
     unsigned long m_total_compute_time=0;
     unsigned long m_ui_time=0;
     ThreadMutex m_wow_data_mutex;
-    SdrThread m_sdr_thread;
-
-    DECLARE_METHODS(on_timer_event)
+    // SdrThread m_sdr_thread;
+ 
     DECLARE_METHODS(on_device_changed)
     DECLARE_METHODS(on_backend_disconnected)
 
     void set_sound_config();
     void reset_audiomanager();
     void detect_periods();
+
+    void process_sweep();
 
 public:
     AudioToolWindow(Window_SDL* win);

@@ -29,12 +29,12 @@ add_subdirectory(libsoundio)
 add_subdirectory(libaudio)
 add_subdirectory(libimgui)
 add_subdirectory(libutils)
-add_subdirectory(libsdr)
+#add_subdirectory(libsdr)
 add_subdirectory(resources)
 
 # Executable rules
 
-add_executable(tapetools main.cpp audio_draw.cpp audio_compute.cpp sdr_draw.cpp main_widget.cpp wow_flutter_thread.cpp)
+add_executable(tapetools main.cpp audio_draw.cpp audio_compute.cpp main_widget.cpp wow_flutter_thread.cpp) # sdr_draw.cpp
 target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libsoundio/include" "libaudio/include" "libutils/include" "resources" "libsdr/include")
 
 # Link rules
@@ -57,7 +57,7 @@ else()
     endif()
 endif(MINGW)
 
-target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} rtlsdr_static dsp_static audio_static imgui_static utils_static $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS} ${DBG_LIBS})
+target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} dsp_static audio_static imgui_static utils_static $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS} ${DBG_LIBS}) # rtlsdr_static
 
 # Install rules
 

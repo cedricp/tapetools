@@ -112,7 +112,7 @@ void AudioToolWindow::draw_sweep_tab()
             if(ImGui::DragInt("Delay (ms)", &m_measure_delay, 1.f, m_recorder_latency_ms * 2, 3000))
             {
                 // Set a comfortable time amount to let the FFT settle (at leat 400ms for 200ms latency)
-                m_sweep_timer.set(m_measure_delay);
+                m_sweep_time = m_measure_delay;
             }
             ImGui::SetItemTooltip("Delay between tone change and capture, not set too low");
         ImGui::EndChild();
@@ -1081,7 +1081,7 @@ void AudioToolWindow::draw_rt_analysis_tab()
         if (m_measure_delay < m_recorder_latency_ms * 2)
         {
             m_measure_delay = m_recorder_latency_ms * 2;
-            m_sweep_timer.set(m_measure_delay);
+            m_sweep_time = m_measure_delay;
         }
         reinit_recorder();
     }
