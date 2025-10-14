@@ -120,7 +120,7 @@ class AudioToolWindow : public Widget
 
     bool    m_sweep_started = false;
     bool    m_async_sweep = false;
-    int     m_sweep_current_frequency;
+    int     m_sweep_target_frequency;
     int     m_sweep_capture_num = 30;
     int     m_measure_delay = 400;
     int     m_sweep_last_measure_freq;

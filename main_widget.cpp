@@ -264,16 +264,18 @@ void AudioToolWindow::start_sweep_gen()
     m_audiorecorder.pause(false);
     m_compute_on = true;
     m_sweep_started = true;
-    m_sweep_current_frequency = 20;
+    m_sweep_target_frequency = 20;
     m_sweep_freqs.clear();
     m_sweep_values.clear();
+    m_recorder_latency_ms = 100;
+    reinit_recorder();
 
     if (!m_async_sweep)
     {
         m_signal_generator_switch = true;
         reset_signal_generator();
-        m_signal_generator.set_pitch(m_sweep_current_frequency);
         m_signal_generator.set_mode(audioWaveformGenerator::SINE);
+        m_signal_generator.set_pitch(m_sweep_target_frequency);
     }
 
     m_sweep_status = true;
@@ -494,7 +496,6 @@ bool AudioToolWindow::check_data_buffer()
         {
             if (m_sweep_status && m_sweep_timer_chrono.get_elapsed_time() > m_measure_delay * 1000){
                 process_sweep();
-                m_sweep_timer_chrono.reset();
             }
             if (m_compute_channel_phase || m_show_thd)
                 compute_thd();

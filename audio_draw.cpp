@@ -789,6 +789,8 @@ void AudioToolWindow::draw_tone_generator_widget()
         ImGui::SetItemTooltip("Set the generator intensity");
         ImGui::EndChild();
 
+        m_signal_generator.set_fm(0, 0);
+
         // if(m_signal_generator.mode() == audioWaveformGenerator::SINE)
         // {
         //     ImGui::SameLine();
@@ -1047,7 +1049,7 @@ void AudioToolWindow::draw_rt_analysis_tab()
     ImGui::SameLine();
     ImGui::BeginChild("ScopesChildCaptureSize", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
     ImGui::SetNextItemWidth(100);
-    if(ImGui::InputInt("Capture size (ms)", &m_recorder_latency_ms, 100, 200, ImGuiInputTextFlags_EnterReturnsTrue))
+    if(ImGui::InputInt("Capture time (ms)", &m_recorder_latency_ms, 100, 200, ImGuiInputTextFlags_EnterReturnsTrue))
     {
         if(m_recorder_latency_ms < 100) m_recorder_latency_ms = 100;
         if(m_recorder_latency_ms > 1000) m_recorder_latency_ms = 1000;

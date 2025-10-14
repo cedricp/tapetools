@@ -617,14 +617,14 @@ void AudioToolWindow::process_sweep()
     if (!m_async_sweep)
     {
         bool need_stop_sweep = false;
-        if (m_sweep_current_frequency > 20000)
+        if (m_sweep_target_frequency > 24000)
         {
-            m_sweep_current_frequency = 20000;
+            // m_sweep_target_frequency = 24000;
             need_stop_sweep = true;
         }
 
-        int min_freq_idx = std::max(int((m_sweep_current_frequency - 500) * fft_step), 0);
-        int max_freq_idx = std::min(int((m_sweep_current_frequency + 500) * fft_step), m_capture_size / 2);
+        int min_freq_idx = std::max(int((m_sweep_target_frequency - 500) * fft_step), 0);
+        int max_freq_idx = std::min(int((m_sweep_target_frequency + 500) * fft_step), m_capture_size / 2);
 
         double max_val = m_noise_foor;
         for (int i = min_freq_idx; i < max_freq_idx; ++i)
@@ -634,13 +634,13 @@ void AudioToolWindow::process_sweep()
         }
 
         m_sweep_values.push_back(max_val);
-        m_sweep_freqs.push_back(m_sweep_current_frequency);
+        m_sweep_freqs.push_back(m_sweep_target_frequency);
 
         double logfreq_min = log10(20.);
-        double logfreq_max = log10(20000.);
+        double logfreq_max = log10(24000.);
         double step = (logfreq_max - logfreq_min) / m_sweep_capture_num;
 
-        double newlogfreq = log10(m_sweep_current_frequency) + step;
+        double newlogfreq = log10(m_sweep_target_frequency) + step;
 
         if (need_stop_sweep)
         {
@@ -649,8 +649,8 @@ void AudioToolWindow::process_sweep()
             return;
         }
 
-        m_sweep_current_frequency = pow(10., newlogfreq);
-        m_signal_generator.set_pitch(m_sweep_current_frequency);
+        m_sweep_target_frequency = pow(10., newlogfreq);
+        m_signal_generator.set_pitch(m_sweep_target_frequency);
     }
     else
     {
@@ -697,6 +697,6 @@ void AudioToolWindow::process_sweep()
             m_sweep_last_measure_freq = frequency > m_sweep_last_measure_freq ? frequency : m_sweep_last_measure_freq;
         }
     }
-
-    update_ui();
+    m_sweep_timer_chrono.reset();
+    //update_ui();
 }
