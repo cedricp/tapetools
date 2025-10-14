@@ -111,8 +111,8 @@ public:
 
     int get_samplerate();
 
-    void set_pitch(double pitch);
-    void set_volume(int db);
+    void set_pitch(double pitch, double duration = 0.1);
+    void set_volume(int db, double duration = 0.1);
     void set_fm(double pitch,double vol){m_fm_freq = pitch; m_fm_strength = vol;}
 
     void set_mode(int m){m_mode = m;}

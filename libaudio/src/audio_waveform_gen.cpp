@@ -217,16 +217,16 @@ bool audioWaveformGenerator::pause(bool pause)
     return true;
 }
 
-void audioWaveformGenerator::set_pitch(double pitch)
+void audioWaveformGenerator::set_pitch(double pitch, double duration)
 {
     m_pitch = pitch;
-    m_sinewave.sine_wave_frequency_transition(m_pitch, .1);
+    m_sinewave.sine_wave_frequency_transition(m_pitch, duration);
 }
 
-void audioWaveformGenerator::set_volume(int db)
+void audioWaveformGenerator::set_volume(int db, double duration)
 {
     m_volume = pow(10, (double)db/20);   
-    m_sinewave.sine_wave_amplitude_transition(m_volume, .1); 
+    m_sinewave.sine_wave_amplitude_transition(m_volume, duration); 
 }
 
 

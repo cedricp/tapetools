@@ -650,7 +650,7 @@ void AudioToolWindow::process_sweep()
         }
 
         m_sweep_target_frequency = pow(10., newlogfreq);
-        m_signal_generator.set_pitch(m_sweep_target_frequency);
+        m_signal_generator.set_pitch(m_sweep_target_frequency, 0.01);
     }
     else
     {
