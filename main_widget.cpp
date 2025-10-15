@@ -540,7 +540,7 @@ void AudioToolWindow::reset_audiomanager()
 IMPLEMENT_CALLBACK_METHOD(on_device_changed, AudioToolWindow)
 {
     // reinit_recorder();
-    printf("Audio device configuration changed.\n");
+    log_message("Audio device configuration changed.\n");
 }
 
 IMPLEMENT_CALLBACK_METHOD(on_backend_disconnected, AudioToolWindow)

@@ -491,16 +491,16 @@ void AudioToolWindow::init_capture()
     int wow_capture_size = samplerate / WOW_FLUTTER_DECIMATION * (WOW_FLUTTER_ANALYSIS_TIME - 0.5f);
     int wow_start_capture = m_wow_flutter_capture_size - wow_capture_size;
     
-    m_fftinl = new double[capture_size];
-    m_fftoutl = new fftw_complex[capture_size];
-    m_fftinr = new double[capture_size];
-    m_fftoutr = new fftw_complex[capture_size];
-    m_fftdrawl = new double[fft_capture_size];
-    m_fftdrawr = new double[fft_capture_size];
-    m_fftfreqs = new double[fft_capture_size];   
-    m_rms_fft = new double[fft_capture_size];
-    m_current_window_cache = new double[capture_size];
-    m_wow_complex_out = new fftw_complex[wow_capture_size];
+    m_fftinl    = new double[capture_size];
+    m_fftoutl   = new fftw_complex[capture_size];
+    m_fftinr    = new double[capture_size];
+    m_fftoutr   = new fftw_complex[capture_size];
+    m_fftdrawl  = new double[fft_capture_size];
+    m_fftdrawr  = new double[fft_capture_size];
+    m_fftfreqs  = new double[fft_capture_size];   
+    m_rms_fft   = new double[fft_capture_size];
+    m_current_window_cache  = new double[capture_size];
+    m_wow_complex_out       = new fftw_complex[wow_capture_size];
 
     m_fftwowdrawfreqs.resize(wow_capture_size/2); 
     m_fftdrawwow.resize(wow_capture_size/2);
@@ -674,11 +674,11 @@ void AudioToolWindow::process_sweep()
                 double freq_hi = freq + (freq * 0.1);
                 if (frequency > freq_low && frequency < freq_hi)
                 {
-                    // if (m_sweep_values[sweep_values_index] < fft_max_val){
-                    m_sweep_values[sweep_values_index] = fft_max_val;
-                    found_bin = true;
-                    break;
-                    //}
+                    if (m_sweep_values[sweep_values_index] < fft_max_val){
+                        m_sweep_values[sweep_values_index] = fft_max_val;
+                        found_bin = true;
+                        break;
+                    }
                 }
                 if (freq > frequency && sweep_values_index >= 0)
                 {
@@ -698,5 +698,4 @@ void AudioToolWindow::process_sweep()
         }
     }
     m_sweep_timer_chrono.reset();
-    //update_ui();
 }

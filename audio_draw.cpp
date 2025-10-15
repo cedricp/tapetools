@@ -1,6 +1,7 @@
 #define _USE_MATH_DEFINES
 #include "main_widget.h"
 #include "lcd_display.h"
+#include <spline.h>
 
 void TextCenter(const char* text, ...) {
     char buffer[256];
@@ -57,6 +58,28 @@ bool manage_slider_mousewheel_int(int &val, int min, int max, int step = 1)
     return false;
 }
 
+void linear_to_spline_response(const std::vector<double> &freqs, const std::vector<double> &vals,
+                            std::vector<double> &xspline, std::vector<double> &yspline, const
+                            int numpnts = 400)
+{
+    tk::spline spline(freqs, vals);
+    double f_min = freqs.front();
+    double f_max = freqs.back();
+    double logfreq_min = log10(f_min);
+    double logfreq_max = log10(f_max);
+    double step = (logfreq_max - logfreq_min) / numpnts;
+    double curr_log_freq = logfreq_min;
+
+    for (int i = 0; i < numpnts; ++i)
+    {
+        double f_new = pow(10, curr_log_freq);
+        xspline[i] = f_new;
+        yspline[i] = spline(f_new);
+        curr_log_freq += step;
+    }
+}
+
+
 void AudioToolWindow::draw_sweep_tab()
 {
     int channelcount = m_audiorecorder.get_channel_count(); 
@@ -84,19 +107,6 @@ void AudioToolWindow::draw_sweep_tab()
         }
         ImGui::SetItemTooltip("Switch between synchronous and asynchronous capture");
     ImGui::EndChild();
-
-    if (!m_async_sweep)
-    {
-        ImGui::SameLine();
-        ImGui::BeginChild("FFTChildToneVol", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-            ImGui::SetNextItemWidth(70);
-            if (ImGui::SliderInt("Tone power", &m_signalgen_volume_db, -100, 0, "%d dB") || manage_slider_mousewheel_int(m_signalgen_volume_db, -100, 0))
-            {
-                m_signal_generator.set_volume(m_signalgen_volume_db);
-            }
-            ImGui::SetItemTooltip("Set audio tone power");
-        ImGui::EndChild();
-    }
 
     ImGui::SameLine();
     ImGui::BeginChild("ScopesChild3", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
@@ -171,7 +181,9 @@ void AudioToolWindow::draw_sweep_tab()
         {
             if (std::find(m_mem_sweeps_names.begin(), m_mem_sweeps_names.end(), buffer) == m_mem_sweeps_names.end())
             {
-                m_mem_sweeps_results.push_back(std::pair<std::vector<double>, std::vector<double>>(m_sweep_freqs, m_sweep_values));
+                std::vector<double> xspline(400), yspline(400);
+                linear_to_spline_response(m_sweep_freqs, m_sweep_values, xspline, yspline, 400);
+                m_mem_sweeps_results.push_back(std::pair<std::vector<double>, std::vector<double>>(xspline, yspline));
                 m_mem_sweeps_names.push_back(buffer);
                 m_sweep_freqs.clear();
                 m_sweep_values.clear();
@@ -223,11 +235,16 @@ void AudioToolWindow::draw_sweep_tab()
             ImPlot::PlotLine("Audio FFT", m_fftfreqs, m_fft_channel_left  ?  m_fftdrawl : m_fftdrawr, m_sound_data_x.size()/2);
             double nf[4] = {0., (current_sample_rate)/2.0, m_noise_foor, m_noise_foor};
             ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
-            ImPlot::PlotLine("Frequency response", m_sweep_freqs.data(), m_sweep_values.data(), m_sweep_values.size());
+            if (m_sweep_freqs.size() > 3){
+                const int numpnts = 400;
+                std::vector<double> xspline(numpnts), yspline(numpnts);
+                linear_to_spline_response(m_sweep_freqs, m_sweep_values, xspline, yspline, numpnts);
+                ImPlot::PlotLine("Frequency response", xspline.data(), yspline.data(), numpnts);
+            }
         }
 
         int i = 0;
-        for (auto sweep_result: m_mem_sweeps_results)
+        for (auto sweep_result: m_mem_sweeps_results)   
         {
             ImPlot::PlotLine(m_mem_sweeps_names[i++].c_str(), sweep_result.first.data(), sweep_result.second.data(), sweep_result.second.size());
         }

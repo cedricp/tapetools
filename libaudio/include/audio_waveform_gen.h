@@ -109,7 +109,7 @@ public:
     bool start();
     bool pause(bool pause = true);
 
-    int get_samplerate();
+    int  get_samplerate();
 
     void set_pitch(double pitch, double duration = 0.1);
     void set_volume(int db, double duration = 0.1);
