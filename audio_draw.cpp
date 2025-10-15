@@ -51,6 +51,9 @@ bool manage_slider_mousewheel_int(int &val, int min, int max, int step = 1)
                 val += step * wheel;
             }
         }
+        else {
+            return false;
+        }
         if (val > max) val = max;
         if (val < min) val = min;
         return true;
@@ -59,9 +62,9 @@ bool manage_slider_mousewheel_int(int &val, int min, int max, int step = 1)
 }
 
 void linear_to_spline_response(const std::vector<double> &freqs, const std::vector<double> &vals,
-                            std::vector<double> &xspline, std::vector<double> &yspline, const
-                            int numpnts = 400)
+                            std::vector<double> &xspline, std::vector<double> &yspline)
 {
+    const int numpnts = xspline.size();
     tk::spline spline(freqs, vals);
     double f_min = freqs.front();
     double f_max = freqs.back();
@@ -182,7 +185,7 @@ void AudioToolWindow::draw_sweep_tab()
             if (std::find(m_mem_sweeps_names.begin(), m_mem_sweeps_names.end(), buffer) == m_mem_sweeps_names.end())
             {
                 std::vector<double> xspline(400), yspline(400);
-                linear_to_spline_response(m_sweep_freqs, m_sweep_values, xspline, yspline, 400);
+                linear_to_spline_response(m_sweep_freqs, m_sweep_values, xspline, yspline);
                 m_mem_sweeps_results.push_back(std::pair<std::vector<double>, std::vector<double>>(xspline, yspline));
                 m_mem_sweeps_names.push_back(buffer);
                 m_sweep_freqs.clear();
@@ -236,10 +239,9 @@ void AudioToolWindow::draw_sweep_tab()
             double nf[4] = {0., (current_sample_rate)/2.0, m_noise_foor, m_noise_foor};
             ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
             if (m_sweep_freqs.size() > 3){
-                const int numpnts = 400;
-                std::vector<double> xspline(numpnts), yspline(numpnts);
-                linear_to_spline_response(m_sweep_freqs, m_sweep_values, xspline, yspline, numpnts);
-                ImPlot::PlotLine("Frequency response", xspline.data(), yspline.data(), numpnts);
+                std::vector<double> xspline(400), yspline(400);
+                linear_to_spline_response(m_sweep_freqs, m_sweep_values, xspline, yspline);
+                ImPlot::PlotLine("Frequency response", xspline.data(), yspline.data(), 400);
             }
         }
 
@@ -802,7 +804,6 @@ void AudioToolWindow::draw_tone_generator_widget()
         {
             m_signal_generator.set_volume(m_signalgen_volume_db);
         }
-        
         ImGui::SetItemTooltip("Set the generator intensity");
         ImGui::EndChild();
 
