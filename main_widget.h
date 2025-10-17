@@ -162,8 +162,9 @@ class AudioToolWindow : public Widget
     unsigned long m_total_compute_time=0;
     unsigned long m_ui_time=0;
     ThreadMutex m_wow_data_mutex;
-    // SdrThread m_sdr_thread;
- 
+#ifdef RTL_SDR
+    SdrThread m_sdr_thread;
+ #endif
     DECLARE_METHODS(on_device_changed)
     DECLARE_METHODS(on_backend_disconnected)
 

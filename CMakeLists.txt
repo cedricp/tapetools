@@ -8,13 +8,17 @@ if(UNIX)
 set(OpenGL_GL_PREFERENCE "GLVND")
 endif(UNIX)
 
+option(WITH_RTLSDR "Build with RTL-SDR support" OFF)
+
 set(ARCH elf64-x86-64)
 
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(FFTW REQUIRED)
-find_package(LIBUSB REQUIRED)
+if (WITH_RTLSDR)
+    find_package(LIBUSB REQUIRED)
+endif()
 
 message(STATUS "FFTW3 libs ${FFTW_DOUBLE_LIB}")
 message(STATUS "FFTW3 includes ${FFTW_INCLUDE_DIRS}")
@@ -29,18 +33,28 @@ add_subdirectory(libsoundio)
 add_subdirectory(libaudio)
 add_subdirectory(libimgui)
 add_subdirectory(libutils)
-#add_subdirectory(libsdr)
+if (WITH_RTLSDR)
+    add_subdirectory(libsdr)
+endif()
+
+set(CPP_FILES main.cpp audio_draw.cpp audio_compute.cpp main_widget.cpp wow_flutter_thread.cpp)
+
+if (WITH_RTLSDR)
+    set(RTL_LIBS rtlsdr_static)
+    add_compile_definitions(RTL_SDR)
+    list(APPEND CPP_FILES sdr_draw.cpp)
+endif()
 add_subdirectory(resources)
 
 # Executable rules
 
-add_executable(tapetools main.cpp audio_draw.cpp audio_compute.cpp main_widget.cpp wow_flutter_thread.cpp) # sdr_draw.cpp
+add_executable(tapetools ${CPP_FILES})
 target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libsoundio/include" "libaudio/include" "libutils/include" "resources" "libsdr/include")
 
 # Link rules
 
 if(MINGW)
-set(PLATFORM_LIBS shlwapi)
+set(PLATFORM_LIBS shlwapi winmm)
 target_sources(tapetools PRIVATE resources/tapetools.rc)
 endif()
 
@@ -53,11 +67,10 @@ if(MINGW)
     set_target_properties(tapetools PROPERTIES LINK_FLAGS "${LINKFLAGS}")
 else()
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    #set(DBG_LIBS "-lefence")
     endif()
 endif(MINGW)
 
-target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} dsp_static audio_static imgui_static utils_static $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS} ${DBG_LIBS}) # rtlsdr_static
+target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} dsp_static audio_static imgui_static utils_static ${RTL_LIBS} $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS} ${DBG_LIBS})
 
 # Install rules
 

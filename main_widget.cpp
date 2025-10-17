@@ -24,8 +24,10 @@ AudioToolWindow::AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m
 AudioToolWindow::~AudioToolWindow()
 {
     m_signal_generator.destroy();
-    // m_sdr_thread.stop();
-    // m_sdr_thread.join();
+#ifdef RTL_SDR
+    m_sdr_thread.stop();
+    m_sdr_thread.join();
+#endif
     destroy_capture();
 }
 
@@ -243,11 +245,13 @@ void AudioToolWindow::draw()
         draw_sweep_tab();
         ImGui::EndTabItem();
     }
-    // if (m_sdr_thread.get_scanner().get_rtl_device().get_device_count() && ImGui::BeginTabItem("SDR analysis"))
-    // {
-    //     draw_sdr();
-    //     ImGui::EndTabItem();
-    // }
+#ifdef RTL_SDR
+    if (m_sdr_thread.get_scanner().get_rtl_device().get_device_count() && ImGui::BeginTabItem("SDR analysis"))
+    {
+        draw_sdr();
+        ImGui::EndTabItem();
+    }
+#endif
     ImGui::EndTabBar();
 
     draw_tools_windows();
@@ -509,12 +513,13 @@ bool AudioToolWindow::check_data_buffer()
             update_ui();
         return true;
     }
-
-    // if (m_sdr_thread.data_available())
-    // {
-    //     update_ui();
-    //     return true;
-    // }
+#ifdef RTL_SDR
+    if (m_sdr_thread.data_available())
+    {
+        update_ui();
+        return true;
+    }
+#endif
 
     return false;
 }

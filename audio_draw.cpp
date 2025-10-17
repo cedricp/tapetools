@@ -19,7 +19,7 @@ void TextCenter(const char* text, ...) {
 bool manage_slider_mousewheel_int(int &val, int min, int max, int step = 1)
 {
     bool shiftdown = ImGui::IsKeyDown(ImGuiKey_ModShift);
-    bool ctrldown = ImGui::IsKeyDown(ImGuiKey_ModCtrl);
+    bool ctrldown  = ImGui::IsKeyDown(ImGuiKey_ModCtrl);
 
     int range = max-min;
 
@@ -61,13 +61,15 @@ bool manage_slider_mousewheel_int(int &val, int min, int max, int step = 1)
     return false;
 }
 
-void linear_to_spline_response(const std::vector<double> &freqs, const std::vector<double> &vals,
+void interpolate_linear_to_hspline_curve(const std::vector<double> &freqs, const std::vector<double> &vals,
                             std::vector<double> &xspline, std::vector<double> &yspline)
 {
     const int numpnts = xspline.size();
-    tk::spline spline(freqs, vals);
+    tk::spline spline(freqs, vals, tk::spline::cspline_hermite);
+
     double f_min = freqs.front();
     double f_max = freqs.back();
+    // We want to draw the spline in log scale
     double logfreq_min = log10(f_min);
     double logfreq_max = log10(f_max);
     double step = (logfreq_max - logfreq_min) / numpnts;
@@ -185,7 +187,7 @@ void AudioToolWindow::draw_sweep_tab()
             if (std::find(m_mem_sweeps_names.begin(), m_mem_sweeps_names.end(), buffer) == m_mem_sweeps_names.end())
             {
                 std::vector<double> xspline(400), yspline(400);
-                linear_to_spline_response(m_sweep_freqs, m_sweep_values, xspline, yspline);
+                interpolate_linear_to_hspline_curve(m_sweep_freqs, m_sweep_values, xspline, yspline);
                 m_mem_sweeps_results.push_back(std::pair<std::vector<double>, std::vector<double>>(xspline, yspline));
                 m_mem_sweeps_names.push_back(buffer);
                 m_sweep_freqs.clear();
@@ -240,7 +242,7 @@ void AudioToolWindow::draw_sweep_tab()
             ImPlot::PlotLine("Noise floor", nf, nf+2, 2);
             if (m_sweep_freqs.size() > 3){
                 std::vector<double> xspline(400), yspline(400);
-                linear_to_spline_response(m_sweep_freqs, m_sweep_values, xspline, yspline);
+                interpolate_linear_to_hspline_curve(m_sweep_freqs, m_sweep_values, xspline, yspline);
                 ImPlot::PlotLine("Frequency response", xspline.data(), yspline.data(), 400);
             }
         }
@@ -465,7 +467,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
                 // Zoom Y axis in/out
                 max_iq += ImGui::GetIO().MouseWheel * 0.05;
                 if (max_iq < 0.1) max_iq = 0.1;
-                if (max_iq > 2) max_iq = 2;
+                if (max_iq > 2.0) max_iq = 2.0;
             }
         }
 

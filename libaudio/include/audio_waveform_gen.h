@@ -32,7 +32,7 @@ public:
     }
 
     SineWave(){
-
+        set(440.0, 44100.0, 1.0);
     }
 
     void set(double freq, double rate, double amp){
@@ -44,6 +44,8 @@ public:
         transition.amplitudeStep = 0;
         transition.frequency = freq;
         transition.frequencyStep = 0;
+        phase = 0.0;
+        phaseStep = 0;
     }
 
     double sine_wave_sample() {

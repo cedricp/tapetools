@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <math.h>
 
+void log_message(const char* format, ...);
+
 static bool is_seed_init = false;
 static uint64_t u,v,w;
 
@@ -74,7 +76,7 @@ void audioWaveformGenerator::write_callback(SoundIoOutStream *outstream, int fra
     for (;;) {
         int frame_count = frames_left;
         if ((err = soundio_outstream_begin_write(outstream, &areas, &frame_count))) {
-            fprintf(stderr, "unrecoverable stream error: %s\n", soundio_strerror(err));
+            log_message("audioWaveformGenerator : unrecoverable stream error: %s\n", soundio_strerror(err));
             exit(1);
         }
         
@@ -112,7 +114,7 @@ void audioWaveformGenerator::write_callback(SoundIoOutStream *outstream, int fra
         if ((err = soundio_outstream_end_write(outstream))) {
             if (err == SoundIoErrorUnderflow)
                 return;
-            fprintf(stderr, "unrecoverable stream error: %s\n", soundio_strerror(err));
+            log_message("audioWaveformGenerator : unrecoverable stream error: %s\n", soundio_strerror(err));
             exit(1);
         }
 
@@ -125,12 +127,12 @@ void audioWaveformGenerator::write_callback(SoundIoOutStream *outstream, int fra
 void audioWaveformGenerator::error_callback(SoundIoOutStream *outstream, int err)
 {
     audioWaveformGenerator *ar = (audioWaveformGenerator*)outstream->userdata;
-    fprintf(stderr, "audioSineGenerator::error_callback %s\n", soundio_strerror(err));
+    log_message("audioSineGenerator::error_callback %s\n", soundio_strerror(err));
 }
 
 void audioWaveformGenerator::underflow_callback(SoundIoOutStream *outstream) {
     static int count = 0;
-    fprintf(stderr, "underflow %d\n", count++);
+    log_message("audioWaveformGenerator: underflow %d\n", count++);
 }
 
 audioWaveformGenerator::audioWaveformGenerator(){
@@ -146,7 +148,7 @@ bool audioWaveformGenerator::init(audioManager& manager, int device_idx, int sam
     m_pitch = 1000;
 
     if (!manager.valid()){
-        fprintf(stderr, "audioSine::init : AudioManager not valid\n");
+        log_message("audioSine::init : AudioManager not valid\n");
     }
 
     m_seconds_offset = 0;
@@ -159,7 +161,7 @@ bool audioWaveformGenerator::init(audioManager& manager, int device_idx, int sam
     m_outstream = manager.get_out_stream(latency, samplerate, SoundIoFormatFloat32NE, device_idx);
 
     if (m_outstream == nullptr){
-        fprintf(stderr, "unable to open device index: %i\n", device_idx);
+        log_message("unable to open device index: %i\n", device_idx);
         return false;
     }
 
@@ -191,12 +193,12 @@ void audioWaveformGenerator::destroy()
 bool audioWaveformGenerator::start()
 {
     if (m_outstream == nullptr){
-        fprintf(stderr, "audioSine::start : outstream not initialized\n");
+        log_message("audioSine::start : outstream not initialized\n");
         return false;
     }
     int err;
     if ((err = soundio_outstream_start(m_outstream))){
-        fprintf(stderr, "unable to start device: %s\n", soundio_strerror(err));
+        log_message("unable to start device: %s\n", soundio_strerror(err));
         return false;
     }
     return true;
@@ -205,13 +207,13 @@ bool audioWaveformGenerator::start()
 bool audioWaveformGenerator::pause(bool pause)
 {
     if (m_outstream == nullptr){
-        fprintf(stderr, "audioSine::pause : outstream not initialized\n");
+        log_message("audioSine::pause : outstream not initialized\n");
         return false;
     }
 
     int err;
     if ((err = soundio_outstream_pause(m_outstream, pause))) {
-        fprintf(stderr, "unable to pause device: %s\n", soundio_strerror(err));
+        log_message("Unable to pause device: %s\n", soundio_strerror(err));
         return false;
     }
     return true;
