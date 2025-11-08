@@ -11,8 +11,8 @@ AudioToolWindow::AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m
     reset_audiomanager();
     set_theme();
 
-    m_audiomanager.device_changed_event.connect_event(STATIC_METHOD(on_device_changed), this);
-    m_audiomanager.backend_disconnected_event.connect_event(STATIC_METHOD(on_backend_disconnected), this);
+    //m_audiomanager.device_changed_event.connect_event(STATIC_METHOD(on_device_changed), this);
+    //m_audiomanager.backend_disconnected_event.connect_event(STATIC_METHOD(on_backend_disconnected), this);
 
     m_audiomanager.flush();
 
@@ -278,7 +278,7 @@ void AudioToolWindow::start_sweep_gen()
     {
         m_signal_generator_switch = true;
         reset_signal_generator();
-        m_signal_generator.set_mode(audioWaveformGenerator::SINE);
+        m_signal_generator.set_mode(PAaudioWaveformGenerator::SINE);
         m_signal_generator.set_pitch(m_sweep_target_frequency);
     }
 

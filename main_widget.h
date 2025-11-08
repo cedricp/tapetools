@@ -4,9 +4,9 @@
 #include <SDL.h>
 #include "imgui_internal.h"
 #include "window_sdl.h"
-#include "audio_waveform_gen.h"
-#include "audio_record.h"
-#include "audio_player.h"
+#include "audio_generator.h"
+#include "audio_recorder.h"
+#include "audio_loopback.h"
 #include "utils.h"
 #include "timer.h"
 #include <fftw3.h>
@@ -24,10 +24,10 @@ class AudioToolWindow : public Widget
 {
     friend class WowAndFluterThread;
 
-    audioManager        m_audiomanager;
-    audioRecorder       m_audiorecorder;
-    audioPlayer         m_audioplayer;
-    audioWaveformGenerator  m_signal_generator;
+    PAaudioManager      m_audiomanager;
+    PAaudioRecorder     m_audiorecorder;
+    PAaudioLoopback     m_audioplayer;
+    PAaudioWaveformGenerator  m_signal_generator;
 
     int  m_uitheme = 0;
     

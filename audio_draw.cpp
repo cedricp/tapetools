@@ -790,7 +790,7 @@ void AudioToolWindow::draw_tone_generator_widget()
         }
         ImGui::SetItemTooltip("Waveform generator ON/OFF");
 
-        if (m_signal_generator.mode() == audioWaveformGenerator::SINE)
+        if (m_signal_generator.mode() == PAaudioWaveformGenerator::SINE)
         {
             ImGui::SameLine();
             if (ImGui::SliderInt("Pitch", &m_signal_generator_pitch, 20, 20000) || manage_slider_mousewheel_int(m_signal_generator_pitch, 20, 20000))
@@ -809,7 +809,7 @@ void AudioToolWindow::draw_tone_generator_widget()
         ImGui::SetItemTooltip("Set the generator intensity");
         ImGui::EndChild();
 
-        m_signal_generator.set_fm(0, 0);
+        // m_signal_generator.set_fm(0, 0);
 
         // if(m_signal_generator.mode() == audioWaveformGenerator::SINE)
         // {

@@ -168,10 +168,10 @@ bool AudioToolWindow::compute()
     // Fill audio for audio loopback
     if (m_audio_loopback_on)
     {
-        std::vector<int16_t> audio_data(m_capture_size * channelcount);
+        std::vector<float> audio_data(m_capture_size * channelcount);
         for (int i = 0; i < m_capture_size * channelcount; i++)
         {
-            audio_data[i] = m_raw_buffer[i] * INT16_MAX;
+            audio_data[i] = m_raw_buffer[i];
         }
 
         if (!m_audioplayer.add_data(audio_data.data(), m_capture_size * channelcount)){

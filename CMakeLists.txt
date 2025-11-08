@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.25.0)
 project(tapetools_project C CXX)
+set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_MODULE_PATH ${tapetools_project_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 set(CMAKE_INSTALL_PREFIX ${tapetools_project_SOURCE_DIR}/INSTALL_${CMAKE_BUILD_TYPE})
@@ -16,6 +17,7 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(FFTW REQUIRED)
+find_package(PortAudio REQUIRED)
 if (WITH_RTLSDR)
     find_package(LIBUSB REQUIRED)
 endif()
@@ -29,7 +31,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 add_subdirectory(libdsp)
-add_subdirectory(libsoundio)
 add_subdirectory(libaudio)
 add_subdirectory(libimgui)
 add_subdirectory(libutils)
@@ -49,7 +50,7 @@ add_subdirectory(resources)
 # Executable rules
 
 add_executable(tapetools ${CPP_FILES})
-target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libsoundio/include" "libaudio/include" "libutils/include" "resources" "libsdr/include")
+target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libpaaudio/include" "libutils/include" "resources" "libsdr/include")
 
 # Link rules
 
@@ -70,7 +71,8 @@ else()
     endif()
 endif(MINGW)
 
-target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} dsp_static audio_static imgui_static utils_static ${RTL_LIBS} $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS} ${DBG_LIBS})
+target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} dsp_static paaudio_static imgui_static utils_static ${PORTAUDIO_LIBRARIES} ${RTL_LIBS} $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS} ${DBG_LIBS})
+
 
 # Install rules
 

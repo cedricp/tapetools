@@ -1,22 +1,26 @@
 #pragma once
 
 #include "audio_manager.h"
-#include "callback.h"
 
-
-class audioRecorder
+class PAaudioRecorder
 {
-    SoundIoInStream *m_instream = nullptr;
     ringBuffer *m_ring_buffer = nullptr;
-    bool m_32bits_sampling = true;
-    static void read_callback(SoundIoInStream *instream, int frame_count_min, int frame_count_max);
-    static void overflow_callback(SoundIoInStream *instream);
-    static void error_callback(SoundIoInStream *instream, int err);
-    audioManager& m_manager;
+    PAaudioManager& m_manager;
+    PaStream* m_instream = nullptr;
+    StreamInfo m_instreaminfo;
     void destroy();
+
+    static int recordCallback(
+    const void *inputBuffer,
+    void *outputBuffer,
+    unsigned long frameCount,
+    const PaStreamCallbackTimeInfo* timeInfo,
+    PaStreamCallbackFlags statusFlags,
+    void *userData);
+
 public:
-    audioRecorder(audioManager& audioManager);
-    ~audioRecorder();
+    PAaudioRecorder(PAaudioManager& audioManager);
+    ~PAaudioRecorder();
 
     bool init(float latency, int device_idx, int samplerate);
     int get_available_bytes();
