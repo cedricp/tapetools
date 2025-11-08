@@ -29,7 +29,9 @@ void PAaudioManager::scan_devices()
     for (int i = 0; i < output_count; ++i){
         const PaDeviceInfo* device_info = Pa_GetDeviceInfo(i);
         if (device_info->maxOutputChannels > 0){
-            std::string device_name = device_info->name;
+            const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(device_info->hostApi);
+            std::string api = apiInfo->name;
+            std::string device_name = device_info->name + std::string(" [") + api + std::string("]");
             m_output_devices.push_back(device_name);
             m_output_map.push_back(i);
         }
@@ -41,7 +43,9 @@ void PAaudioManager::scan_devices()
     for (int i = 0; i < input_count; ++i){
         const PaDeviceInfo* device_info = Pa_GetDeviceInfo(i);
         if (device_info->maxInputChannels > 0){
-            std::string device_name = device_info->name;
+            const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(device_info->hostApi);
+            std::string api = apiInfo->name;
+            std::string device_name = device_info->name + std::string(" [") + api + std::string("]");
             m_input_devices.push_back(device_name);
             m_input_map.push_back(i);
         }
@@ -77,7 +81,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerat
         &inputParameters,
         nullptr,  // no output
         samplerate,
-        1024,
+        2048,
         paClipOff,  // no clipping
         callback,    // no callback, we’ll use blocking read
         userData
@@ -90,7 +94,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerat
     return std::make_tuple(stream, info);
 }
 
-std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplerate, int device_idx, float latency, PaSampleFormat format, PaStreamCallback* callback, void* userData)
+std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplerate, int device_idx, float latency, PaSampleFormat format, PaStreamCallback* callback, void* userData, int num_channel)
 {
     StreamInfo info;
     if(!m_pa_ok) return std::make_tuple(nullptr, info);
@@ -104,7 +108,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplera
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(device_idx);
     PaStreamParameters outputParameters;
     outputParameters.device = device_idx;
-    outputParameters.channelCount = deviceInfo->maxOutputChannels;
+    outputParameters.channelCount = num_channel > 0 ? num_channel : deviceInfo->maxOutputChannels;
     outputParameters.sampleFormat = paFloat32;
     outputParameters.suggestedLatency = latency;
     outputParameters.hostApiSpecificStreamInfo = nullptr;
@@ -119,7 +123,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplera
         nullptr,  // no input
         &outputParameters,
         samplerate,
-        1024,
+        2048,
         paClipOff,  // no clipping
         callback,    // no callback, we’ll use blocking read
         userData
@@ -179,8 +183,6 @@ const std::vector<int> PAaudioManager::get_input_sample_rates(int devidx)
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(devidx);
     const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
 
-
-
     PaStreamParameters inputParams;
     inputParams.device = devidx;
     inputParams.channelCount = deviceInfo->maxInputChannels;
@@ -205,10 +207,6 @@ const std::vector<int> PAaudioManager::get_output_sample_rates(int devidx)
 
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(devidx);
     const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
-
-    std::cout << "Checking supported rates for: "
-              << deviceInfo->name << " ("
-              << apiInfo->name << ")\n";
 
     PaStreamParameters outputParams;
     outputParams.device = devidx;

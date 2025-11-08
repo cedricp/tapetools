@@ -30,7 +30,7 @@ public:
     ~PAaudioManager();
 
     std::tuple<PaStream*, StreamInfo> get_input_stream(int samplerate, int device_idx, float latency, PaSampleFormat format, PaStreamCallback* callback, void* userData);
-    std::tuple<PaStream*, StreamInfo> get_output_stream(int samplerate, int device_idx, float latency, PaSampleFormat format, PaStreamCallback* callback, void* userData);
+    std::tuple<PaStream*, StreamInfo> get_output_stream(int samplerate, int device_idx, float latency, PaSampleFormat format, PaStreamCallback* callback, void* userData, int num_channels=-1);
 
     const std::vector<std::string>& get_input_devices(){return m_input_devices;}
     const std::vector<std::string>& get_output_devices(){return m_output_devices;}

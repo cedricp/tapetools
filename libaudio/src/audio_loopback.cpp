@@ -17,7 +17,7 @@ int PAaudioLoopback::generator_callback(const void* input, void* output,
     int numSamples = numChannel*frameCount;
 
     if (rbuffer->getReadAvailable() >= numSamples){
-        rbuffer->write(output, numSamples);
+        rbuffer->read(output, numSamples);
     }
 
     return paContinue;
@@ -43,7 +43,7 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
 
     int ringbugger_size = samplerate * latency * m_outstreaminfo.numChannel * 4;
     
-    std::tie(m_outstream, m_outstreaminfo) = m_manager.get_output_stream(samplerate, device_idx, latency, paFloat32, generator_callback, this);
+    std::tie(m_outstream, m_outstreaminfo) = m_manager.get_output_stream(samplerate, device_idx, latency, paFloat32, generator_callback, this, channels);
 
     m_ringbuffer = new ringBuffer(sizeof(float), ringbugger_size);
 
@@ -52,7 +52,7 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
 
 bool PAaudioLoopback::add_data(const float data[], int size)
 {
-    if (m_ringbuffer && m_ringbuffer->getWriteAvailable() > size){
+    if (m_ringbuffer && m_ringbuffer->getWriteAvailable() >= size){
         m_ringbuffer->write(data, size);
         return true;
     }
