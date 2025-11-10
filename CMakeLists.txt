@@ -4,6 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_MODULE_PATH ${tapetools_project_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 set(CMAKE_INSTALL_PREFIX ${tapetools_project_SOURCE_DIR}/INSTALL_${CMAKE_BUILD_TYPE})
+set(CMAKE_EXPORT_COMPILE_COMMANDS True)
 
 if(UNIX)
 set(OpenGL_GL_PREFERENCE "GLVND")
@@ -11,7 +12,20 @@ endif(UNIX)
 
 option(WITH_RTLSDR "Build with RTL-SDR support" OFF)
 
-set(ARCH elf64-x86-64)
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "X86_64|AMD64")
+    set(PLATFORM_ARCH "elf64-x86-64")
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "i.86")
+    set(PLATFORM_ARCH "elf32-i386")
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    set(PLATFORM_ARCH "elf64-aarch64")
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "armv7" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+    set(PLATFORM_ARCH "elf32-littlearm")
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "riscv64")
+    set(PLATFORM_ARCH "elf64-littleriscv")
+else()
+    set(PLATFORM_ARCH "unknown")
+    message(FATAL_ERROR "Error : Unknown architecture ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
 
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
@@ -55,7 +69,7 @@ target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/incl
 # Link rules
 
 if(MINGW)
-set(PLATFORM_LIBS shlwapi winmm)
+set(PLATFORM_LIBS shlwapi)
 target_sources(tapetools PRIVATE resources/tapetools.rc)
 endif()
 
@@ -71,8 +85,7 @@ else()
     endif()
 endif(MINGW)
 
-target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} dsp_static paaudio_static imgui_static utils_static ${PORTAUDIO_LIBRARIES} ${RTL_LIBS} $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS} ${DBG_LIBS})
-
+target_link_libraries(tapetools ${FFTW_DOUBLE_LIB} dsp_static paaudio_static imgui_static utils_static ${RTL_LIBS} $<LINK_LIBRARY:WHOLE_ARCHIVE,resources_static> ${PLATFORM_LIBS})
 
 # Install rules
 

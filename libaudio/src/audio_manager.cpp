@@ -1,11 +1,17 @@
 #include "audio_manager.h"
 
+#ifdef WIN32
+#include "pa_win_wasapi.h"
+#endif
+
+void log_message(const char* format, ...);
+
 PAaudioManager::PAaudioManager()
 {
     m_pa_ok = false;
     PaError err = Pa_Initialize();
     if (err != paNoError) {
-        fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
+        log_message( "PortAudio error: %s\n", Pa_GetErrorText(err));
         return;
     }
 
@@ -23,7 +29,10 @@ void PAaudioManager::scan_devices()
     if (!m_pa_ok) return;
 
     m_output_devices.clear();
+    m_input_devices.clear();
+
     m_output_map.clear();
+    m_input_map.clear();
 
     int output_count = Pa_GetDeviceCount();
     for (int i = 0; i < output_count; ++i){
@@ -31,21 +40,14 @@ void PAaudioManager::scan_devices()
         if (device_info->maxOutputChannels > 0){
             const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(device_info->hostApi);
             std::string api = apiInfo->name;
-            std::string device_name = device_info->name + std::string(" [") + api + std::string("]");
+            std::string device_name = std::string("[") + api + std::string("] ") + device_info->name;
             m_output_devices.push_back(device_name);
             m_output_map.push_back(i);
         }
-    }
-
-    m_input_devices.clear();
-    m_input_map.clear();
-    int input_count = Pa_GetDeviceCount();
-    for (int i = 0; i < input_count; ++i){
-        const PaDeviceInfo* device_info = Pa_GetDeviceInfo(i);
         if (device_info->maxInputChannels > 0){
             const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(device_info->hostApi);
             std::string api = apiInfo->name;
-            std::string device_name = device_info->name + std::string(" [") + api + std::string("]");
+            std::string device_name = std::string("[") + api + std::string("] ") + device_info->name;
             m_input_devices.push_back(device_name);
             m_input_map.push_back(i);
         }
@@ -57,21 +59,40 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerat
     StreamInfo info;
     if(!m_pa_ok) return std::make_tuple(nullptr, info);
 
+    device_idx = input_to_pa(device_idx);
+
     int err;
     if (device_idx == paNoDevice) {
-        std::cerr << "Error: No default input device.\n";
-        Pa_Terminate();
+        log_message("Error: No default input device.");
         return std::make_tuple(nullptr, info);;
     }
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(device_idx);
+
+    if (latency < deviceInfo->defaultLowInputLatency){
+        latency = deviceInfo->defaultLowInputLatency;
+        log_message("Latency forced to min [%f]", latency);
+    }
+
     PaStreamParameters inputParameters;
     inputParameters.device = device_idx;
     inputParameters.channelCount = deviceInfo->maxInputChannels;
     inputParameters.sampleFormat = format;
     inputParameters.suggestedLatency = latency;
+#ifdef WIN32
+    PaWasapiStreamInfo wasapiInfo;
+    memset(&wasapiInfo, 0, sizeof(wasapiInfo));
+    wasapiInfo.size = sizeof(PaWasapiStreamInfo);
+    wasapiInfo.hostApiType = paWASAPI;
+    wasapiInfo.version = 1;
+    wasapiInfo.flags = (paWinWasapiExclusive|paWinWasapiThreadPriority);
+    wasapiInfo.threadPriority = eThreadPriorityProAudio;
+    const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
+    inputParameters.hostApiSpecificStreamInfo = (apiInfo->type == paWASAPI && m_use_exclusive_mode) ? &wasapiInfo : nullptr;
+#else
     inputParameters.hostApiSpecificStreamInfo = nullptr;
+#endif
 
-    info.numChannel = inputParameters.channelCount ;
+    info.numChannel = inputParameters.channelCount;
     info.sampleRate = samplerate;
     info.format = format;
 
@@ -81,7 +102,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerat
         &inputParameters,
         nullptr,  // no output
         samplerate,
-        2048,
+        (unsigned long)round(latency * samplerate),
         paClipOff,  // no clipping
         callback,    // no callback, we’ll use blocking read
         userData
@@ -99,20 +120,39 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplera
     StreamInfo info;
     if(!m_pa_ok) return std::make_tuple(nullptr, info);
 
+    device_idx = output_to_pa(device_idx);
+
     int err;
     if (device_idx == paNoDevice) {
-        std::cerr << "Error: No default output device.\n";
-        Pa_Terminate();
+        log_message("Error: No default output device.");
         return std::make_tuple(nullptr, info);
     }
+
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(device_idx);
+
+    if (latency < deviceInfo->defaultLowInputLatency){
+        latency = deviceInfo->defaultLowInputLatency;
+        log_message("Latency forced to min [%f]", latency);
+    }
+
     PaStreamParameters outputParameters;
     outputParameters.device = device_idx;
     outputParameters.channelCount = num_channel > 0 ? num_channel : deviceInfo->maxOutputChannels;
     outputParameters.sampleFormat = paFloat32;
     outputParameters.suggestedLatency = latency;
+#ifdef WIN32
+    PaWasapiStreamInfo wasapiInfo;
+    memset(&wasapiInfo, 0, sizeof(wasapiInfo));
+    wasapiInfo.size = sizeof(PaWasapiStreamInfo);
+    wasapiInfo.hostApiType = paWASAPI;
+    wasapiInfo.version = 1;
+    wasapiInfo.flags = (paWinWasapiExclusive|paWinWasapiThreadPriority);
+    wasapiInfo.threadPriority = eThreadPriorityProAudio;
+    const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
+    outputParameters.hostApiSpecificStreamInfo = (apiInfo->type == paWASAPI && m_use_exclusive_mode) ? &wasapiInfo : nullptr;
+#else
     outputParameters.hostApiSpecificStreamInfo = nullptr;
-
+#endif
     info.numChannel = outputParameters.channelCount ;
     info.sampleRate = samplerate;
     info.format = format;
@@ -123,13 +163,14 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplera
         nullptr,  // no input
         &outputParameters,
         samplerate,
-        2048,
+        (unsigned long)round(latency * samplerate),
         paClipOff,  // no clipping
         callback,    // no callback, we’ll use blocking read
         userData
     );
 
     if (err != paNoError){
+        log_message("Error opening output device : %s", Pa_GetErrorText(err));
         return std::make_tuple(nullptr, info);
     }
 
@@ -138,37 +179,39 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplera
 
 int PAaudioManager::get_default_output_device_id()
 {
-    return Pa_GetDefaultOutputDevice();
+    return pa_to_output(Pa_GetDefaultOutputDevice());
 }
 
 int PAaudioManager::get_default_input_device_id()
 {
-    return Pa_GetDefaultInputDevice();
+    return pa_to_input(Pa_GetDefaultInputDevice());
 }
 
-int PAaudioManager::get_input_device_reverse_map(int mapid)
+int PAaudioManager::get_default_output_device_samplerate()
 {
-    int count = 0;
-    for(auto idx : m_input_map){
-        if (idx == mapid){
-            return count;
-        }
-        count++;
+    PaDeviceIndex outidx = Pa_GetDefaultOutputDevice();
+
+    if (outidx == paNoDevice)
+    {
+        return 0;
     }
-    return -1;
+    const PaDeviceInfo* inputInfo = Pa_GetDeviceInfo(outidx);
+    return inputInfo->defaultSampleRate;
+    
 }
 
-int PAaudioManager::get_output_device_reverse_map(int mapid)
+int PAaudioManager::get_default_input_device_samplerate()
 {
-    int count = 0;
-    for(auto idx : m_output_map){
-        if (idx == mapid){
-            return count;
-        }
-        count++;
+    PaDeviceIndex inidx = Pa_GetDefaultOutputDevice();
+
+    if (inidx == paNoDevice)
+    {
+        return 0;
     }
-    return -1;
+    const PaDeviceInfo* outputInfo = Pa_GetDeviceInfo(inidx);
+    return outputInfo->defaultSampleRate;
 }
+
 
 ringBuffer* PAaudioManager::get_new_ringbuffer(int capacity)
 {
@@ -176,53 +219,100 @@ ringBuffer* PAaudioManager::get_new_ringbuffer(int capacity)
     return rb;
 }
 
-const std::vector<int> PAaudioManager::get_input_sample_rates(int devidx)
+const std::vector<int> PAaudioManager::get_input_sample_rates(int devidx, bool only_default)
 {
     std::vector<int> samplerates;
 
+    devidx = input_to_pa(devidx);
+
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(devidx);
-    const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
 
     PaStreamParameters inputParams;
     inputParams.device = devidx;
     inputParams.channelCount = deviceInfo->maxInputChannels;
     inputParams.sampleFormat = paFloat32;
     inputParams.suggestedLatency = deviceInfo->defaultLowOutputLatency;
+#ifdef WIN32
+    PaWasapiStreamInfo wasapiInfo;
+    memset(&wasapiInfo, 0, sizeof(wasapiInfo));
+    wasapiInfo.size = sizeof(PaWasapiStreamInfo);
+    wasapiInfo.hostApiType = paWASAPI;
+    wasapiInfo.version = 1;
+    wasapiInfo.flags = (paWinWasapiExclusive|paWinWasapiThreadPriority);
+    wasapiInfo.threadPriority = eThreadPriorityProAudio;
+    const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
+    inputParams.hostApiSpecificStreamInfo = (apiInfo->type == paWASAPI && m_use_exclusive_mode) ? &wasapiInfo : nullptr;
+#else
     inputParams.hostApiSpecificStreamInfo = nullptr;
+#endif
+    double defaultsamplerate = deviceInfo->defaultSampleRate;
+
+    if (only_default){
+        samplerates.push_back(defaultsamplerate);
+        return samplerates;
+    }
 
     std::vector<double> rates = {8000, 11025, 16000, 22050, 32000,
                       44100, 48000, 88200, 96000, 192000};
 
     for (double rate : rates) {
         PaError err = Pa_IsFormatSupported(&inputParams, nullptr, rate);
-        if (err == paFormatIsSupported)
-            samplerates.push_back(rate);
+        if (err == paFormatIsSupported) samplerates.push_back(rate);
     }
+
+    if (samplerates.empty())
+    {
+        samplerates.push_back(defaultsamplerate);
+    }
+
     return samplerates;
 }
 
-const std::vector<int> PAaudioManager::get_output_sample_rates(int devidx)
+const std::vector<int> PAaudioManager::get_output_sample_rates(int devidx, bool only_default)
 {
     std::vector<int> samplerates;
 
+    devidx = output_to_pa(devidx);
+
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(devidx);
-    const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
 
     PaStreamParameters outputParams;
     outputParams.device = devidx;
     outputParams.channelCount = deviceInfo->maxOutputChannels;
     outputParams.sampleFormat = paFloat32;
     outputParams.suggestedLatency = deviceInfo->defaultLowOutputLatency;
+    double defaultsamplerate = deviceInfo->defaultSampleRate;
+#ifdef WIN32
+    PaWasapiStreamInfo wasapiInfo;
+    memset(&wasapiInfo, 0, sizeof(wasapiInfo));
+    wasapiInfo.size = sizeof(PaWasapiStreamInfo);
+    wasapiInfo.hostApiType = paWASAPI;
+    wasapiInfo.version = 1;
+    wasapiInfo.flags = (paWinWasapiExclusive|paWinWasapiThreadPriority);
+    wasapiInfo.threadPriority = eThreadPriorityProAudio;
+    const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
+    outputParams.hostApiSpecificStreamInfo = apiInfo->type == (apiInfo->type == paWASAPI && m_use_exclusive_mode) ? &wasapiInfo : nullptr;
+#else
     outputParams.hostApiSpecificStreamInfo = nullptr;
+#endif
+    if (only_default){
+        samplerates.push_back(defaultsamplerate);
+        return samplerates;
+    }
 
     std::vector<double> rates = {8000, 11025, 16000, 22050, 32000,
                       44100, 48000, 88200, 96000, 192000};
 
     for (double rate : rates) {
         PaError err = Pa_IsFormatSupported(nullptr, &outputParams, rate);
-        if (err == paFormatIsSupported)
-            samplerates.push_back(rate);
+        if (err == paFormatIsSupported) samplerates.push_back(rate);
     }
+
+    if (samplerates.empty())
+    {
+        samplerates.push_back(defaultsamplerate);
+    }
+
     return samplerates;
 }
 
@@ -244,4 +334,26 @@ const std::vector<std::string> PAaudioManager::get_output_sample_rates_str(int d
         list.push_back(std::to_string(rate));
     }
     return list;
+}
+
+int PAaudioManager::get_default_input_samplerate_idx(int dev)
+{
+    const std::vector<int> sr = get_input_sample_rates(dev);
+    int default_idx = get_input_sample_rates(dev, true)[0];
+
+    std::vector<int>::const_iterator it = std::find(sr.begin(), sr.end(), default_idx);
+    if (it == sr.end()) return 0;
+    int idx = std::distance(sr.begin(), it);
+    return idx;
+}
+
+int PAaudioManager::get_default_output_samplerate_idx(int dev)
+{
+    const std::vector<int> sr = get_output_sample_rates(dev);
+    int default_idx = get_output_sample_rates(dev, true)[0];
+
+    std::vector<int>::const_iterator it = std::find(sr.begin(), sr.end(), default_idx);
+    if (it == sr.end()) return 0;
+    int idx = std::distance(sr.begin(), it);
+    return idx;
 }

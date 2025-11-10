@@ -13,7 +13,7 @@ macro(binarize RESOURCE_FILE RESOURCES_OBJ REDEF_SYM_PREFIX)
       OUTPUT ${RESOURCES_OBJ} 
       COMMAND
       ${CMAKE_OBJCOPY}
-      --input-target binary --output-target ${ARCH}
+      --input-target binary --output-target ${PLATFORM_ARCH}
       --rename-section .data=.rodata,alloc,load,readonly,data,contents
       --redefine-sym ${SYM_NAME}${BINARY_START}=${REDEF_SYM_PREFIX}_start
       --redefine-sym ${SYM_NAME}${BINARY_END}=${REDEF_SYM_PREFIX}_end

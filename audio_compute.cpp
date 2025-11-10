@@ -43,10 +43,7 @@ void AudioToolWindow::set_window_fn(bool compute_cache)
             m_window_fn = hann_fft_window;
             break;
         case 6:
-            m_window_fn = kaiser5_fft_window;
-            break;
-        case 7:
-            m_window_fn = kaiser7_fft_window;
+            m_window_fn = kaiser6_fft_window;
             break;
         default:
             m_window_fn = rectangle_fft_window;

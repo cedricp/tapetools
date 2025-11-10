@@ -19,7 +19,7 @@ class PAaudioLoopback
                     void* userData);
 
 public:
-    PAaudioLoopback(PAaudioManager& manager) : m_manager(manager), m_ringbuffer(nullptr)
+    PAaudioLoopback(PAaudioManager& manager) : m_manager(manager)
     {
     }
     ~PAaudioLoopback()

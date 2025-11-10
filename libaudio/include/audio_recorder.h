@@ -5,8 +5,8 @@
 class PAaudioRecorder
 {
     ringBuffer *m_ring_buffer = nullptr;
-    PAaudioManager& m_manager;
     PaStream* m_instream = nullptr;
+    PAaudioManager& m_manager;
     StreamInfo m_instreaminfo;
     void destroy();
 
@@ -28,7 +28,7 @@ public:
     bool start();
     bool pause(bool);
 
-    bool get_data(std::vector<double>& data, size_t size);
+    bool get_data(std::vector<float>& data, size_t size);
     int  get_current_samplerate();
     int  get_channel_count();
 

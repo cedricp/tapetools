@@ -53,7 +53,7 @@ class AudioToolWindow : public Widget
     // Wow flutter IQ data
     std::vector<double> m_signal_i;
     std::vector<double> m_signal_q;
-    std::vector<double> m_raw_buffer;
+    std::vector<float> m_raw_buffer;
     fftw_plan m_fftplanr = NULL;
     fftw_plan m_fftplanl = NULL;
     fftw_plan m_fftplanwow = NULL;
@@ -85,7 +85,7 @@ class AudioToolWindow : public Widget
     bool m_show0db = false;
     double m_rms_calibration_scale = 1.0f;
     float m_scopezoom = 1;;
-    std::vector<std::string> m_wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann", "Kaiser 5", "Kaiser 7"};
+    std::vector<std::string> m_wmodes = {"Rectangle", "Hamming", "Hann-Poisson", "Blackman", "Blackman-Harris", "Hann", "Kaiser 6"};
     std::vector<std::string> m_fftchannels = {"Left", "Right"};
     double m_window_amplitude_correction[8] = {0.0};
     double m_window_energy_correction[8] = {0.0};
@@ -157,6 +157,8 @@ class AudioToolWindow : public Widget
 
     bool    m_debug_info = false;
     bool    m_show_log_window = false;
+
+    bool    m_wasapi_exclusive = false;
 
     std::vector<std::string> m_debug_logs;
     unsigned long m_total_compute_time=0;

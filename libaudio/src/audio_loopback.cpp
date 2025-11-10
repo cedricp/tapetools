@@ -7,14 +7,13 @@ int PAaudioLoopback::generator_callback(const void* input, void* output,
                     void* userData)
 {
     // NumSamples = frameCount * numChannel
-
     if (output == nullptr) return paContinue;
 
     PAaudioLoopback* al = (PAaudioLoopback*)userData;
     ringBuffer* rbuffer = al->m_ringbuffer;
     int numChannel = al->m_outstreaminfo.numChannel;
 
-    int numSamples = numChannel*frameCount;
+    int numSamples = numChannel * frameCount;
 
     if (rbuffer->getReadAvailable() >= numSamples){
         rbuffer->read(output, numSamples);
@@ -27,6 +26,7 @@ int PAaudioLoopback::generator_callback(const void* input, void* output,
 void PAaudioLoopback::destroy()
 {
     if (m_outstream){
+        Pa_AbortStream(m_outstream);
         Pa_CloseStream(m_outstream);
         m_outstream = nullptr;
     }

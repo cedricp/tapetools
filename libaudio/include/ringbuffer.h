@@ -18,9 +18,9 @@ static uint32_t nextPowerOfTwoFP(uint32_t n) {
 
 class ringBuffer
 {
-    size_t  bufferSize; /**< Number of elements in FIFO. Power of 2. Set by PaUtil_InitRingBuffer. */
-    volatile size_t  writeIndex; /**< Index of next writable element. Set by PaUtil_AdvanceRingBufferWriteIndex. */
-    volatile size_t  readIndex;  /**< Index of next readable element. Set by PaUtil_AdvanceRingBufferReadIndex. */
+    size_t  bufferSize; /**< Number of elements in FIFO. Power of 2. **/
+    volatile size_t  writeIndex; /**< Index of next writable element. **/
+    volatile size_t  readIndex;  /**< Index of next readable element. **/
     size_t  bigMask;    /**< Used for wrapping indices with extra bit to distinguish full/empty. */
     size_t  smallMask;  /**< Used for fitting indices to buffer. */
     size_t  elementSizeBytes; /**< Number of bytes per element. */
@@ -61,6 +61,46 @@ public:
         return ( bufferSize - getReadAvailable() );
     }
 
+    size_t write( const void *data, size_t elementCount )
+    {
+        size_t size1, size2, numWritten;
+        void *data1, *data2;
+        numWritten = getWriteRegions( elementCount, &data1, &size1, &data2, &size2 );
+        if( size2 > 0 )
+        {
+
+            memcpy( data1, data, size1*elementSizeBytes );
+            data = ((char *)data) + size1*elementSizeBytes;
+            memcpy( data2, data, size2*elementSizeBytes );
+        }
+        else
+        {
+            memcpy( data1, data, size1*elementSizeBytes );
+        }
+        advanceWriteIndex( numWritten );
+        return numWritten;
+    }
+
+    size_t read( void *data, size_t elementCount )
+    {
+        size_t size1, size2, numRead;
+        void *data1, *data2;
+        numRead = getReadRegions( elementCount, &data1, &size1, &data2, &size2 );
+        if( size2 > 0 )
+        {
+            memcpy( data, data1, size1*elementSizeBytes );
+            data = ((char *)data) + size1*elementSizeBytes;
+            memcpy( data, data2, size2*elementSizeBytes );
+        }
+        else
+        {
+            memcpy( data, data1, size1*elementSizeBytes );
+        }
+        advanceReadIndex( numRead );
+        return numRead;
+    }
+
+private:
     size_t getWriteRegions( size_t elementCount,
                                         void **dataPtr1, size_t *sizePtr1,
                                         void **dataPtr2, size_t *sizePtr2 )
@@ -142,44 +182,4 @@ public:
         FullMemoryBarrier();
         return readIndex = (readIndex + elementCount) & bigMask;
     }
-
-    size_t write( const void *data, size_t elementCount )
-    {
-        size_t size1, size2, numWritten;
-        void *data1, *data2;
-        numWritten = getWriteRegions( elementCount, &data1, &size1, &data2, &size2 );
-        if( size2 > 0 )
-        {
-
-            memcpy( data1, data, size1*elementSizeBytes );
-            data = ((char *)data) + size1*elementSizeBytes;
-            memcpy( data2, data, size2*elementSizeBytes );
-        }
-        else
-        {
-            memcpy( data1, data, size1*elementSizeBytes );
-        }
-        advanceWriteIndex( numWritten );
-        return numWritten;
-    }
-
-    size_t read( void *data, size_t elementCount )
-    {
-        size_t size1, size2, numRead;
-        void *data1, *data2;
-        numRead = getReadRegions( elementCount, &data1, &size1, &data2, &size2 );
-        if( size2 > 0 )
-        {
-            memcpy( data, data1, size1*elementSizeBytes );
-            data = ((char *)data) + size1*elementSizeBytes;
-            memcpy( data, data2, size2*elementSizeBytes );
-        }
-        else
-        {
-            memcpy( data, data1, size1*elementSizeBytes );
-        }
-        advanceReadIndex( numRead );
-        return numRead;
-    }
-
 };

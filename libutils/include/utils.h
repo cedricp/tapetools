@@ -134,10 +134,45 @@ static inline double kaiser_fft_window(double shape, int i,int len)
 	return zeroethOrderBessel(shape * arg) * oneOverDenom;
 }
 
-static double kaiser5_fft_window(int i,int len){
-	return kaiser_fft_window(5.f, i, len);
+
+// Improved Kaiser version 
+static inline double bessel_i0_fast(double x) {
+    double ax = fabs(x);
+    if (ax < 3.75) {
+        double y = x / 3.75, y2 = y * y;
+        return 1.0 + y2 * (3.5156229 + y2 * (3.0899424 + y2 * (1.2067492
+               + y2 * (0.2659732 + y2 * (0.0360768 + y2 * 0.0045813)))));
+    } else {
+        double y = 3.75 / ax;
+        return (exp(ax) / sqrt(ax)) *
+               (0.39894228 + y * (0.01328592 + y * (0.00225319
+               + y * (-0.00157565 + y * (0.00916281
+               + y * (-0.02057706 + y * (0.02635537
+               + y * (-0.01647633 + y * 0.00392377))))))));
+    }
 }
 
-static double kaiser7_fft_window(int i,int len){
-	return kaiser_fft_window(7.f, i, len);
+static inline double bessel_i0(double x) {
+    const double eps = 1e-12;
+    double sum = 1.0, term = 1.0;
+    double m = 1.0;
+    while (fabs(term) > eps * fabs(sum)) {
+        term *= (x * x) / (4.0 * m * m);
+        sum += term;
+        ++m;
+    }
+    return sum;
 }
+
+static inline double kaiser2_fft_window(double beta, int i, int len) {
+    const int N = len - 1;
+    const double denom = bessel_i0_fast(beta);
+    const double ratio = (2.0 * i) / (double)N - 1.0;
+    const double arg = sqrt(1.0 - ratio * ratio);
+    return bessel_i0(beta * arg) / denom;
+}
+
+static double kaiser6_fft_window(int i,int len){
+	return kaiser2_fft_window(5.f, i, len);
+}
+

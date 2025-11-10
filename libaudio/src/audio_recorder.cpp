@@ -26,7 +26,6 @@ int PAaudioRecorder::recordCallback(
 
 PAaudioRecorder::PAaudioRecorder(PAaudioManager& audioManager) : m_manager(audioManager)
 {
-    m_ring_buffer = nullptr;
 }
 
 PAaudioRecorder::~PAaudioRecorder()
@@ -122,7 +121,7 @@ bool PAaudioRecorder::pause(bool pause)
     return true;
 }
 
-bool PAaudioRecorder::get_data(std::vector<double>& data, size_t size)
+bool PAaudioRecorder::get_data(std::vector<float>& data, size_t size)
 {
     if (!m_ring_buffer){
         return false;
@@ -135,11 +134,7 @@ bool PAaudioRecorder::get_data(std::vector<double>& data, size_t size)
 
     if (data.size() != size) data.resize(size, 0);
 
-    for(int i = 0; i < size; ++i){
-        float sample;
-        m_ring_buffer->read(&sample, 1);
-        data[i] = sample;
-    }
+    m_ring_buffer->read(data.data(), size);
 
     return true;
 }

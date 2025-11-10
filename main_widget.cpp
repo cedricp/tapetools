@@ -11,9 +11,6 @@ AudioToolWindow::AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m
     reset_audiomanager();
     set_theme();
 
-    //m_audiomanager.device_changed_event.connect_event(STATIC_METHOD(on_device_changed), this);
-    //m_audiomanager.backend_disconnected_event.connect_event(STATIC_METHOD(on_backend_disconnected), this);
-
     m_audiomanager.flush();
 
     ImPlotStyle& s = ImPlot::GetStyle();
@@ -302,14 +299,44 @@ void AudioToolWindow::draw_tools_windows()
         ImGui::SetNextWindowSize(ImVec2(600, 200));
         if (ImGui::Begin("Sound card setup", &m_sound_setup_open))
         {
+            if (ImGui::Button("Reset to default"))
+            {
+                const std::vector<std::string> &out_devices = m_audiomanager.get_output_devices();
+                const std::vector<std::string> &in_devices = m_audiomanager.get_input_devices();
+
+
+                m_audio_out_idx = m_audiomanager.get_default_output_device_id();
+                m_output_device = out_devices[m_audio_out_idx];
+                m_audio_in_idx  = m_audiomanager.get_default_input_device_id();
+                m_input_device  = in_devices[m_audio_in_idx];
+                m_audio_loopback_out_idx = m_audiomanager.get_default_output_device_id();
+                m_output_loopback_device = out_devices[m_audio_loopback_out_idx];
+
+                m_combo_out = m_audio_out_idx;
+                m_combo_in  = m_audio_in_idx;
+                m_combo_out_loopback = m_audio_loopback_out_idx;
+
+                m_in_sample_rate_idx = m_audiomanager.get_default_input_samplerate_idx(m_combo_in);
+                m_out_sample_rate_idx = m_audiomanager.get_default_output_samplerate_idx(m_combo_out);
+
+                reset_signal_generator();
+                reinit_recorder();
+            }
+
+            if (ImGui::Checkbox("Use WASAPI exclusive mode", &m_wasapi_exclusive))
+            {
+                m_audiomanager.set_exclusive_mode(m_wasapi_exclusive);
+            }
+
             ImVec2 winsize = ImGui::GetWindowSize();
             ImGui::PushItemWidth(winsize.x / 3);
             const std::vector<std::string> &out_devices = m_audiomanager.get_output_devices();
             ImGui::SeparatorText("Output device");
             if (ImGui::Combo("Ouput", &m_combo_out, vector_getter, (void *)&out_devices, out_devices.size()))
             {
-                m_audio_out_idx = m_audiomanager.get_output_device_map(m_combo_out);
+                m_audio_out_idx = m_combo_out;
                 m_output_device = out_devices[m_combo_out];
+                m_out_sample_rate_idx = m_audiomanager.get_default_output_samplerate_idx(m_combo_out);
                 reset_signal_generator();
             }
             ImGui::SameLine();
@@ -323,8 +350,9 @@ void AudioToolWindow::draw_tools_windows()
             const std::vector<std::string> &in_devices = m_audiomanager.get_input_devices();
             if (ImGui::Combo("Input", &m_combo_in, vector_getter, (void *)&in_devices, in_devices.size()))
             {
-                m_audio_in_idx = m_audiomanager.get_input_device_map(m_combo_in);
+                m_audio_in_idx = m_combo_in;
                 m_input_device = in_devices[m_combo_in];
+                m_in_sample_rate_idx = m_audiomanager.get_default_input_samplerate_idx(m_combo_in);
                 reinit_recorder();
             }
             ImGui::SameLine();
@@ -336,7 +364,7 @@ void AudioToolWindow::draw_tools_windows()
             ImGui::SeparatorText("Output loopback device");
             if (ImGui::Combo("Output", &m_combo_out_loopback, vector_getter, (void *)&out_devices, out_devices.size()))
             {
-                m_audio_loopback_out_idx = m_audiomanager.get_output_device_map(m_combo_out_loopback);
+                m_audio_loopback_out_idx = m_combo_out_loopback;
                 m_output_loopback_device = out_devices[m_combo_out];
                 reinit_recorder();
             }
@@ -374,7 +402,7 @@ void AudioToolWindow::set_configuration_string(std::string s, std::string str)
         if (it != in_devices.end())
         {
             m_combo_in = std::distance(in_devices.begin(), it);
-            m_audio_in_idx = m_audiomanager.get_input_device_map(m_combo_in);
+            m_audio_in_idx = m_combo_in;
             printf("Restoring saved input dev found [%s] [%i]\n", str.c_str(), m_audio_in_idx);
             m_input_device = str;
         }
@@ -387,7 +415,7 @@ void AudioToolWindow::set_configuration_string(std::string s, std::string str)
         if (it != out_devices.end())
         {
             m_combo_out = std::distance(out_devices.begin(), it);
-            m_audio_out_idx = m_audiomanager.get_output_device_map(m_combo_out);
+            m_audio_out_idx = m_combo_out;
             printf("Restoring saved output dev found [%s] [%i]\n", str.c_str(), m_audio_out_idx);
             m_output_device = str;
         }
@@ -400,7 +428,7 @@ void AudioToolWindow::set_configuration_string(std::string s, std::string str)
         if (it != out_devices.end())
         {
             m_combo_out_loopback = std::distance(out_devices.begin(), it);
-            m_audio_loopback_out_idx = m_audiomanager.get_output_device_map(m_combo_out_loopback);
+            m_audio_loopback_out_idx = m_combo_out_loopback;
             printf("Restoring saved output loopback dev found [%s] [%i]\n", str.c_str(), m_audio_loopback_out_idx);
             m_output_device = str;
         }
@@ -409,6 +437,7 @@ void AudioToolWindow::set_configuration_string(std::string s, std::string str)
 
 void AudioToolWindow::get_configuration_int(std::map<std::string, int> &cnf)
 {
+    cnf["use_exclusive_mode"] = m_wasapi_exclusive;
     cnf["logScaleFFT"] = m_logscale_frequency == true ? 1 : 0;
     cnf["FFTwindowType"] = m_fft_window_fn_index;
     cnf["showVoltmeter"] = m_show_rms_voltage == true ? 1 : 0;
@@ -476,6 +505,9 @@ void AudioToolWindow::set_configuration_int(std::string s, int i)
     else if (s == "outSampleRateIdx")
     {
         m_out_sample_rate_idx = i;
+    } else if (s == "use_exclusive_mode")
+    {
+        m_wasapi_exclusive = i;
     }
 }
 
@@ -529,8 +561,8 @@ void AudioToolWindow::set_sound_config()
     if (m_input_device.empty()) m_audio_in_idx  = m_audiomanager.get_default_input_device_id();
     if (m_output_device.empty()) m_audio_out_idx = m_audiomanager.get_default_output_device_id();
 
-    m_combo_in  = m_audiomanager.get_input_device_reverse_map(m_audio_in_idx);
-    m_combo_out = m_audiomanager.get_output_device_reverse_map(m_audio_out_idx);
+    m_combo_in  = m_audio_in_idx;
+    m_combo_out = m_audio_out_idx;
 }
 
 void AudioToolWindow::reset_audiomanager()
@@ -540,15 +572,3 @@ void AudioToolWindow::reset_audiomanager()
     reset_signal_generator();
 }
 
-// Callbacks methods
-
-IMPLEMENT_CALLBACK_METHOD(on_device_changed, AudioToolWindow)
-{
-    // reinit_recorder();
-    log_message("Audio device configuration changed.\n");
-}
-
-IMPLEMENT_CALLBACK_METHOD(on_backend_disconnected, AudioToolWindow)
-{
-    reset_audiomanager();
-}
