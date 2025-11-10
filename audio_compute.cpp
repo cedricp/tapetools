@@ -573,12 +573,13 @@ void AudioToolWindow::reinit_recorder()
         log_message("Cannot set recorder samplerate to requested value");
     }
 
-    int samplerate = m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate_idx];
-    if (m_audiorecorder.init(float(m_recorder_latency_ms) / 1000.f, m_audio_in_idx, samplerate))
+    int input_samplerate = m_audiomanager.get_input_sample_rates(m_audio_in_idx)[m_in_sample_rate_idx];
+
+    if (m_audiorecorder.init(float(m_recorder_latency_ms) / 1000.f, m_audio_in_idx, input_samplerate))
     {
         m_audiorecorder.start();
-        if (m_audio_loopback_out_idx >= 0 && !m_audioplayer.set(samplerate, float(m_recorder_latency_ms)/1000.f, m_audio_loopback_out_idx, m_audiorecorder.get_channel_count())){
-            log_message("Unable to set init player");
+        if (m_audio_loopback_out_idx >= 0 && !m_audioplayer.set(input_samplerate, float(m_recorder_latency_ms)/1000.f, m_audio_loopback_out_idx, m_audiorecorder.get_channel_count())){
+            log_message("Cannot start loopback interface, check input samplerate = output samplerate and the loopback device is different of the output device");
         }
     }
 
@@ -620,7 +621,7 @@ void AudioToolWindow::process_sweep()
             need_stop_sweep = true;
         }
 
-        int min_freq_idx = std::max(int((m_sweep_target_frequency - 500) * fft_step), 0);
+        int min_freq_idx = std::max(int((m_sweep_target_frequency - 500) * fft_step), 1);
         int max_freq_idx = std::min(int((m_sweep_target_frequency + 500) * fft_step), m_capture_size / 2);
 
         double max_val = m_noise_foor;

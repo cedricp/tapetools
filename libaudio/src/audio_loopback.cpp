@@ -45,6 +45,10 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
     
     std::tie(m_outstream, m_outstreaminfo) = m_manager.get_output_stream(samplerate, device_idx, latency, paFloat32, generator_callback, this, channels);
 
+    if (!m_outstream){
+        return false;
+    }
+    
     m_ringbuffer = new ringBuffer(sizeof(float), ringbugger_size);
 
     return true;

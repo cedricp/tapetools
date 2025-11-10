@@ -104,8 +104,7 @@ bool PAaudioRecorder::start()
     if (m_instream == nullptr){
         return false;
     }
-    Pa_StartStream(m_instream);
-    return true;
+    return Pa_StartStream(m_instream) == paNoError;
 }
 
 bool PAaudioRecorder::pause(bool pause)

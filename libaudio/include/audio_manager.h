@@ -78,7 +78,9 @@ public:
 
     bool valid(){return m_pa_ok;}
 
-    void flush(){}
+    void flush(){
+        scan_devices();
+    }
 };
 
 

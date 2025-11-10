@@ -8,7 +8,8 @@ AudioToolWindow::AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m
     set_titlebar(false);
 
     compute_fft_window_corrections();
-    reset_audiomanager();
+    set_sound_config();
+    //reset_audiomanager();
     set_theme();
 
     m_audiomanager.flush();
@@ -322,12 +323,14 @@ void AudioToolWindow::draw_tools_windows()
                 reset_signal_generator();
                 reinit_recorder();
             }
-
+#ifdef WIN32
             if (ImGui::Checkbox("Use WASAPI exclusive mode", &m_wasapi_exclusive))
             {
                 m_audiomanager.set_exclusive_mode(m_wasapi_exclusive);
+                reset_signal_generator();
+                reinit_recorder();
             }
-
+#endif
             ImVec2 winsize = ImGui::GetWindowSize();
             ImGui::PushItemWidth(winsize.x / 3);
             const std::vector<std::string> &out_devices = m_audiomanager.get_output_devices();
@@ -437,7 +440,9 @@ void AudioToolWindow::set_configuration_string(std::string s, std::string str)
 
 void AudioToolWindow::get_configuration_int(std::map<std::string, int> &cnf)
 {
+#ifdef WIN32
     cnf["use_exclusive_mode"] = m_wasapi_exclusive;
+#endif
     cnf["logScaleFFT"] = m_logscale_frequency == true ? 1 : 0;
     cnf["FFTwindowType"] = m_fft_window_fn_index;
     cnf["showVoltmeter"] = m_show_rms_voltage == true ? 1 : 0;
@@ -505,10 +510,13 @@ void AudioToolWindow::set_configuration_int(std::string s, int i)
     else if (s == "outSampleRateIdx")
     {
         m_out_sample_rate_idx = i;
-    } else if (s == "use_exclusive_mode")
+    }
+#ifdef WIN32
+    else if (s == "use_exclusive_mode")
     {
         m_wasapi_exclusive = i;
     }
+#endif
 }
 
 void AudioToolWindow::get_configuration_float(std::map<std::string, float> &cnf)

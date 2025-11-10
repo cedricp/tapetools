@@ -291,7 +291,7 @@ const std::vector<int> PAaudioManager::get_output_sample_rates(int devidx, bool 
     wasapiInfo.flags = (paWinWasapiExclusive|paWinWasapiThreadPriority);
     wasapiInfo.threadPriority = eThreadPriorityProAudio;
     const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
-    outputParams.hostApiSpecificStreamInfo = apiInfo->type == (apiInfo->type == paWASAPI && m_use_exclusive_mode) ? &wasapiInfo : nullptr;
+    outputParams.hostApiSpecificStreamInfo = (apiInfo->type == paWASAPI && m_use_exclusive_mode) ? &wasapiInfo : nullptr;
 #else
     outputParams.hostApiSpecificStreamInfo = nullptr;
 #endif
