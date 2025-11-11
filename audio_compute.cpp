@@ -563,7 +563,7 @@ void AudioToolWindow::destroy_capture()
 void AudioToolWindow::reinit_recorder()
 {
     m_audiorecorder.pause(true);
-    
+
     if (m_audio_in_idx < 0) return;
     if (m_audiomanager.get_input_sample_rates(m_audio_in_idx).empty()) return;
 

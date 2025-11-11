@@ -47,6 +47,8 @@ void PAaudioRecorder::destroy()
 
 bool PAaudioRecorder::init(float latency, int device_idx, int samplerate)
 {
+    destroy();
+
     std::tie(m_instream, m_instreaminfo) = m_manager.get_input_stream(samplerate, device_idx, latency, paFloat32, recordCallback, this);
     if (!m_instream){
         return false;
@@ -104,6 +106,7 @@ bool PAaudioRecorder::start()
     if (m_instream == nullptr){
         return false;
     }
+    m_ring_buffer->flush();
     return Pa_StartStream(m_instream) == paNoError;
 }
 
@@ -115,7 +118,7 @@ bool PAaudioRecorder::pause(bool pause)
     if(pause){
         Pa_StopStream(m_instream);
     } else {
-        Pa_StartStream(m_instream);
+        start();
     }
     return true;
 }

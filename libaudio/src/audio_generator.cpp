@@ -31,8 +31,9 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
         }
         else if (udata->m_mode == BROWN_NOISE)
         {
-            sample = udata->m_volume * (randq64_double()*2.0 -1.0);
-            sample = smoothdata - (0.025* (smoothdata - sample));
+            double rawdata = (randq64_double()*2.0 -1.0);
+            smoothdata = smoothdata - (0.025* (smoothdata - rawdata));
+            sample = udata->m_volume  * smoothdata;
         }
 
         for (int channel = 0; channel < info.numChannel; channel ++) {

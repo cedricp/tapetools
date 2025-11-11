@@ -92,7 +92,7 @@ void WowAndFluterThread::entry()
 
         double max_dev = -1000, min_dev = 1000, mean = 0;
         int num_samples = 0;
-        // I start the measure a little after the beginnig to suppress lpf settling part
+        // I start the measure a little after the beginning to suppress lpf settling part
         for (int i = decimated_size/10; i < decimated_size; ++i)
         {
             double current = m_wow_flutter_data[i];

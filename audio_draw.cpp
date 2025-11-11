@@ -809,43 +809,6 @@ void AudioToolWindow::draw_tone_generator_widget()
         ImGui::SetItemTooltip("Set the generator intensity");
         ImGui::EndChild();
 
-        // m_signal_generator.set_fm(0, 0);
-
-        // if(m_signal_generator.mode() == audioWaveformGenerator::SINE)
-        // {
-        //     ImGui::SameLine();
-        //     ImGui::BeginChild("ScopesChildFMTone", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        //     if (ImGui::ToggleButton("FM", &fm_enable))
-        //     {
-        //         if (!fm_enable)
-        //         {
-        //             m_signal_generator.set_fm(0, 0);
-        //         } else {
-        //             m_signal_generator.set_fm(fm_freq, fm_vol);
-        //         }
-        //     }
-        //     if (fm_enable)
-        //     {
-        //         ImGui::SameLine();
-        //         ImGui::SetNextItemWidth(80);
-        //         if (ImGui::SliderInt("FM frequency", &fm_freq, 0, 5000, "%d Hz") || manage_slider_mousewheel_int(fm_freq, 0, 5000))
-        //         {
-        //             m_signal_generator.set_fm(fm_freq, fm_vol);
-        //         }
-                
-        //         ImGui::SetItemTooltip("Set the FM modulation signal frequency");
-
-        //         ImGui::SameLine();
-        //         ImGui::SetNextItemWidth(80);
-        //         if (ImGui::SliderFloat("FM intensity", &fm_vol, 0, 100))
-        //         {
-        //             m_signal_generator.set_fm(fm_freq, fm_vol);
-        //         }
-        //         ImGui::SetItemTooltip("Set the FM modulation signal frequency");
-        //     }
-        //     ImGui::EndChild();
-        // }
-
         ImGui::EndChild();
     }
 }

@@ -347,18 +347,6 @@ SDR_Scanner::frequency_range(double crop, int upper, int lower, int max_size)
 	m_scan_info.num_frequency_hops	= m_tune_count;
 	m_scan_info.total_fft_bins		= m_tune_count * (1<<bin_e);
 
-	/* report */
-	/*
-	printf( "Number of frequency hops: %i\n", m_tune_count);
-	printf( "Dongle bandwidth: %iHz\n", bw_used);
-	printf( "Downsampling by: %ix\n", downsample);
-	printf( "Cropping by: %0.2f%%\n", crop*100);
-	printf( "Total FFT bins: %i\n", m_tune_count * (1<<bin_e));
-	printf( "Logged FFT bins: %i\n", \
-	  (int)((double)(m_tune_count * (1<<bin_e)) * (1.0-crop)));
-	printf( "FFT bin size: %0.2fHz\n", bin_size);
-	printf( "Buffer size: %i bytes (%0.2fms)\n", buf_len, 1000 * 0.5 * (float)buf_len / (float)bw_used);
-	*/
 	return SCANNER_OK;
 
 }
