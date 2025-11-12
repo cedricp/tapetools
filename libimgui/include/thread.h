@@ -109,7 +109,7 @@ protected:
 public:
     Thread(std::string name = "default", bool loop = false, bool managed = true);
     virtual ~Thread();
-    void start();
+    void start(bool wait_for_start = false);
     bool join();
     void usleep(unsigned long us);
     const std::string& name(){return m_name;}

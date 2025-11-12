@@ -83,7 +83,7 @@ Thread::~Thread()
     join();
 }
 
-void Thread::start()
+void Thread::start(bool wait_for_start)
 {
     if (!m_running)
     {
@@ -95,6 +95,11 @@ void Thread::start()
 #endif
     }
     m_chrono.reset();
+
+    if (wait_for_start)
+    {
+        while(m_started == false);
+    }
 }
 
 void Thread::usleep(unsigned long us)

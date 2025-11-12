@@ -1,6 +1,6 @@
 #include "main_widget.h"
 
-AudioToolWindow::AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_audioplayer(m_audiomanager)
+AudioToolWindow::AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_audioloopback(m_audiomanager)
 {
     set_maximized(true);
     set_movable(false);

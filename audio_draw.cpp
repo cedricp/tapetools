@@ -833,7 +833,7 @@ void AudioToolWindow::draw_rt_analysis_tab()
     if (ImGui::ToggleButton("Start", &m_compute_on))
     {
         m_audiorecorder.pause(!m_compute_on);
-        if (m_audio_loopback_on) m_audioplayer.pause(!m_compute_on);
+        if (m_audio_loopback_on) m_audioloopback.pause(!m_compute_on);
     }
     ImGui::SameLine();
     ImGui::ToggleButton("Trigger", &m_trigger_on);
@@ -841,7 +841,7 @@ void AudioToolWindow::draw_rt_analysis_tab()
     ImGui::SameLine();
     if (ImGui::ToggleButton("Audio loopback", &m_audio_loopback_on))
     {
-        if (m_compute_on) m_audioplayer.pause(!m_audio_loopback_on);
+        if (m_compute_on) m_audioloopback.pause(!m_audio_loopback_on);
     }
     ImGui::SetItemTooltip("Audio loopback (send recorder data to output device)");
     ImGui::EndChild();

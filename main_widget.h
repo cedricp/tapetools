@@ -26,7 +26,7 @@ class AudioToolWindow : public Widget
 
     PAaudioManager      m_audiomanager;
     PAaudioRecorder     m_audiorecorder;
-    PAaudioLoopback     m_audioplayer;
+    PAaudioLoopback     m_audioloopback;
     PAaudioWaveformGenerator  m_signal_generator;
 
     int  m_uitheme = 0;

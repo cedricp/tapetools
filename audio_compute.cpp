@@ -166,12 +166,8 @@ bool AudioToolWindow::compute()
     if (m_audio_loopback_on)
     {
         std::vector<float> audio_data(m_capture_size * channelcount);
-        for (int i = 0; i < m_capture_size * channelcount; i++)
-        {
-            audio_data[i] = m_raw_buffer[i];
-        }
 
-        if (!m_audioplayer.add_data(audio_data.data(), m_capture_size * channelcount)){
+        if (!m_audioloopback.add_data(m_raw_buffer.data(), m_capture_size * channelcount)){
             log_message("Error adding audio data\n");
         }
     }
@@ -183,7 +179,7 @@ bool AudioToolWindow::compute()
         m_sound_data1[i] = sound_data;
             
         m_fftinl[i] = sound_data * m_current_window_cache[i];
-        m_sound_data_x[i] = float(i) * inv_current_sample_rate * 1000.0;
+        m_sound_data_x[i] = float(i) * inv_current_sample_rate * 1000.0; // m_sound_data_x is in ms
 
         m_rms_left += m_sound_data1[i] * m_sound_data1[i];
         if(channelcount>1)
@@ -303,9 +299,8 @@ void AudioToolWindow::compute_wow_and_flutter()
 
     // Create and launch thread
     WowAndFluterThread* wt = new WowAndFluterThread(*this, reference_frequency, samplerate);
-    wt->start();
-    // Wait for thread to start
-    while(!wt->is_started()){}
+
+    wt->start(true);
 }
 
 void AudioToolWindow::compute_channels_phase()
@@ -578,7 +573,7 @@ void AudioToolWindow::reinit_recorder()
     if (m_audiorecorder.init(float(m_recorder_latency_ms) / 1000.f, m_audio_in_idx, input_samplerate))
     {
         m_audiorecorder.start();
-        if (m_audio_loopback_out_idx >= 0 && !m_audioplayer.set(input_samplerate, float(m_recorder_latency_ms)/1000.f, m_audio_loopback_out_idx, m_audiorecorder.get_channel_count())){
+        if (m_audio_loopback_out_idx >= 0 && !m_audioloopback.set(input_samplerate, float(m_recorder_latency_ms)/1000.f, m_audio_loopback_out_idx, m_audiorecorder.get_channel_count())){
             log_message("Cannot start loopback interface, check input samplerate = output samplerate and the loopback device is different of the output device");
         }
     }
@@ -586,7 +581,7 @@ void AudioToolWindow::reinit_recorder()
     init_capture();
 
     m_audiorecorder.pause(!m_compute_on);
-    m_audioplayer.pause(!m_compute_on | !m_audio_loopback_on);
+    m_audioloopback.pause(!m_compute_on | !m_audio_loopback_on);
 }
 
 void AudioToolWindow::reset_signal_generator()
@@ -598,6 +593,7 @@ void AudioToolWindow::reset_signal_generator()
         m_out_sample_rate_idx = 0;
         log_message("Cannot set player samplerate to requested value");
     }
+
     int current_sine_samplerate = m_audiomanager.get_output_sample_rates(m_audio_out_idx)[m_out_sample_rate_idx];
     m_signal_generator.destroy();
     m_signal_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, m_signalgen_latency_s);
