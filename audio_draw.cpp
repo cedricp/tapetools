@@ -965,6 +965,12 @@ void AudioToolWindow::draw_rt_analysis_tab()
         ImGui::AlignTextToFramePadding();
         ImGui::Text("UI draw time : %luns", m_ui_time);
         ImGui::EndChild();
+
+        ImGui::SameLine();
+        ImGui::BeginChild("ScopesChildBufferInfoUI", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Record buffer : %.1f%%", m_audiorecorder.get_ringbuffer_occupation());
+        ImGui::EndChild();
     }
     /*
     *   LCD voltmeter

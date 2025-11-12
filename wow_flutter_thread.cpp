@@ -1,5 +1,7 @@
 #include "wow_flutter_thread.h"
 
+extern const int WOW_FLUTTER_DECIMATION;
+
 WowAndFluterThread::WowAndFluterThread(AudioToolWindow& mainwin, int ref_frequency, int samplerate) : ASyncTask("WFtask"),
     m_longterm_audio(mainwin.m_longterm_audio), m_wow_flutter_data(mainwin.m_wow_flutter_data),
     m_wow_flutter_data_x(mainwin.m_wow_flutter_data_x), m_wow_peak(mainwin.m_wow_peak_detection),

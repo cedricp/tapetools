@@ -7,8 +7,6 @@
 #include <thread.h>
 #include "main_widget.h"
 
-extern const int WOW_FLUTTER_DECIMATION;
-
 class WowAndFluterThread : public ASyncTask
 {
     // Data

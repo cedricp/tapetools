@@ -45,6 +45,11 @@ public:
         free(buffer);
     }
 
+    size_t getBufferSize()
+    {
+        return bufferSize;
+    }
+
     void flush()
     {
         writeIndex = 0;
@@ -102,8 +107,8 @@ public:
 
 private:
     size_t getWriteRegions( size_t elementCount,
-                                        void **dataPtr1, size_t *sizePtr1,
-                                        void **dataPtr2, size_t *sizePtr2 )
+                            void **dataPtr1, size_t *sizePtr1,
+                            void **dataPtr2, size_t *sizePtr2 )
     {
         size_t   index;
         size_t   available = getWriteAvailable();
@@ -143,8 +148,8 @@ private:
     }
 
     size_t getReadRegions( size_t elementCount,
-                                void **dataPtr1, size_t *sizePtr1,
-                                void **dataPtr2, size_t *sizePtr2 )
+                            void **dataPtr1, size_t *sizePtr1,
+                            void **dataPtr2, size_t *sizePtr2 )
     {
         size_t   index;
         size_t   available = getReadAvailable(); /* doesn't use memory barrier */

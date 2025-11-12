@@ -33,4 +33,5 @@ public:
     int  get_channel_count();
 
     int get_buffer_size(float time, bool channels_mult = true);
+    float get_ringbuffer_occupation();
 };

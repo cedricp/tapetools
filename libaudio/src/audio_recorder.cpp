@@ -56,7 +56,7 @@ bool PAaudioRecorder::init(float latency, int device_idx, int samplerate)
 
     int bytes_per_sample = Pa_GetSampleSize(m_instreaminfo.format);
     int capacity = get_buffer_size(latency);
-    m_ring_buffer = new ringBuffer(sizeof(float), capacity*4);
+    m_ring_buffer = new ringBuffer(sizeof(float), capacity*2);
 
     return true;
 }
@@ -86,7 +86,7 @@ int PAaudioRecorder::get_current_samplerate()
 
 int PAaudioRecorder::get_available_bytes()
 {
-    if (!m_ring_buffer){
+    if (!m_ring_buffer || m_instream == nullptr){
         return 0;
     }
     int bytes_per_sample = Pa_GetSampleSize(m_instreaminfo.format);
@@ -129,8 +129,8 @@ bool PAaudioRecorder::get_data(std::vector<float>& data, size_t size)
         return false;
     }
 
-    size_t fill_bytes = m_ring_buffer->getReadAvailable();
-    if (fill_bytes < size){
+    size_t sample_fill = m_ring_buffer->getReadAvailable();
+    if (sample_fill < size){
         return false;
     }
 
@@ -139,4 +139,10 @@ bool PAaudioRecorder::get_data(std::vector<float>& data, size_t size)
     m_ring_buffer->read(data.data(), size);
 
     return true;
+}
+
+float PAaudioRecorder::get_ringbuffer_occupation()
+{
+    if (m_ring_buffer == nullptr) return 0;
+    return ((float)m_ring_buffer->getReadAvailable() / (float)m_ring_buffer->getBufferSize()) * 100.;
 }

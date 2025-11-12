@@ -231,23 +231,26 @@ void AudioToolWindow::draw()
     }
 
     ImGui::BeginTabBar("MaintabBar");
-    if (ImGui::BeginTabItem("Realtime analysis"))
-    {
-        draw_rt_analysis_tab();
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem("Sweep measurement"))
-    {
-        draw_sweep_tab();
-        ImGui::EndTabItem();
-    }
-#ifdef RTL_SDR
-    if (m_sdr_thread.get_scanner().get_rtl_device().get_device_count() && ImGui::BeginTabItem("SDR analysis"))
-    {
-        draw_sdr();
-        ImGui::EndTabItem();
-    }
-#endif
+    
+        if (ImGui::BeginTabItem("Realtime analysis"))
+        {
+            draw_rt_analysis_tab();
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Sweep measurement"))
+        {
+            draw_sweep_tab();
+            ImGui::EndTabItem();
+        }
+        
+        #ifdef RTL_SDR
+        if (m_sdr_thread.get_scanner().get_rtl_device().get_device_count() && ImGui::BeginTabItem("SDR analysis"))
+        {
+            draw_sdr();
+            ImGui::EndTabItem();
+        }
+        #endif
+
     ImGui::EndTabBar();
 
     draw_tools_windows();
@@ -301,6 +304,11 @@ void AudioToolWindow::draw_tools_windows()
         {
             if (ImGui::Button("Reset to default"))
             {
+                // Disable exclusive mode
+                m_wasapi_exclusive = false;
+                m_audiomanager.set_exclusive_mode(m_wasapi_exclusive);
+                m_audiomanager.flush();
+
                 auto &out_devices = m_audiomanager.get_output_devices();
                 auto &in_devices = m_audiomanager.get_input_devices();
 
@@ -532,10 +540,14 @@ void AudioToolWindow::set_configuration_float(std::string s, float f)
 bool AudioToolWindow::check_data_buffer()
 {
     const int min_wanted_buffer_size = m_capture_size * m_audiorecorder.get_channel_count();
+
+    bool data_available = false;
+
     if (m_audiorecorder.get_available_samples() >= min_wanted_buffer_size)
     {
-        bool computed = compute();
-        if (computed)
+        data_available = compute();
+
+        if (data_available)
         {
             if (m_sweep_status && m_sweep_timer_chrono.get_elapsed_time() > m_measure_delay * 1000){
                 process_sweep();
@@ -546,21 +558,13 @@ bool AudioToolWindow::check_data_buffer()
                 compute_thdn();
             if (m_compute_channel_phase)
                 compute_channels_phase();
-            
-            update_ui();
         }
-
-        return true;
     }
 #ifdef RTL_SDR
-    if (m_sdr_thread.data_available())
-    {
-        update_ui();
-        return true;
-    }
+    data_available = m_sdr_thread.data_available();
 #endif
 
-    return false;
+    return data_available;
 }
 
 void AudioToolWindow::set_sound_config()

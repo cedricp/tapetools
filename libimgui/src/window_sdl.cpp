@@ -420,19 +420,20 @@ void Window_SDL::draw(bool compute_only)
     ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.00f);
     ImGuiIO& io = ImGui::GetIO();
 
+	
     // Start the Dear ImGui frame
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
-
+	
 	for (auto widget: _impl->widgets){
 		widget->draw_widget();
 	}
-
+	
     // Rendering
     ImGui::Render();
-
-	if (compute_only || chrono.get_elapsed_time() < 25000){
+	
+	if (compute_only || chrono.get_elapsed_time() < 15000){
 		return;
 	}
 
@@ -856,19 +857,20 @@ void App_SDL::run()
 
     bool done = false;
 	bool sleep_mode = false;
+
     while (!done)
     {
-        SDL_Event event;
 		if (sleep_mode) SDL_WaitEventTimeout(NULL, 100);
 		sleep_mode = true;
-
+		
 		for (auto window : _impl->_windows){
 			if (window->probe_event())
 			{
 				window->set_last_event_time();
 			}
 		}
-
+		
+		SDL_Event event;
         while (SDL_PollEvent(&event))
 		{
 			if (event.type == SDL_QUIT){

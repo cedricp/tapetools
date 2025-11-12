@@ -103,7 +103,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerat
         &inputParameters,
         nullptr,  // no output
         samplerate,
-        (unsigned long)round(latency * samplerate),
+        0,//(unsigned long)round(latency * samplerate),
         paClipOff,  // no clipping
         callback,
         userData);
@@ -118,7 +118,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerat
             &inputParameters,
             nullptr,  // no output
             samplerate,
-            (unsigned long)round(latency * samplerate),
+            0, //(unsigned long)round(latency * samplerate),
             paClipOff,  // no clipping
             callback,
             userData);
@@ -180,7 +180,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplera
         nullptr,  // no input
         &outputParameters,
         samplerate,
-        (unsigned long)round(latency * samplerate),
+        0, //(unsigned long)round(latency * samplerate),
         paClipOff,  // no clipping
         callback,    // no callback, we’ll use blocking read
         userData
