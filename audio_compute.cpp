@@ -177,9 +177,10 @@ bool AudioToolWindow::compute()
     {
         double sound_data = m_raw_buffer[i*channelcount] * m_audio_gain;
         m_sound_data1[i] = sound_data;
-            
+        
+        // Apply window coeffs
         m_fftinl[i] = sound_data * m_current_window_cache[i];
-        m_sound_data_x[i] = float(i) * inv_current_sample_rate * 1000.0; // m_sound_data_x is in ms
+        m_sound_data_x[i] = float(i) * inv_current_sample_rate * 1000.0/* ->ms */;
 
         m_rms_left += m_sound_data1[i] * m_sound_data1[i];
         if(channelcount>1)

@@ -6,6 +6,9 @@
 
 void log_message(const char* format, ...);
 
+std::vector<double> test_rates = {8000, 11025, 16000, 22050, 32000,
+                      44100, 48000, 88200, 96000, 192000};
+
 PAaudioManager::PAaudioManager()
 {
     m_pa_ok = false;
@@ -287,10 +290,7 @@ const std::vector<int> PAaudioManager::get_input_sample_rates(int devidx, bool o
         return samplerates;
     }
 
-    std::vector<double> rates = {8000, 11025, 16000, 22050, 32000,
-                      44100, 48000, 88200, 96000, 192000};
-
-    for (double rate : rates) {
+    for (double rate : test_rates) {
         PaError err = Pa_IsFormatSupported(&inputParams, nullptr, rate);
         if (err == paFormatIsSupported) samplerates.push_back(rate);
     }
@@ -298,7 +298,7 @@ const std::vector<int> PAaudioManager::get_input_sample_rates(int devidx, bool o
     if (samplerates.empty())
     {
         inputParams.channelCount = 1;
-        for (double rate : rates) {
+        for (double rate : test_rates) {
             PaError err = Pa_IsFormatSupported(&inputParams, nullptr, rate);
             if (err == paFormatIsSupported) samplerates.push_back(rate);
         }
@@ -341,10 +341,7 @@ const std::vector<int> PAaudioManager::get_output_sample_rates(int devidx, bool 
         return samplerates;
     }
 
-    std::vector<double> rates = {8000, 11025, 16000, 22050, 32000,
-                      44100, 48000, 88200, 96000, 192000};
-
-    for (double rate : rates) {
+    for (double rate : test_rates) {
         PaError err = Pa_IsFormatSupported(nullptr, &outputParams, rate);
         if (err == paFormatIsSupported) samplerates.push_back(rate);
     }

@@ -41,7 +41,7 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
 {
     destroy();
 
-    int ringbugger_size = samplerate * latency * m_outstreaminfo.numChannel * 4;
+    int ringbugger_size = samplerate * latency * m_outstreaminfo.numChannel * 8;
     
     std::tie(m_outstream, m_outstreaminfo) = m_manager.get_output_stream(samplerate, device_idx, latency, paFloat32, generator_callback, this, channels);
 
