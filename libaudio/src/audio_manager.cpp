@@ -161,7 +161,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplera
     PaStreamParameters outputParameters;
     outputParameters.device = device_idx;
     outputParameters.channelCount = num_channel > 0 ? num_channel : deviceInfo->maxOutputChannels;
-    outputParameters.sampleFormat = paFloat32;
+    outputParameters.sampleFormat = format;
     outputParameters.suggestedLatency = latency;
 #ifdef WIN32
     PaWasapiStreamInfo wasapiInfo;
