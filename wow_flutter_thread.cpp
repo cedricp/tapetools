@@ -28,6 +28,7 @@ void WowAndFluterThread::entry()
     // Init low pass filter
     m_iq_lowpass_filter.setup(4, m_samplerate, 700, 0.1);
     m_wf_lowpass_filter.setup(4, m_samplerate / m_decimation, m_filter_freq, 0.1);
+    m_wf_lowpass_prefilter.setup(4, m_samplerate, m_reference_frequency, 500, 0.2);
 
     // We need ~5 seconds of audio recording
     {
@@ -41,13 +42,18 @@ void WowAndFluterThread::entry()
 
         m_signal_i.resize(actual_audio_length);
         m_signal_q.resize(actual_audio_length);
+
+        // Pre-filter audio data
+        std::vector<double> longterm_filterer = m_longterm_audio;
+        double *lta_chans[1] = {longterm_filterer.data()};
+        m_wf_lowpass_prefilter.process(actual_audio_length, lta_chans);
         
         // real signal to IQ data
         for (int i = 0; i < actual_audio_length; ++i)
         {
             // Convert audio to Inphase (cos)/Quadrature(sine) data
-            m_signal_i[i] = m_longterm_audio[i] * cos(reference_freq_times_twopi_over_sr * double(i));
-            m_signal_q[i] = m_longterm_audio[i] * sin(reference_freq_times_twopi_over_sr * double(i));
+            m_signal_i[i] = longterm_filterer[i] * cos(reference_freq_times_twopi_over_sr * double(i));
+            m_signal_q[i] = longterm_filterer[i] * sin(reference_freq_times_twopi_over_sr * double(i));
         }
 
         // Low pass filter IQ signal to suppress fundamental

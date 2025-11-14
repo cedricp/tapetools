@@ -34,6 +34,7 @@ class WowAndFluterThread : public ASyncTask
     // Objects
     Dsp::SimpleFilter <Dsp::ChebyshevI::LowPass <4>, 2> m_iq_lowpass_filter;
     Dsp::SimpleFilter <Dsp::ChebyshevI::LowPass <4>, 1> m_wf_lowpass_filter;
+    Dsp::SimpleFilter <Dsp::ChebyshevI::BandPass <4>, 1> m_wf_lowpass_prefilter;
     ThreadMutex& m_mutex;
 public:
     WowAndFluterThread(AudioToolWindow& mainwin, int ref_frequency, int samplerate);
