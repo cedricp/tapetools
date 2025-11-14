@@ -335,6 +335,13 @@ void AudioToolWindow::draw_tools_windows()
                 m_audiomanager.scan_devices();
             }
             ImGui::SetItemTooltip("Refresh device list from current hardware");
+            ImGui::SameLine();
+            if (ImGui::Checkbox("use floating point", &m_use_floatingpoint))
+            {
+                m_audiomanager.set_floatingpoint(m_use_floatingpoint);
+                reset_signal_generator();
+                reinit_recorder();
+            }
 #ifdef WIN32
             if (ImGui::Checkbox("Use WASAPI exclusive mode (recommanded)", &m_wasapi_exclusive))
             {
@@ -463,6 +470,7 @@ void AudioToolWindow::get_configuration_int(std::map<std::string, int> &cnf)
     cnf["optimizedFFT"] = m_optimized_fft == true ? 1 : 0;
     cnf["inSampleRateIdx"] = m_in_sample_rate_idx;
     cnf["outSampleRateIdx"] = m_out_sample_rate_idx;
+    cnf["use_floatingpoint"] = m_use_floatingpoint;
 }
 
 void AudioToolWindow::log_message(std::string msg)
@@ -529,6 +537,10 @@ void AudioToolWindow::set_configuration_int(std::string s, int i)
         m_wasapi_exclusive = i;
     }
 #endif
+    else if (s == "use_floatingpoint")
+    {
+        m_use_floatingpoint = i;
+    }
 }
 
 void AudioToolWindow::get_configuration_float(std::map<std::string, float> &cnf)
@@ -578,6 +590,7 @@ void AudioToolWindow::set_sound_config()
     if (m_output_device.empty()) m_audio_out_idx = m_audiomanager.get_default_output_device_id();
 
     m_audiomanager.set_exclusive_mode(m_wasapi_exclusive);
+    m_audiomanager.set_floatingpoint(m_use_floatingpoint);
 
     m_combo_in  = m_audio_in_idx;
     m_combo_out = m_audio_out_idx;

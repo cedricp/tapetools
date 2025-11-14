@@ -28,6 +28,7 @@ class PAaudioManager
 
     bool m_use_exclusive_mode = false;
     bool m_pa_ok = false;
+    bool m_floatingpoint = true;
 
     int pa_to_input(int pa){
         return std::distance(m_input_map.begin(), std::find(m_input_map.begin(), m_input_map.end(), pa));
@@ -51,8 +52,11 @@ public:
     void set_exclusive_mode(bool mode){m_use_exclusive_mode = mode;}
     bool get_exclusive_mode(){return m_use_exclusive_mode;}
 
-    std::tuple<PaStream*, StreamInfo> get_input_stream(int samplerate, int device_idx, float latency, PaSampleFormat format, PaStreamCallback* callback, void* userData);
-    std::tuple<PaStream*, StreamInfo> get_output_stream(int samplerate, int device_idx, float latency, PaSampleFormat format, PaStreamCallback* callback, void* userData, int num_channels=-1);
+    void set_floatingpoint(bool fp){m_floatingpoint = fp;}
+    bool get_is_floatingpoint(){return m_floatingpoint;}
+
+    std::tuple<PaStream*, StreamInfo> get_input_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData);
+    std::tuple<PaStream*, StreamInfo> get_output_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData, int num_channels=-1);
 
     void safe_close_stream(PaStream** stream);
 

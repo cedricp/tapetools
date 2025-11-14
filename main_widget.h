@@ -159,6 +159,7 @@ class AudioToolWindow : public Widget
     bool    m_show_log_window = false;
 
     bool    m_wasapi_exclusive = false;
+    bool    m_use_floatingpoint = true;
 
     std::vector<std::string> m_debug_logs;
     unsigned long m_total_compute_time=0;

@@ -17,7 +17,10 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
     double float_sample_rate = info.sampleRate;
     double seconds_per_frame = 1.0 / float_sample_rate;
 
-    int16_t* data = (int16_t*)output;
+    int16_t* dataint = (int16_t*)output;
+    float* datafloat = (float*)output;
+
+    bool fp = udata->m_manager.get_is_floatingpoint();
 
     for (int i = 0; i < frameCount; ++i){
         double sample = 0;
@@ -36,8 +39,14 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
             sample = udata->m_volume  * smoothdata;
         }
 
-        for (int channel = 0; channel < info.numChannel; channel ++) {
-            *data++ = sample * INT16_MAX;
+        if (fp){
+            for (int channel = 0; channel < info.numChannel; channel ++) {
+                *datafloat++ = sample;
+            }
+        } else {
+            for (int channel = 0; channel < info.numChannel; channel ++) {
+                *dataint++ = sample * INT16_MAX;
+            }
         }
     }
 
@@ -71,7 +80,7 @@ bool PAaudioWaveformGenerator::init(int device_idx, int samplerate, float latenc
     
     m_manager.safe_close_stream(&m_outstream);
 
-    std::tie(m_outstream, m_outstreaminfo) = m_manager.get_output_stream(samplerate, device_idx, latency, paInt16, generator_callback, this);
+    std::tie(m_outstream, m_outstreaminfo) = m_manager.get_output_stream(samplerate, device_idx, latency, generator_callback, this);
 
     if (m_outstream == nullptr){
         log_message("unable to open device index: %i\n", device_idx);

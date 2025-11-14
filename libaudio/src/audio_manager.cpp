@@ -61,7 +61,7 @@ void PAaudioManager::scan_devices()
     }
 }
 
-std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerate, int device_idx, float latency, PaSampleFormat format, PaStreamCallback* callback, void* userData)
+std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData)
 {
     StreamInfo info;
     if(!m_pa_ok) return std::make_tuple(nullptr, info);
@@ -83,7 +83,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerat
     PaStreamParameters inputParameters;
     inputParameters.device = device_idx;
     inputParameters.channelCount = deviceInfo->maxInputChannels;
-    inputParameters.sampleFormat = format;
+    inputParameters.sampleFormat = m_floatingpoint ? paFloat32 : paInt16;;
     inputParameters.suggestedLatency = latency;
 #ifdef WIN32
     PaWasapiStreamInfo wasapiInfo;
@@ -101,7 +101,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerat
 
     info.numChannel = inputParameters.channelCount;
     info.sampleRate = samplerate;
-    info.format = format;
+    info.format = inputParameters.sampleFormat;
 
     PaStream* stream;
     err = Pa_OpenStream(
@@ -138,7 +138,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerat
     return std::make_tuple(stream, info);
 }
 
-std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplerate, int device_idx, float latency, PaSampleFormat format, PaStreamCallback* callback, void* userData, int num_channel)
+std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData, int num_channel)
 {
     StreamInfo info;
     if(!m_pa_ok) return std::make_tuple(nullptr, info);
@@ -161,7 +161,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplera
     PaStreamParameters outputParameters;
     outputParameters.device = device_idx;
     outputParameters.channelCount = num_channel > 0 ? num_channel : deviceInfo->maxOutputChannels;
-    outputParameters.sampleFormat = format;
+    outputParameters.sampleFormat = m_floatingpoint ? paFloat32 : paInt16;
     outputParameters.suggestedLatency = latency;
 #ifdef WIN32
     PaWasapiStreamInfo wasapiInfo;
@@ -178,7 +178,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplera
 #endif
     info.numChannel = outputParameters.channelCount ;
     info.sampleRate = samplerate;
-    info.format = format;
+    info.format = outputParameters.sampleFormat;
 
     PaStream* stream;
     err = Pa_OpenStream(
@@ -277,7 +277,7 @@ const std::vector<int> PAaudioManager::get_input_sample_rates(int devidx, bool o
     PaStreamParameters inputParams;
     inputParams.device = devidx;
     inputParams.channelCount = deviceInfo->maxInputChannels;
-    inputParams.sampleFormat = paFloat32;
+    inputParams.sampleFormat = m_floatingpoint ? paFloat32 : paInt16;
     inputParams.suggestedLatency = deviceInfo->defaultLowOutputLatency;
 #ifdef WIN32
     PaWasapiStreamInfo wasapiInfo;
@@ -337,7 +337,7 @@ const std::vector<int> PAaudioManager::get_output_sample_rates(int devidx, bool 
     PaStreamParameters outputParams;
     outputParams.device = devidx;
     outputParams.channelCount = deviceInfo->maxOutputChannels;
-    outputParams.sampleFormat = paFloat32;
+    outputParams.sampleFormat = m_floatingpoint ? paFloat32 : paInt16;
     outputParams.suggestedLatency = deviceInfo->defaultLowOutputLatency;
     double defaultsamplerate = deviceInfo->defaultSampleRate;
 #ifdef WIN32

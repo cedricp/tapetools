@@ -44,15 +44,17 @@ bool PAaudioRecorder::init(float latency, int device_idx, int samplerate)
 {
     destroy();
 
-    std::tie(m_instream, m_instreaminfo) = m_manager.get_input_stream(samplerate, device_idx, latency, paFloat32, recordCallback, this);
+    std::tie(m_instream, m_instreaminfo) = m_manager.get_input_stream(samplerate, device_idx, latency, recordCallback, this);
     
     if (!m_instream){
         return false;
     }
 
+    bool fp = m_manager.get_is_floatingpoint();
+
     int bytes_per_sample = Pa_GetSampleSize(m_instreaminfo.format);
     int capacity = get_buffer_size(latency);
-    m_ring_buffer = new ringBuffer(sizeof(float), capacity*2);
+    m_ring_buffer = new ringBuffer(fp ? sizeof(float) : sizeof(int16_t), capacity*2);
 
     return true;
 }
@@ -111,11 +113,16 @@ bool PAaudioRecorder::pause(bool pause)
     if (m_instream == nullptr){
         return false;
     }
-    if(pause){
+
+    if(pause)
+    {
         Pa_StopStream(m_instream);
-    } else {
+    }
+    else
+    {
         start();
     }
+
     return true;
 }
 
@@ -130,9 +137,24 @@ bool PAaudioRecorder::get_data(std::vector<float>& data, size_t size)
         return false;
     }
 
+    bool fp = m_manager.get_is_floatingpoint();
+
     if (data.size() != size) data.resize(size, 0);
 
-    m_ring_buffer->read(data.data(), size);
+    if (fp)
+    {
+        m_ring_buffer->read(data.data(), size);
+    }
+    else
+    {
+        std::vector<int16_t> intdata(size);
+        m_ring_buffer->read(intdata.data(), size);
+
+        for (int i = 0; i < size; ++i)
+        {
+            data[i] = (float)intdata[i] / (float)INT16_MAX;
+        }
+    }
 
     return true;
 }
