@@ -269,7 +269,7 @@ const std::vector<int> PAaudioManager::get_input_sample_rates(int devidx, bool o
 
     if (deviceInfo == nullptr) return samplerates;
 
-    if (m_input_samplerate_cache.find(devidx) != m_input_samplerate_cache.end())
+    if (m_input_samplerate_cache.find(devidx) != m_input_samplerate_cache.end() && !only_default)
     {
         return m_input_samplerate_cache[devidx];
     }
@@ -329,7 +329,7 @@ const std::vector<int> PAaudioManager::get_output_sample_rates(int devidx, bool 
     
     if (deviceInfo == nullptr) return samplerates;
 
-    if (m_output_samplerate_cache.find(devidx) != m_output_samplerate_cache.end())
+    if (m_output_samplerate_cache.find(devidx) != m_output_samplerate_cache.end() && !only_default)
     {
         return m_output_samplerate_cache[devidx];
     }
