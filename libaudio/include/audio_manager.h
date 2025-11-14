@@ -55,10 +55,10 @@ public:
     void set_floatingpoint(bool fp);
     bool get_is_floatingpoint(){return m_floatingpoint;}
 
-    std::tuple<PaStream*, StreamInfo> get_input_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData);
-    std::tuple<PaStream*, StreamInfo> get_output_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData, int num_channels=-1);
+    PaStream* get_input_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData, StreamInfo& info);
+    PaStream* get_output_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData, StreamInfo& info, int num_channels=-1);
 
-    void safe_close_stream(PaStream** stream);
+    void safe_close_stream(PaStream*& stream);
 
     const std::vector<std::string>& get_input_devices(){return m_input_devices;}
     const std::vector<std::string>& get_output_devices(){return m_output_devices;}

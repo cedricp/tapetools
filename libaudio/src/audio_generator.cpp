@@ -65,7 +65,7 @@ PAaudioWaveformGenerator::~PAaudioWaveformGenerator()
 
 void PAaudioWaveformGenerator::destroy()
 {
-    m_manager.safe_close_stream(&m_outstream);
+    m_manager.safe_close_stream(m_outstream);
     m_outstream = nullptr;
 }
 
@@ -78,9 +78,9 @@ bool PAaudioWaveformGenerator::init(int device_idx, int samplerate, float latenc
 
     m_seconds_offset = 0;
     
-    m_manager.safe_close_stream(&m_outstream);
+    m_manager.safe_close_stream(m_outstream);
 
-    std::tie(m_outstream, m_outstreaminfo) = m_manager.get_output_stream(samplerate, device_idx, latency, generator_callback, this);
+    m_outstream = m_manager.get_output_stream(samplerate, device_idx, latency, generator_callback, this, m_outstreaminfo);
 
     if (m_outstream == nullptr){
         log_message("unable to open device index: %i\n", device_idx);

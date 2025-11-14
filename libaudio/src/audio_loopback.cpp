@@ -25,7 +25,7 @@ int PAaudioLoopback::generator_callback(const void* input, void* output,
 
 void PAaudioLoopback::destroy()
 {
-    m_manager.safe_close_stream(&m_outstream);
+    m_manager.safe_close_stream(m_outstream);
     delete m_ringbuffer;
     m_ringbuffer = nullptr;
 
@@ -39,7 +39,7 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
 
     int ringbuffer_size = samplerate * latency * m_outstreaminfo.numChannel * 8;
     
-    std::tie(m_outstream, m_outstreaminfo) = m_manager.get_output_stream(samplerate, device_idx, latency, generator_callback, this, channels);
+    m_outstream = m_manager.get_output_stream(samplerate, device_idx, latency, generator_callback, this, m_outstreaminfo, channels);
 
     if (!m_outstream){
         return false;
@@ -55,20 +55,23 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
 bool PAaudioLoopback::add_data(const float data[], int size)
 {
     bool fp = m_manager.get_is_floatingpoint();
+
     if (m_ringbuffer && m_ringbuffer->getWriteAvailable() >= size){
-    if (fp)
-    {
-        m_ringbuffer->write(data, size);
-        return true;
-    } else {
-        std::vector<uint16_t> intdata(size);
-        for (int i = 0; i < size; ++i)
+        if (fp)
         {
-            intdata[i] = data[i] * INT16_MAX;
+            m_ringbuffer->write(data, size);
+            return true;
+        } else {
+            std::vector<int16_t> intdata(size);
+            for (int i = 0; i < size; ++i)
+            {
+                intdata[i] = data[i] * INT16_MAX;
+            }
+            m_ringbuffer->write(intdata.data(), size);
+            return true;
         }
-        m_ringbuffer->write(intdata.data(), size);
     }
-    }
+
     return false;
 }
 

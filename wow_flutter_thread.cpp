@@ -25,7 +25,7 @@ WowAndFluterThread::~WowAndFluterThread()
 void WowAndFluterThread::entry()
 {
     Chrono chrono;
-    
+
     // Init low pass filter
     m_iq_lowpass_filter.setup(4, m_samplerate, 700, 0.1);
     m_wf_lowpass_filter.setup(4, m_samplerate / m_decimation, m_filter_freq, 0.1);
@@ -44,12 +44,12 @@ void WowAndFluterThread::entry()
         m_signal_i.resize(actual_audio_length);
         m_signal_q.resize(actual_audio_length);
 
-        // Pre-filter audio data
+        // Pre-filter audio data with a bandfilter to isolate the carrier frequency as much as possible
         std::vector<double> longterm_filterer = m_longterm_audio;
         double *lta_chans[1] = {longterm_filterer.data()};
         m_wf_lowpass_prefilter.process(actual_audio_length, lta_chans);
         
-        // real signal to IQ data
+        // Transform real signal to IQ data
         for (int i = 0; i < actual_audio_length; ++i)
         {
             // Convert audio to Inphase (cos)/Quadrature(sine) data
@@ -65,6 +65,7 @@ void WowAndFluterThread::entry()
         int decimated_samplerate = m_samplerate / WOW_FLUTTER_DECIMATION;
         double phase_to_hz = (m_samplerate / (M_PI * 2.));
 
+        // Compute phase difference to find frequency drift
         for (int i = 1; i < decimated_size; i++)
         {
             int step_i = i * m_decimation;

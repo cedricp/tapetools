@@ -76,17 +76,16 @@ void PAaudioManager::scan_devices()
     }
 }
 
-std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData)
+PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData, StreamInfo& info)
 {
-    StreamInfo info;
-    if(!m_pa_ok) return std::make_tuple(nullptr, info);
+    if(!m_pa_ok) return nullptr;
 
     device_idx = input_to_pa(device_idx);
 
     int err;
     if (device_idx == paNoDevice) {
         log_message("Error: No default input device.");
-        return std::make_tuple(nullptr, info);;
+        return nullptr;
     }
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(device_idx);
 
@@ -98,7 +97,7 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerat
     PaStreamParameters inputParameters;
     inputParameters.device = device_idx;
     inputParameters.channelCount = deviceInfo->maxInputChannels;
-    inputParameters.sampleFormat = m_floatingpoint ? paFloat32 : paInt16;;
+    inputParameters.sampleFormat = m_floatingpoint ? paFloat32 : paInt16;
     inputParameters.suggestedLatency = latency;
 #ifdef WIN32
     PaWasapiStreamInfo wasapiInfo;
@@ -147,23 +146,22 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_input_stream(int samplerat
 
     if (err != paNoError){
         log_message("Error opening input device : %s", Pa_GetErrorText(err));
-        return std::make_tuple(nullptr, info);
+        return nullptr;
     }
 
-    return std::make_tuple(stream, info);
+    return stream;
 }
 
-std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData, int num_channel)
+PaStream*PAaudioManager::get_output_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData, StreamInfo& info, int num_channel)
 {
-    StreamInfo info;
-    if(!m_pa_ok) return std::make_tuple(nullptr, info);
+    if(!m_pa_ok) return nullptr;
     
     device_idx = output_to_pa(device_idx);
 
     int err;
     if (device_idx == paNoDevice) {
         log_message("Error: No default output device.");
-        return std::make_tuple(nullptr, info);
+        return nullptr;
     }
 
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(device_idx);
@@ -209,17 +207,17 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplera
 
     if (err != paNoError){
         log_message("Error opening output device : %s", Pa_GetErrorText(err));
-        return std::make_tuple(nullptr, info);
+        return nullptr;
     }
 
-    return std::make_tuple(stream, info);;
+    return stream;
 }
 
-void PAaudioManager::safe_close_stream(PaStream** stream)
+void PAaudioManager::safe_close_stream(PaStream*& stream)
 {
-    if (*stream == nullptr) return;
-    Pa_CloseStream(*stream);
-    *stream = nullptr;
+    if (stream == nullptr) return;
+    Pa_CloseStream(stream);
+    stream = nullptr;
 }
 
 int PAaudioManager::get_default_output_device_id()

@@ -34,7 +34,7 @@ PAaudioRecorder::~PAaudioRecorder()
 
 void PAaudioRecorder::destroy()
 {
-    m_manager.safe_close_stream(&m_instream);
+    m_manager.safe_close_stream(m_instream);
 
     delete m_ring_buffer;
     m_ring_buffer = nullptr;
@@ -44,7 +44,7 @@ bool PAaudioRecorder::init(float latency, int device_idx, int samplerate)
 {
     destroy();
 
-    std::tie(m_instream, m_instreaminfo) = m_manager.get_input_stream(samplerate, device_idx, latency, recordCallback, this);
+    m_instream = m_manager.get_input_stream(samplerate, device_idx, latency, recordCallback, this, m_instreaminfo);
     
     if (!m_instream){
         return false;
