@@ -19,6 +19,7 @@ private:
     PaStream *m_outstream = nullptr;
     StreamInfo m_outstreaminfo;
     SineWave m_sinewave;
+    PAaudioManager& m_manager;
 
     static int generator_callback(const void* input, void* output,
                     unsigned long frameCount,
@@ -27,13 +28,13 @@ private:
                     void* userData);
 
 public:
-    PAaudioWaveformGenerator();
+    PAaudioWaveformGenerator(PAaudioManager& manager);
     ~PAaudioWaveformGenerator();
 
     StreamInfo& get_info(){return m_outstreaminfo;}
 
     void destroy();
-    bool init(PAaudioManager& manager, int device_idx, int samplerate, float latency);
+    bool init(int device_idx, int samplerate, float latency);
     bool start();
     bool pause(bool pause = true);
 

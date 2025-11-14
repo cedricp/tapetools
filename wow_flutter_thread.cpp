@@ -1,6 +1,8 @@
 #include "wow_flutter_thread.h"
+#include <array>
 
 extern const int WOW_FLUTTER_DECIMATION;
+const std::array<int, 4> filter_mapping = {0, 6, 20, 100};
 
 WowAndFluterThread::WowAndFluterThread(AudioToolWindow& mainwin, int ref_frequency, int samplerate) : ASyncTask("WFtask"),
     m_longterm_audio(mainwin.m_longterm_audio), m_wow_flutter_data(mainwin.m_wow_flutter_data),
@@ -11,25 +13,11 @@ WowAndFluterThread::WowAndFluterThread(AudioToolWindow& mainwin, int ref_frequen
     m_wow_fftwowdrawfreqs(mainwin.m_fftwowdrawfreqs), m_signal_i(mainwin.m_signal_i), m_signal_q(mainwin.m_signal_q), m_time(mainwin.m_wf_compute_time),
     m_compute_fft(mainwin.m_show_wf_fft_view)
 {
-    switch (mainwin.m_wf_filter_freq_combo){
-        case 1:
-        m_filter_freq = 6;
-        break;
-        case 2:
-        m_filter_freq = 20;
-        break;
-        case 3:
-        m_filter_freq = 100;
-        break;
-        default:
-        m_filter_freq = 0;
-        break;
-    }
+    m_filter_freq = mainwin.m_wf_filter_freq_combo < filter_mapping.size() ? filter_mapping[mainwin.m_wf_filter_freq_combo] : 0;
 }
 
 WowAndFluterThread::~WowAndFluterThread()
 {
-    m_chrono.print_elapsed_time("WF thread time : ");
 }
 
 
@@ -44,10 +32,12 @@ void WowAndFluterThread::entry()
     // We need ~5 seconds of audio recording
     {
         ScopedMutex mutex(m_mutex);
+
         int actual_audio_length = m_longterm_audio.size();
         double current_samplerate = m_samplerate;
         double inv_current_samplerate = 1. / m_samplerate;
         double twopi_over_sr = 2. * M_PI / m_samplerate;
+        double reference_freq_times_twopi_over_sr = m_reference_frequency * twopi_over_sr;
 
         m_signal_i.resize(actual_audio_length);
         m_signal_q.resize(actual_audio_length);
@@ -55,11 +45,9 @@ void WowAndFluterThread::entry()
         // real signal to IQ data
         for (int i = 0; i < actual_audio_length; ++i)
         {
-            // Convert audio to Inphase/Quadrature data
-            double I = m_longterm_audio[i] * cos(m_reference_frequency*double(i) * twopi_over_sr);
-            double Q = m_longterm_audio[i] * sin(m_reference_frequency*double(i) * twopi_over_sr);
-            m_signal_i[i] = I;
-            m_signal_q[i] = Q;
+            // Convert audio to Inphase (cos)/Quadrature(sine) data
+            m_signal_i[i] = m_longterm_audio[i] * cos(reference_freq_times_twopi_over_sr * double(i));
+            m_signal_q[i] = m_longterm_audio[i] * sin(reference_freq_times_twopi_over_sr * double(i));
         }
 
         // Low pass filter IQ signal to suppress fundamental
@@ -73,9 +61,13 @@ void WowAndFluterThread::entry()
         for (int i = 1; i < decimated_size; i++)
         {
             int step_i = i * m_decimation;
+
             // Start graph a little later to hide LPF settle time
             int step_i_x = (i - (decimated_size / 10)) * m_decimation;
-            double phase_diff = wrap_phase(atan2(m_signal_q[step_i-1], m_signal_i[step_i-1]) - atan2(m_signal_q[step_i], m_signal_i[step_i]));
+            double phase0 = complex_argument(m_signal_q[step_i-1], m_signal_i[step_i-1]);
+            double phase1 = complex_argument(m_signal_q[step_i], m_signal_i[step_i]);
+            double phase_diff = wrap_phase(phase0 - phase1);
+
             // Convert phase difference to Hertz
             m_wow_flutter_data[i] = phase_diff * phase_to_hz;
             m_wow_flutter_data_x[i] = (double)step_i_x * inv_current_samplerate;
@@ -84,6 +76,7 @@ void WowAndFluterThread::entry()
             }
         }
 
+        // Process low pass filtering of W&F data
         if(m_filter_freq > 0)
         {
             m_wf_lowpass_filter.reset();
@@ -94,6 +87,7 @@ void WowAndFluterThread::entry()
 
         double max_dev = -1000, min_dev = 1000, mean = 0;
         int num_samples = 0;
+
         // I start the measure a little after the beginning to suppress lpf settling part
         for (int i = decimated_size/10; i < decimated_size; ++i)
         {
@@ -103,12 +97,14 @@ void WowAndFluterThread::entry()
             mean += current;
             num_samples++;
         }
+
         mean /= num_samples;
         double peak_plus = fabs(max_dev - mean);
         double peak_minus = fabs(mean - min_dev);
         m_wow_peak = peak_plus > peak_minus ? peak_plus : peak_minus;
         m_wow_mean = mean;
 
+        // Process FFT compute of the W&F data
         if (m_compute_fft)
         {
             fftw_execute(m_wowfftplan);
@@ -119,7 +115,7 @@ void WowAndFluterThread::entry()
 
             for(int i = 0; i < fftdraw_size; ++i)
             {
-                double fftout = sqrt(m_wow_complex_fftout[i][0] * m_wow_complex_fftout[i][0] + m_wow_complex_fftout[i][1] * m_wow_complex_fftout[i][1]) * inv_fft_capture_size;
+                double fftout = complex_module(m_wow_complex_fftout[i][FFTW_IMAGINARY_INDEX], m_wow_complex_fftout[i][FFTW_REAL_INDEX]) * inv_fft_capture_size;
                 m_wow_fftdrawout[i] = fftout;
                 m_wow_fftwowdrawfreqs[i] = fft_step * i;
             }

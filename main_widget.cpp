@@ -1,6 +1,6 @@
 #include "main_widget.h"
 
-AudioToolWindow::AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_audioloopback(m_audiomanager)
+AudioToolWindow::AudioToolWindow(Window_SDL* win) : Widget(win, "AudioTools"), m_audiorecorder(m_audiomanager), m_audioloopback(m_audiomanager), m_signal_generator(m_audiomanager)
 {
     set_maximized(true);
     set_movable(false);
@@ -350,7 +350,7 @@ void AudioToolWindow::draw_tools_windows()
                 reset_signal_generator();
             }
             ImGui::SameLine();
-            auto out_samplerate = m_audio_out_idx >= 0 ? m_audiomanager.get_output_sample_rates_str(m_audio_out_idx) : std::vector<std::string>();
+            auto out_samplerate = m_audio_out_idx >= 0 ? m_audiomanager.get_output_sample_rates_as_stringlist(m_audio_out_idx) : std::vector<std::string>();
             if (ImGui::Combo("Samplerate##1", &m_out_sample_rate_idx, vector_getter, (void *)&out_samplerate, out_samplerate.size()))
             {
                 reset_signal_generator();
@@ -366,7 +366,7 @@ void AudioToolWindow::draw_tools_windows()
                 reinit_recorder();
             }
             ImGui::SameLine();
-            auto in_samplerate = m_audio_in_idx >= 0 ? m_audiomanager.get_input_sample_rates_str(m_audio_in_idx) : std::vector<std::string>();
+            auto in_samplerate = m_audio_in_idx >= 0 ? m_audiomanager.get_input_sample_rates_as_stringlist(m_audio_in_idx) : std::vector<std::string>();
             if (ImGui::Combo("Samplerate##2", &m_in_sample_rate_idx, vector_getter, (void *)&in_samplerate, in_samplerate.size()))
             {
                 reinit_recorder();
@@ -386,16 +386,16 @@ void AudioToolWindow::draw_tools_windows()
 
 void AudioToolWindow::save_soundcard_setup(std::map<std::string, std::string> &cnf)
 {
-    auto &out_devices = m_audiomanager.get_output_devices();
-    std::string out_device = out_devices[m_combo_out];
-    auto &in_devices = m_audiomanager.get_input_devices();
-    std::string in_device = in_devices[m_combo_in];
-    auto &out_reroute_devices = m_audiomanager.get_output_devices();
-    std::string out_reroute_device = out_devices[m_combo_out_loopback];
+    auto &out_devices       = m_audiomanager.get_output_devices();
+    std::string out_device  = out_devices[m_combo_out];
+    auto &in_devices        = m_audiomanager.get_input_devices();
+    std::string in_device   = in_devices[m_combo_in];
+    auto &loopback_devices  = m_audiomanager.get_output_devices();
+    std::string loopback_device = out_devices[m_combo_out_loopback];
 
     cnf["output_device"] = out_device;
     cnf["input_device"]  = in_device;
-    cnf["output_loopback_device"] = out_reroute_device;
+    cnf["output_loopback_device"] = loopback_device;
 }
 
 void AudioToolWindow::get_configuration_string(std::map<std::string, std::string> &cnf)
@@ -539,11 +539,11 @@ void AudioToolWindow::set_configuration_float(std::string s, float f)
 
 bool AudioToolWindow::check_data_buffer()
 {
-    const int min_wanted_buffer_size = m_capture_size * m_audiorecorder.get_channel_count();
+    const int expected_buffer_size = m_capture_size * m_audiorecorder.get_channel_count();
 
     bool data_available = false;
 
-    if (m_audiorecorder.get_available_samples() >= min_wanted_buffer_size)
+    if (m_audiorecorder.get_available_samples() >= expected_buffer_size)
     {
         data_available = compute();
 

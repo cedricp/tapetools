@@ -5,6 +5,10 @@
 #include <math.h>
 #include <vector>
 
+
+#define FFTW_REAL_INDEX 0
+#define FFTW_IMAGINARY_INDEX 1
+
 void smoothed_z_score(const double y[], double signals[], const int count, const int lag, const float threshold, const float influence);
 bool sg_smooth(const double *v, double *res, const int size, const int width, const int deg);
 
@@ -176,3 +180,12 @@ static double kaiser6_fft_window(int i,int len){
 	return kaiser2_fft_window(5.f, i, len);
 }
 
+static inline double complex_module(double i, double r)
+{
+    return sqrt(i*i+r*r);
+}
+
+static inline double complex_argument(double i, double r)
+{
+	return atan2(i, r);
+}

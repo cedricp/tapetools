@@ -37,7 +37,6 @@ class WowAndFluterThread : public ASyncTask
     ThreadMutex& m_mutex;
 public:
     WowAndFluterThread(AudioToolWindow& mainwin, int ref_frequency, int samplerate);
-
     ~WowAndFluterThread();
 
 private:

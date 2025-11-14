@@ -575,7 +575,7 @@ void AudioToolWindow::reinit_recorder()
     {
         m_audiorecorder.start();
         if (m_audio_loopback_out_idx >= 0 && !m_audioloopback.set(input_samplerate, float(m_recorder_latency_ms)/1000.f, m_audio_loopback_out_idx, m_audiorecorder.get_channel_count())){
-            log_message("Cannot start loopback interface, check input samplerate = output samplerate and the loopback device is different of the output device");
+            log_message("Cannot start loopback interface, maybe input samplerate is not compatible, try a different one");
         }
     }
 
@@ -595,9 +595,9 @@ void AudioToolWindow::reset_signal_generator()
         log_message("Cannot set player samplerate to requested value");
     }
 
-    int current_sine_samplerate = m_audiomanager.get_output_sample_rates(m_audio_out_idx)[m_out_sample_rate_idx];
+    int output_device_samplerate = m_audiomanager.get_output_sample_rates(m_audio_out_idx)[m_out_sample_rate_idx];
     m_signal_generator.destroy();
-    m_signal_generator.init(m_audiomanager, m_audio_out_idx, current_sine_samplerate, m_signalgen_latency_s);
+    m_signal_generator.init(m_audio_out_idx, output_device_samplerate, m_signalgen_latency_s);
     m_signal_generator.set_pitch(m_signal_generator_pitch);
     m_signal_generator.start();
     m_signal_generator.pause(!m_signal_generator_switch);
@@ -614,7 +614,6 @@ void AudioToolWindow::process_sweep()
         bool need_stop_sweep = false;
         if (m_sweep_target_frequency > 24000)
         {
-            // m_sweep_target_frequency = 24000;
             need_stop_sweep = true;
         }
 

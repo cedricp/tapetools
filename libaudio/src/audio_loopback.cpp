@@ -25,11 +25,7 @@ int PAaudioLoopback::generator_callback(const void* input, void* output,
 
 void PAaudioLoopback::destroy()
 {
-    if (m_outstream){
-        Pa_AbortStream(m_outstream);
-        Pa_CloseStream(m_outstream);
-        m_outstream = nullptr;
-    }
+    m_manager.safe_close_stream(&m_outstream);
     delete m_ringbuffer;
     m_ringbuffer = nullptr;
 
@@ -41,7 +37,7 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
 {
     destroy();
 
-    int ringbugger_size = samplerate * latency * m_outstreaminfo.numChannel * 8;
+    int ringbuffer_size = samplerate * latency * m_outstreaminfo.numChannel * 8;
     
     std::tie(m_outstream, m_outstreaminfo) = m_manager.get_output_stream(samplerate, device_idx, latency, paFloat32, generator_callback, this, channels);
 
@@ -49,7 +45,7 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
         return false;
     }
     
-    m_ringbuffer = new ringBuffer(sizeof(float), ringbugger_size);
+    m_ringbuffer = new ringBuffer(sizeof(float), ringbuffer_size);
 
     return true;
 }

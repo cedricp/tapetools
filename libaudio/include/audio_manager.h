@@ -51,11 +51,13 @@ public:
     std::tuple<PaStream*, StreamInfo> get_input_stream(int samplerate, int device_idx, float latency, PaSampleFormat format, PaStreamCallback* callback, void* userData);
     std::tuple<PaStream*, StreamInfo> get_output_stream(int samplerate, int device_idx, float latency, PaSampleFormat format, PaStreamCallback* callback, void* userData, int num_channels=-1);
 
+    void safe_close_stream(PaStream** stream);
+
     const std::vector<std::string>& get_input_devices(){return m_input_devices;}
     const std::vector<std::string>& get_output_devices(){return m_output_devices;}
 
-    const std::vector<std::string> get_input_sample_rates_str(int devidx);
-    const std::vector<std::string> get_output_sample_rates_str(int devidx);
+    const std::vector<std::string> get_input_sample_rates_as_stringlist(int devidx);
+    const std::vector<std::string> get_output_sample_rates_as_stringlist(int devidx);
 
     const std::vector<int> get_input_sample_rates(int devidx, bool only_default = false);
     const std::vector<int> get_output_sample_rates(int devidx, bool only_default = false);
@@ -70,8 +72,6 @@ public:
     int get_default_output_device_samplerate_idx(int devidx);
 
     void scan_devices();
-
-    ringBuffer* get_new_ringbuffer(int capacity);
 
     int get_default_input_samplerate_idx(int dev);
     int get_default_output_samplerate_idx(int dev);

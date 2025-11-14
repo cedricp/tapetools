@@ -44,10 +44,9 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
     return paContinue;
 }
 
-PAaudioWaveformGenerator::PAaudioWaveformGenerator()
+PAaudioWaveformGenerator::PAaudioWaveformGenerator(PAaudioManager& manager) : m_manager(manager)
 {
     m_pitch = 1000;
-
 }
 
 PAaudioWaveformGenerator::~PAaudioWaveformGenerator()
@@ -57,25 +56,22 @@ PAaudioWaveformGenerator::~PAaudioWaveformGenerator()
 
 void PAaudioWaveformGenerator::destroy()
 {
-    Pa_CloseStream(m_outstream);
+    m_manager.safe_close_stream(&m_outstream);
     m_outstream = nullptr;
 }
 
-bool PAaudioWaveformGenerator::init(PAaudioManager& manager, int device_idx, int samplerate, float latency){
+bool PAaudioWaveformGenerator::init(int device_idx, int samplerate, float latency){
     m_pitch = 1000;
 
-    if (!manager.valid()){
+    if (!m_manager.valid()){
         log_message("audioSine::init : AudioManager not valid\n");
     }
 
     m_seconds_offset = 0;
     
-    if (m_outstream){
-        Pa_CloseStream(m_outstream);
-        m_outstream = nullptr;
-    }
+    m_manager.safe_close_stream(&m_outstream);
 
-    std::tie(m_outstream, m_outstreaminfo) = manager.get_output_stream(samplerate, device_idx, latency, paFloat32, generator_callback, this);
+    std::tie(m_outstream, m_outstreaminfo) = m_manager.get_output_stream(samplerate, device_idx, latency, paFloat32, generator_callback, this);
 
     if (m_outstream == nullptr){
         log_message("unable to open device index: %i\n", device_idx);

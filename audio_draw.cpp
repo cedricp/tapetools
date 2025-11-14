@@ -746,7 +746,7 @@ void AudioToolWindow::draw_channels_phase_widget(int plotheight)
             // Zoom Y axis in/out
             phase_limit_mult += ImGui::GetIO().MouseWheel * .01;
             if (phase_limit_mult < .1) phase_limit_mult = .1;
-            if (phase_limit_mult > 1) phase_limit_mult = 1;
+            if (phase_limit_mult > 1)  phase_limit_mult = 1;
         }
 
         if (ImPlot::IsAxisHovered(ImAxis_Y2)){
@@ -1072,7 +1072,7 @@ void AudioToolWindow::draw_rt_analysis_tab()
         if (m_measure_delay < m_recorder_latency_ms * 2)
         {
             m_measure_delay = m_recorder_latency_ms * 2;
-            m_sweep_time = m_measure_delay;
+            m_sweep_time    = m_measure_delay;
         }
         reinit_recorder();
     }

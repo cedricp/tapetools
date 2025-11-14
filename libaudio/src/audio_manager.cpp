@@ -6,7 +6,7 @@
 
 void log_message(const char* format, ...);
 
-std::vector<double> test_rates = {8000, 11025, 16000, 22050, 32000,
+static std::vector<double> test_rates = {8000, 11025, 16000, 22050, 32000,
                       44100, 48000, 88200, 96000, 192000};
 
 PAaudioManager::PAaudioManager()
@@ -197,6 +197,13 @@ std::tuple<PaStream*, StreamInfo> PAaudioManager::get_output_stream(int samplera
     return std::make_tuple(stream, info);;
 }
 
+void PAaudioManager::safe_close_stream(PaStream** stream)
+{
+    if (*stream == nullptr) return;
+    Pa_CloseStream(*stream);
+    *stream = nullptr;
+}
+
 int PAaudioManager::get_default_output_device_id()
 {
 #ifdef WIN32
@@ -248,12 +255,6 @@ int PAaudioManager::get_default_input_device_samplerate()
     return outputInfo->defaultSampleRate;
 }
 
-
-ringBuffer* PAaudioManager::get_new_ringbuffer(int capacity)
-{
-    ringBuffer* rb = new ringBuffer(sizeof(float), capacity);
-    return rb;
-}
 
 const std::vector<int> PAaudioManager::get_input_sample_rates(int devidx, bool only_default)
 {
@@ -349,7 +350,7 @@ const std::vector<int> PAaudioManager::get_output_sample_rates(int devidx, bool 
     return samplerates;
 }
 
-const std::vector<std::string> PAaudioManager::get_input_sample_rates_str(int devidx)
+const std::vector<std::string> PAaudioManager::get_input_sample_rates_as_stringlist(int devidx)
 {
     std::vector<std::string> list;
     for (auto rate : get_input_sample_rates(devidx))
@@ -359,7 +360,7 @@ const std::vector<std::string> PAaudioManager::get_input_sample_rates_str(int de
     return list;
 }
 
-const std::vector<std::string> PAaudioManager::get_output_sample_rates_str(int devidx)
+const std::vector<std::string> PAaudioManager::get_output_sample_rates_as_stringlist(int devidx)
 {
     std::vector<std::string> list;
     for (auto rate : get_output_sample_rates(devidx))
