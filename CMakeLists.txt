@@ -12,7 +12,7 @@ endif(UNIX)
 
 option(WITH_RTLSDR "Build with RTL-SDR support" OFF)
 
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "X86_64|AMD64")
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "X86_64|AMD64|x86_64")
     set(PLATFORM_ARCH "elf64-x86-64")
 elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "i.86")
     set(PLATFORM_ARCH "elf32-i386")
@@ -64,7 +64,7 @@ add_subdirectory(resources)
 # Executable rules
 
 add_executable(tapetools ${CPP_FILES})
-target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} "libimgui/include" "libpaaudio/include" "libutils/include" "resources" "libsdr/include")
+target_include_directories(tapetools PRIVATE ${FFTW_INCLUDE_DIRS} ${PORTAUDIO_INCLUDE_DIR} "libimgui/include" "libpaaudio/include" "libutils/include" "resources" "libsdr/include")
 
 # Link rules
 
