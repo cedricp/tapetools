@@ -49,10 +49,10 @@ public:
     PAaudioManager();
     ~PAaudioManager();
 
-    void set_exclusive_mode(bool mode){m_use_exclusive_mode = mode;}
+    void set_exclusive_mode(bool mode);
     bool get_exclusive_mode(){return m_use_exclusive_mode;}
 
-    void set_floatingpoint(bool fp){m_floatingpoint = fp;}
+    void set_floatingpoint(bool fp);
     bool get_is_floatingpoint(){return m_floatingpoint;}
 
     std::tuple<PaStream*, StreamInfo> get_input_stream(int samplerate, int device_idx, float latency, PaStreamCallback* callback, void* userData);

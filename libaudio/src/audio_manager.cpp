@@ -27,6 +27,21 @@ PAaudioManager::~PAaudioManager()
     Pa_Terminate();
 }
 
+void PAaudioManager::set_exclusive_mode(bool mode)
+{
+    m_input_samplerate_cache.clear();
+    m_output_samplerate_cache.clear();
+    m_use_exclusive_mode = mode;
+}
+
+void PAaudioManager::set_floatingpoint(bool fp)
+{
+    m_input_samplerate_cache.clear();
+    m_output_samplerate_cache.clear();
+    m_floatingpoint = fp;
+}
+
+
 void PAaudioManager::scan_devices()
 {
     if (!m_pa_ok) return;
