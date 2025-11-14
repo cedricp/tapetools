@@ -10,7 +10,7 @@
 class WowAndFluterThread : public ASyncTask
 {
     // Data
-    std::vector<double> &m_longterm_audio;
+    const std::vector<double> &m_longterm_audio;
     std::vector<double> &m_wow_flutter_data;
     std::vector<double> &m_wow_flutter_data_x;
     std::vector<double> &m_signal_i;
@@ -23,9 +23,9 @@ class WowAndFluterThread : public ASyncTask
     float m_analysis_time_s;
     float m_filter_freq;
     int   m_decimation;
-    bool &m_compute_fft;
+    const bool &m_compute_fft;
 
-    fftw_plan& m_wowfftplan;
+    const fftw_plan& m_wowfftplan;
     std::vector<double>& m_wow_fftdrawout;
     std::vector<double>& m_wow_fftwowdrawfreqs;
     fftw_complex* m_wow_complex_fftout;

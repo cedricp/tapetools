@@ -298,7 +298,7 @@ void AudioToolWindow::draw_tools_windows()
 {
     if (m_sound_setup_open && !m_sweep_started)
     {
-        m_audiomanager.scan_devices();
+        
         ImGui::SetNextWindowSize(ImVec2(800, 210));
         if (ImGui::Begin("Sound card setup", &m_sound_setup_open))
         {
@@ -330,6 +330,11 @@ void AudioToolWindow::draw_tools_windows()
                 reinit_recorder();
             }
             ImGui::SetItemTooltip("Set the best parameters from the mixer");
+            ImGui::SameLine();
+            if (ImGui::Button("Rescan devices")){
+                m_audiomanager.scan_devices();
+            }
+            ImGui::SetItemTooltip("Refresh device list from current hardware");
 #ifdef WIN32
             if (ImGui::Checkbox("Use WASAPI exclusive mode (recommanded)", &m_wasapi_exclusive))
             {

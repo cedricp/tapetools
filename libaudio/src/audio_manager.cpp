@@ -37,6 +37,9 @@ void PAaudioManager::scan_devices()
     m_output_map.clear();
     m_input_map.clear();
 
+    m_input_samplerate_cache.clear();
+    m_output_samplerate_cache.clear();
+
     for (int i = 0; i < Pa_GetDeviceCount(); ++i){
         const PaDeviceInfo* device_info = Pa_GetDeviceInfo(i);
         if (device_info->maxOutputChannels > 0){
@@ -266,6 +269,11 @@ const std::vector<int> PAaudioManager::get_input_sample_rates(int devidx, bool o
 
     if (deviceInfo == nullptr) return samplerates;
 
+    if (m_input_samplerate_cache.find(devidx) != m_input_samplerate_cache.end())
+    {
+        return m_input_samplerate_cache[devidx];
+    }
+
     PaStreamParameters inputParams;
     inputParams.device = devidx;
     inputParams.channelCount = deviceInfo->maxInputChannels;
@@ -305,6 +313,8 @@ const std::vector<int> PAaudioManager::get_input_sample_rates(int devidx, bool o
         }
     }
 
+    m_input_samplerate_cache[devidx] = samplerates;
+
     return samplerates;
 }
 
@@ -316,7 +326,13 @@ const std::vector<int> PAaudioManager::get_output_sample_rates(int devidx, bool 
 
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(devidx);
 
+    
     if (deviceInfo == nullptr) return samplerates;
+
+    if (m_output_samplerate_cache.find(devidx) != m_output_samplerate_cache.end())
+    {
+        return m_output_samplerate_cache[devidx];
+    }
 
     PaStreamParameters outputParams;
     outputParams.device = devidx;
@@ -346,6 +362,8 @@ const std::vector<int> PAaudioManager::get_output_sample_rates(int devidx, bool 
         PaError err = Pa_IsFormatSupported(nullptr, &outputParams, rate);
         if (err == paFormatIsSupported) samplerates.push_back(rate);
     }
+
+    m_output_samplerate_cache[devidx] = samplerates;
 
     return samplerates;
 }

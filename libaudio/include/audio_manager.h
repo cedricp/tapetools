@@ -23,6 +23,9 @@ class PAaudioManager
     std::vector<std::string> m_output_devices;
     std::vector<int> m_input_map, m_output_map;
 
+    std::map<int, std::vector<int>> m_input_samplerate_cache;
+    std::map<int, std::vector<int>>  m_output_samplerate_cache;
+
     bool m_use_exclusive_mode = false;
     bool m_pa_ok = false;
 
