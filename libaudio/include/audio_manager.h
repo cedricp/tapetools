@@ -26,6 +26,8 @@ class PAaudioManager
     std::map<int, std::vector<int>> m_input_samplerate_cache;
     std::map<int, std::vector<int>>  m_output_samplerate_cache;
 
+    std::vector<PaStream*> m_open_streams;
+
     bool m_use_exclusive_mode = false;
     bool m_pa_ok = false;
     bool m_floatingpoint = true;
@@ -88,6 +90,7 @@ public:
     void flush(){
         scan_devices();
     }
+    void close_open_stream();
 };
 
 

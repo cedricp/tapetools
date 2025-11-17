@@ -306,6 +306,9 @@ void AudioToolWindow::draw_tools_windows()
             {
                 // Disable exclusive mode
                 m_wasapi_exclusive = false;
+                m_audioloopback.destroy();
+                m_audiorecorder.destroy();
+                m_signal_generator.destroy();
                 m_audiomanager.set_exclusive_mode(m_wasapi_exclusive);
                 m_audiomanager.flush();
 
@@ -338,6 +341,9 @@ void AudioToolWindow::draw_tools_windows()
             ImGui::SameLine();
             if (ImGui::Checkbox("use floating point", &m_use_floatingpoint))
             {
+                m_audioloopback.destroy();
+                m_audiorecorder.destroy();
+                m_signal_generator.destroy();
                 m_audiomanager.set_floatingpoint(m_use_floatingpoint);
                 reset_signal_generator();
                 reinit_recorder();

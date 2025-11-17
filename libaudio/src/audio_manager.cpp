@@ -149,6 +149,8 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
         return nullptr;
     }
 
+    m_open_streams.push_back(stream);
+
     return stream;
 }
 
@@ -199,9 +201,9 @@ PaStream*PAaudioManager::get_output_stream(int samplerate, int device_idx, float
         nullptr,  // no input
         &outputParameters,
         samplerate,
-        0, //(unsigned long)round(latency * samplerate),
+        (unsigned long)round(latency * samplerate),
         paClipOff,  // no clipping
-        callback,    // no callback, we’ll use blocking read
+        callback,
         userData
     );
 
@@ -210,12 +212,17 @@ PaStream*PAaudioManager::get_output_stream(int samplerate, int device_idx, float
         return nullptr;
     }
 
+    m_open_streams.push_back(stream);
+
     return stream;
 }
 
 void PAaudioManager::safe_close_stream(PaStream*& stream)
 {
     if (stream == nullptr) return;
+    auto itstream = std::find(m_open_streams.begin(), m_open_streams.end(), stream);
+    if (itstream != m_open_streams.end()) m_open_streams.erase(itstream);
+    Pa_AbortStream(stream);
     Pa_CloseStream(stream);
     stream = nullptr;
 }
@@ -421,4 +428,13 @@ int PAaudioManager::get_default_output_samplerate_idx(int dev)
     if (it == sr.end()) return 0;
     int idx = std::distance(sr.begin(), it);
     return idx;
+}
+
+void PAaudioManager::close_open_stream()
+{
+    for(auto stream : m_open_streams)
+    {
+        Pa_CloseStream(stream);
+    }
+    m_open_streams.clear();
 }

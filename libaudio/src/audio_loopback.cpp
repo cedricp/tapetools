@@ -12,11 +12,14 @@ int PAaudioLoopback::generator_callback(const void* input, void* output,
     PAaudioLoopback* al = (PAaudioLoopback*)userData;
     ringBuffer* rbuffer = al->m_ringbuffer;
     int numChannel = al->m_outstreaminfo.numChannel;
+    bool fp = al->m_outstreaminfo.format == paFloat32;
 
     int numSamples = numChannel * frameCount;
 
     if (rbuffer->getReadAvailable() >= numSamples){
         rbuffer->read(output, numSamples);
+    } else {
+        memset(output, 0, fp ? sizeof(float) : sizeof(int16_t));
     }
 
     return paContinue;

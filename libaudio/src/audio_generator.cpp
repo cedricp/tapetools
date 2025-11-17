@@ -74,8 +74,9 @@ bool PAaudioWaveformGenerator::init(int device_idx, int samplerate, float latenc
 
     m_seconds_offset = 0;
     
-    m_manager.safe_close_stream(m_outstream);
-
+    m_sinewave.set(0, samplerate, 1.);
+    
+    destroy();
     m_outstream = m_manager.get_output_stream(samplerate, device_idx, latency, generator_callback, this, m_outstreaminfo);
 
     if (m_outstream == nullptr){
@@ -84,7 +85,6 @@ bool PAaudioWaveformGenerator::init(int device_idx, int samplerate, float latenc
     }
 
 
-    m_sinewave.set(0, samplerate, 1.);
 
     return true;
 }

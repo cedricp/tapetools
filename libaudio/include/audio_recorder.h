@@ -8,7 +8,6 @@ class PAaudioRecorder
     PaStream* m_instream = nullptr;
     PAaudioManager& m_manager;
     StreamInfo m_instreaminfo;
-    void destroy();
 
     static int recordCallback(
     const void *inputBuffer,
@@ -21,6 +20,7 @@ class PAaudioRecorder
 public:
     PAaudioRecorder(PAaudioManager& audioManager);
     ~PAaudioRecorder();
+    void destroy();
 
     bool init(float latency, int device_idx, int samplerate);
     int get_available_bytes();
