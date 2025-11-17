@@ -287,10 +287,11 @@ void AudioToolWindow::compute_wow_and_flutter()
         // Wait buffer to be completly filled
         return;
     }
-
+    
     App_SDL::get()->release_finished_threads();
     if(App_SDL::get()->get_thread("WFtask")){
         // Check is previous thread has terminated, if not, reject these samples to not overload the UI
+        log_message("Wow and flutter thread too slow... Some audio data will be dropped.");
         return;
     }
 

@@ -45,7 +45,7 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
         return false;
     }
 
-    bool fp = m_manager.get_is_floatingpoint();
+    bool fp = (m_outstreaminfo.format == paFloat32);
     
     m_ringbuffer = new ringBuffer(fp ? sizeof(float) : sizeof(int16_t), ringbuffer_size);
 
@@ -54,7 +54,7 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
 
 bool PAaudioLoopback::add_data(const float data[], int size)
 {
-    bool fp = m_manager.get_is_floatingpoint();
+    bool fp = m_outstreaminfo.format == paFloat32;
 
     if (m_ringbuffer && m_ringbuffer->getWriteAvailable() >= size){
         if (fp)

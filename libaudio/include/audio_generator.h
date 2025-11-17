@@ -11,7 +11,7 @@ public:
     };
 private:
     double m_seconds_offset = 0;
-    double m_pitch;
+    double m_pitch = 1000;
     double m_volume = 1.0;
     double m_fm_freq = 0.0;
     double m_fm_strength = 1.0;

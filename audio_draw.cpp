@@ -862,6 +862,10 @@ void AudioToolWindow::draw_rt_analysis_tab()
         }
 
         m_longterm_audio.clear();
+        if (m_show_wow_flutter)
+        {
+            memset((void*)m_wow_flutter_data.data(), 0, m_wow_flutter_data.size() * sizeof(double));
+        }
     }
     ImGui::SetItemTooltip("Shows wow and flutter panel");
     ImGui::EndChild();

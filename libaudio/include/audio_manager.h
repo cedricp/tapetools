@@ -2,8 +2,8 @@
 
 extern "C"{
 #include <portaudio.h>
-#include "ringbuffer.h"
 }
+#include "ringbuffer.h"
 #include <iostream>
 #include <map>
 #include <vector>

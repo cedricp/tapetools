@@ -137,7 +137,7 @@ bool PAaudioRecorder::get_data(std::vector<float>& data, size_t size)
         return false;
     }
 
-    bool fp = m_manager.get_is_floatingpoint();
+    bool fp = m_instreaminfo.format == paFloat32;
 
     if (data.size() != size) data.resize(size, 0);
 

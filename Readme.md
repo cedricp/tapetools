@@ -24,16 +24,17 @@ Install these libraries with pacman :
 * mingw64/mingw-w64-x86_64-fftw
 * mingw64/mingw-w64-x86_64-SDL2
 * mingw64/mingw-w64-x86_64-glew
-* mingw64/mingw-w64-x86_64-libusb-win32
+* mingw64/mingw-w64-x86_64-libusb-win32 [not mandatory]
+* mingw64/mingw-w64-x86_64-portaudio
 
-# Linux (Ubuntu)
+## Linux (Ubuntu)
 
 Install via apt-get :
 
 * libfftw3-dev
 * libsdl2-dev
 * libglew-dev
-* libusb
+* portaudio
 * cmake
 
 with command : ```sudo apt install libfftw3-dev libsdl2-dev libglew-dev```

@@ -20,7 +20,7 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
     int16_t* dataint = (int16_t*)output;
     float* datafloat = (float*)output;
 
-    bool fp = udata->m_manager.get_is_floatingpoint();
+    bool is_floatingpoint = (info.format == paFloat32);
 
     for (int i = 0; i < frameCount; ++i){
         double sample = 0;
@@ -39,14 +39,10 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
             sample = udata->m_volume  * smoothdata;
         }
 
-        if (fp){
-            for (int channel = 0; channel < info.numChannel; channel ++) {
-                *datafloat++ = sample;
-            }
+        if (is_floatingpoint){
+            for (int channel = 0; channel < info.numChannel; channel ++) *datafloat++ = sample;
         } else {
-            for (int channel = 0; channel < info.numChannel; channel ++) {
-                *dataint++ = sample * INT16_MAX;
-            }
+            for (int channel = 0; channel < info.numChannel; channel ++) *dataint++ = sample * INT16_MAX;
         }
     }
 
@@ -55,7 +51,7 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
 
 PAaudioWaveformGenerator::PAaudioWaveformGenerator(PAaudioManager& manager) : m_manager(manager)
 {
-    m_pitch = 1000;
+
 }
 
 PAaudioWaveformGenerator::~PAaudioWaveformGenerator()
