@@ -4,7 +4,7 @@
 
 class PAaudioRecorder
 {
-    ringBuffer *m_ring_buffer = nullptr;
+    IringBuffer *m_ring_buffer = nullptr;
     PaStream* m_instream = nullptr;
     PAaudioManager& m_manager;
     StreamInfo m_instreaminfo;

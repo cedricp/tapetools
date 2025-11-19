@@ -563,7 +563,8 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
         if (is_buffering)
         {
             snprintf(peak_text, 32, "Buffering...");
-        } else
+        }
+        else
         {
             snprintf(peak_text, 32, "Drift: [%.3f Hz] [%.3f %%]", wow_zero, percent_drift);
         }
@@ -847,30 +848,6 @@ void AudioToolWindow::draw_rt_analysis_tab()
     ImGui::EndChild();
     ImGui::SameLine();
 
-    ImGui::BeginChild("ScopesChildShowRmsVolts", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-    ImGui::ToggleButton("Show voltmeter", &m_show_rms_voltage);
-    ImGui::SetItemTooltip("Shows the voltmeters panel");
-    ImGui::EndChild();
-    ImGui::SameLine();
-
-    ImGui::BeginChild("ScopesChildShowWAF", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-    if (ImGui::ToggleButton("Show Wow&Flutter", &m_show_wow_flutter))
-    {
-        while(App_SDL::get()->get_thread("WFtask"))
-        {
-            App_SDL::get()->release_finished_threads();
-        }
-
-        m_longterm_audio.clear();
-        if (m_show_wow_flutter)
-        {
-            memset((void*)m_wow_flutter_data.data(), 0, m_wow_flutter_data.size() * sizeof(double));
-        }
-    }
-    ImGui::SetItemTooltip("Shows wow and flutter panel");
-    ImGui::EndChild();
-    ImGui::SameLine();
-
     /*
     *   0dBu Ref section 
     */
@@ -1005,14 +982,6 @@ void AudioToolWindow::draw_rt_analysis_tab()
     ImGui::SetItemTooltip("Log scale/linear scale X axis");
     ImGui::EndChild();
 
-    ImGui::SameLine();
-    if (channelcount > 1)
-    {
-        ImGui::BeginChild("ScopesChild5", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
-        ImGui::ToggleButton("Compute L/R phase", &m_compute_channel_phase);
-        ImGui::SetItemTooltip("Enable left/right phase/amplitude differential");
-        ImGui::EndChild();
-    }
     ImGui::SameLine();
     ImGui::BeginChild("ScopesChildFFTWindowMode", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
     ImGui::SetNextItemWidth(150);

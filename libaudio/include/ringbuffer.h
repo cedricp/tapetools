@@ -11,26 +11,26 @@
 #define ReadMemoryBarrier()  __sync_synchronize()
 #define WriteMemoryBarrier() __sync_synchronize()
 
+#include <stdio.h>
 static uint32_t nextPowerOfTwoFP(uint32_t n) {
     if (n == 0) return 1;
-    return 1u << static_cast<uint32_t>(std::ceil(std::log2(n)));
+    uint32_t size = 1u << static_cast<uint32_t>(std::ceil(std::log2(n)));
+    return size;
 }
 
-class ringBuffer
+class IringBuffer
 {
     size_t  bufferSize; /**< Number of elements in FIFO. Power of 2. **/
-    volatile size_t  writeIndex; /**< Index of next writable element. **/
-    volatile size_t  readIndex;  /**< Index of next readable element. **/
     size_t  bigMask;    /**< Used for wrapping indices with extra bit to distinguish full/empty. */
     size_t  smallMask;  /**< Used for fitting indices to buffer. */
     size_t  elementSizeBytes; /**< Number of bytes per element. */
-    char  *buffer;    /**< Pointer to the buffer containing the actual data. */
-
+    char    *buffer;    /**< Pointer to the buffer containing the actual data. */
+    volatile size_t  writeIndex; /**< Index of next writable element. **/
+    volatile size_t  readIndex;  /**< Index of next readable element. **/
 public:
-    ringBuffer(size_t elementSizeBytes, size_t elementCount)
+    IringBuffer(size_t elementSizeBytes, size_t elementCount)
     {
         buffer = nullptr;
-
         elementCount = nextPowerOfTwoFP(elementCount);
         bufferSize = elementCount;
         buffer = (char *)malloc( elementSizeBytes * elementCount );
@@ -40,7 +40,7 @@ public:
         this->elementSizeBytes = elementSizeBytes;
     }
  
-    ~ringBuffer()
+    virtual ~IringBuffer()
     {
         free(buffer);
     }
@@ -187,4 +187,12 @@ private:
         FullMemoryBarrier();
         return readIndex = (readIndex + elementCount) & bigMask;
     }
+};
+
+template<class T>
+class ringBuffer : public IringBuffer
+{
+public:
+    ringBuffer(size_t size) : IringBuffer(sizeof(T), size){};
+    virtual ~ringBuffer(){};
 };

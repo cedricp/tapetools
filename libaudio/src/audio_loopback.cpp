@@ -10,7 +10,7 @@ int PAaudioLoopback::generator_callback(const void* input, void* output,
     if (output == nullptr) return paContinue;
 
     PAaudioLoopback* al = (PAaudioLoopback*)userData;
-    ringBuffer* rbuffer = al->m_ringbuffer;
+    IringBuffer* rbuffer = al->m_ringbuffer;
     int numChannel = al->m_outstreaminfo.numChannel;
     bool fp = al->m_outstreaminfo.format == paFloat32;
 
@@ -40,9 +40,9 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
 {
     destroy();
 
-    int ringbuffer_size = samplerate * latency * m_outstreaminfo.numChannel * 8;
-    
     m_outstream = m_manager.get_output_stream(samplerate, device_idx, latency, generator_callback, this, m_outstreaminfo, channels);
+
+    int ringbuffer_size = samplerate * latency * m_outstreaminfo.numChannel * 2;
 
     if (!m_outstream){
         return false;
@@ -50,7 +50,8 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
 
     bool fp = (m_outstreaminfo.format == paFloat32);
     
-    m_ringbuffer = new ringBuffer(fp ? sizeof(float) : sizeof(int16_t), ringbuffer_size);
+    if (fp) m_ringbuffer = new ringBuffer<float>(ringbuffer_size);
+    else m_ringbuffer    = new ringBuffer<int16_t>(ringbuffer_size);
 
     return true;
 }
@@ -82,10 +83,13 @@ void PAaudioLoopback::pause(bool pause)
 {
     if (!m_outstream) return;
 
-    if (pause){
+    if (pause)
+    {
         Pa_StopStream(m_outstream);
         m_ringbuffer->flush();
-    } else {
+    }
+    else
+    {
         Pa_StartStream(m_outstream);
     }
 }

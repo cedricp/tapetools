@@ -168,7 +168,6 @@ bool AudioToolWindow::compute()
         std::vector<float> audio_data(m_capture_size * channelcount);
 
         if (!m_audioloopback.add_data(m_raw_buffer.data(), m_capture_size * channelcount)){
-            log_message("Error adding audio data\n");
         }
     }
 
@@ -526,8 +525,8 @@ void AudioToolWindow::destroy_capture()
     // Wait WowAndFlutter thread to finish before releasing memory
     wait_wow_thread();
 
-    if (m_fftplanr) fftw_destroy_plan(m_fftplanr);
-    if (m_fftplanl) fftw_destroy_plan(m_fftplanl);
+    if (m_fftplanr)   fftw_destroy_plan(m_fftplanr);
+    if (m_fftplanl)   fftw_destroy_plan(m_fftplanl);
     if (m_fftplanwow) fftw_destroy_plan(m_fftplanwow);
 
     delete[] m_fftinl;
@@ -542,19 +541,19 @@ void AudioToolWindow::destroy_capture()
     delete[] m_current_window_cache;
     m_sound_data_x.clear();
 
-    m_fftinl = nullptr;
-    m_fftoutl = nullptr;
-    m_fftinr = nullptr;
-    m_fftoutr = nullptr;
-    m_fftdrawl = nullptr;
-    m_fftdrawr = nullptr;
-    m_fftfreqs = nullptr;
-    m_fftplanr = nullptr;
-    m_fftplanl = nullptr;
+    m_fftinl    = nullptr;
+    m_fftoutl   = nullptr;
+    m_fftinr    = nullptr;
+    m_fftoutr   = nullptr;
+    m_fftdrawl  = nullptr;
+    m_fftdrawr  = nullptr;
+    m_fftfreqs  = nullptr;
+    m_fftplanr  = nullptr;
+    m_fftplanl  = nullptr;
+    m_rms_fft   = nullptr;
+    m_fftplanwow = nullptr;
     m_wow_complex_out = nullptr;
     m_current_window_cache = nullptr;
-    m_rms_fft = nullptr;
-    m_fftplanwow = nullptr;
 }
 
 void AudioToolWindow::reinit_recorder()

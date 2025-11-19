@@ -227,6 +227,28 @@ void AudioToolWindow::draw()
 
             ImGui::EndMenu();
         }
+        if (ImGui::BeginMenu("Views")){
+            int channelcount = m_audiorecorder.get_channel_count(); 
+
+            ImGui::MenuItem("Show Voltmeter", nullptr, &m_show_rms_voltage);
+            if (ImGui::MenuItem("Show Wow and flutter", nullptr, &m_show_wow_flutter))
+            {
+                while(App_SDL::get()->get_thread("WFtask"))
+                {
+                    App_SDL::get()->release_finished_threads();
+                }
+                // Thread is temrinated, we can do some cleanup...
+                m_longterm_audio.clear();
+                if (m_show_wow_flutter)
+                {
+                    memset((void*)m_wow_flutter_data.data(), 0, m_wow_flutter_data.size() * sizeof(typename decltype(m_wow_flutter_data)::value_type));
+                }
+            }
+            
+            if (channelcount > 1) ImGui::MenuItem("Show L/R channel phase", nullptr, &m_compute_channel_phase);
+
+            ImGui::EndMenu();
+        }
         ImGui::EndMainMenuBar();
     }
 
@@ -306,10 +328,15 @@ void AudioToolWindow::draw_tools_windows()
             {
                 // Disable exclusive mode
                 m_wasapi_exclusive = false;
+                m_use_floatingpoint = true;
+                
+                // Release open streams
                 m_audioloopback.destroy();
                 m_audiorecorder.destroy();
                 m_signal_generator.destroy();
+
                 m_audiomanager.set_exclusive_mode(m_wasapi_exclusive);
+                m_audiomanager.set_floatingpoint(m_use_floatingpoint);
                 m_audiomanager.flush();
 
                 auto &out_devices = m_audiomanager.get_output_devices();
@@ -341,10 +368,14 @@ void AudioToolWindow::draw_tools_windows()
             ImGui::SameLine();
             if (ImGui::Checkbox("use floating point", &m_use_floatingpoint))
             {
+                // Release open streams
                 m_audioloopback.destroy();
                 m_audiorecorder.destroy();
                 m_signal_generator.destroy();
+
                 m_audiomanager.set_floatingpoint(m_use_floatingpoint);
+                m_audiomanager.flush();
+                
                 reset_signal_generator();
                 reinit_recorder();
             }
@@ -352,6 +383,8 @@ void AudioToolWindow::draw_tools_windows()
             if (ImGui::Checkbox("Use WASAPI exclusive mode (recommanded)", &m_wasapi_exclusive))
             {
                 m_audiomanager.set_exclusive_mode(m_wasapi_exclusive);
+                m_audiomanager.flush();
+
                 reset_signal_generator();
                 reinit_recorder();
             }

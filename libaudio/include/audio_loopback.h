@@ -8,7 +8,7 @@ class PAaudioLoopback
     PAaudioManager& m_manager;
     PaStream *m_outstream = nullptr;
     StreamInfo m_outstreaminfo;
-    ringBuffer* m_ringbuffer = nullptr;
+    IringBuffer* m_ringbuffer = nullptr;
     bool m_playing = false;
     int m_numchannels = 0;
 
