@@ -20,6 +20,7 @@ private:
     StreamInfo m_outstreaminfo;
     SineWave m_sinewave;
     PAaudioManager& m_manager;
+    bool m_is_playing = false;
 
     static int generator_callback(const void* input, void* output,
                     unsigned long frameCount,

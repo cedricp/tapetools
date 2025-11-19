@@ -13,14 +13,30 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
     if (output == nullptr) return paContinue;
 
     PAaudioWaveformGenerator* udata = (PAaudioWaveformGenerator*)userData;
+
+    if (statusFlags & paOutputUnderflow){
+        printf("Underflow\n");
+    }
+
+    if (statusFlags & paOutputOverflow){
+        printf("Overflowflow\n");
+    }
+
     const StreamInfo info = udata->get_info();
+    bool is_floatingpoint = (info.format == paFloat32);
+
+    if (!udata->m_is_playing)
+    {
+        memset(output, 0, (is_floatingpoint ? sizeof(float) : sizeof(int16_t)) * frameCount * info.numChannel);
+        return paAbort;
+    }
+
     double float_sample_rate = info.sampleRate;
     double seconds_per_frame = 1.0 / float_sample_rate;
 
     int16_t* dataint = (int16_t*)output;
     float* datafloat = (float*)output;
 
-    bool is_floatingpoint = (info.format == paFloat32);
 
     for (int i = 0; i < frameCount; ++i){
         double sample = 0;
@@ -74,9 +90,10 @@ bool PAaudioWaveformGenerator::init(int device_idx, int samplerate, float latenc
 
     m_seconds_offset = 0;
     
+    destroy();
+    
     m_sinewave.set(0, samplerate, 1.);
     
-    destroy();
     m_outstream = m_manager.get_output_stream(samplerate, device_idx, latency, generator_callback, this, m_outstreaminfo);
 
     if (m_outstream == nullptr){
@@ -103,16 +120,20 @@ bool PAaudioWaveformGenerator::start()
 bool PAaudioWaveformGenerator::pause(bool pause)
 {
     if (m_outstream == nullptr){
-        log_message("audioSine::pause : outstream not initialized\n");
+        log_message("PAaudioWaveformGenerator::pause : outstream not initialized\n");
         return false;
     }
-    if (pause){    
+    if (pause){
+        m_is_playing = false;
+        Pa_AbortStream(m_outstream);
         PaError err = Pa_StopStream(m_outstream);
         return err == paNoError;
     } else {
+        m_is_playing = true;
         PaError err = Pa_StartStream(m_outstream);
         return err == paNoError;
     }
+    return false;
 }
 
 void PAaudioWaveformGenerator::set_pitch(double pitch, double duration)
