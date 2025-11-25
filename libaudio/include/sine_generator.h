@@ -2,23 +2,23 @@
 
 #include <math.h>
 
-struct Transition {
+
+class SineWave {
+    struct Transition {
     double
         amplitude,
         amplitudeStep,
         frequency,
         frequencyStep;
-};
-
-class SineWave {
-    Transition transition;
-public:
+    } transition;
+    
     double
         amplitude,
         rate,           // sample rate
         frequency,      // oscillation Hz.
         phase,          // current phase
         phaseStep;      // phase step
+public:
 
     const double radians = (M_PI * 2);
     bool double_equals(double a, double b)

@@ -504,7 +504,7 @@ void AudioToolWindow::init_capture()
     std::fill(m_wow_flutter_data.begin(), m_wow_flutter_data.end(), 0.);
     std::fill(m_fftdrawwow.begin(), m_fftdrawwow.end(), 0.);
 
-    int fft_flags = FFTW_PRESERVE_INPUT;
+    unsigned int fft_flags = FFTW_PRESERVE_INPUT;
 
     if (m_optimized_fft) fft_flags |= FFTW_MEASURE;
     else fft_flags |= FFTW_ESTIMATE;

@@ -8,8 +8,6 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
                     PaStreamCallbackFlags statusFlags,
                     void* userData)
 {
-    static double smoothdata = 0;
-
     if (output == nullptr) return paContinue;
 
     PAaudioWaveformGenerator* udata = (PAaudioWaveformGenerator*)userData;
@@ -46,13 +44,14 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
         }
         else if (udata->m_mode == WHITE_NOISE)
         {
-            sample = udata->m_volume * (randq64_double()*2.0 -1.0);
+            sample = udata->m_volume * udata->m_whitenoise.sample();
         }
         else if (udata->m_mode == BROWN_NOISE)
         {
-            double rawdata = (randq64_double()*2.0 -1.0);
-            smoothdata = smoothdata - (0.025* (smoothdata - rawdata));
-            sample = udata->m_volume  * smoothdata;
+            sample = udata->m_volume * udata->m_brownnoise.sample();
+        } else if (udata->m_mode == PINK_NOISE)
+        {
+            sample = udata->m_volume *udata->m_pinknoise.sample();
         }
 
         if (is_floatingpoint){

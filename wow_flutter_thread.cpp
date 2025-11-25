@@ -20,13 +20,13 @@ WowAndFluterThread::~WowAndFluterThread()
 {
 }
 
-
 // Main thread WF code
 void WowAndFluterThread::entry()
 {
     Chrono chrono;
 
     // Init low pass filter
+    // That could have been done in the constructor, but the thread is unique 
     m_iq_lowpass_filter.setup(4, m_samplerate, 700, 0.1);
     m_wf_lowpass_filter.setup(4, m_samplerate / m_decimation, m_filter_freq, 0.1);
     m_wf_lowpass_prefilter.setup(4, m_samplerate, m_reference_frequency, 500, 0.2);

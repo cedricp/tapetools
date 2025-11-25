@@ -7,8 +7,13 @@ public:
     enum generatorMode{
         SINE,
         WHITE_NOISE,
-        BROWN_NOISE
+        BROWN_NOISE,
+        PINK_NOISE
     };
+    WhiteNoiseGenerator m_whitenoise;
+    BrownNoiseGenerator m_brownnoise;
+    PinkNoiseGenerator m_pinknoise;
+
 private:
     double m_seconds_offset = 0;
     double m_pitch = 1000;
