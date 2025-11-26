@@ -54,10 +54,9 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
             sample = udata->m_volume *udata->m_pinknoise.sample();
         }
 
-        if (is_floatingpoint){
-            for (int channel = 0; channel < info.numChannel; channel ++) *datafloat++ = sample;
-        } else {
-            for (int channel = 0; channel < info.numChannel; channel ++) *dataint++ = sample * INT16_MAX;
+        for (int channel = 0; channel < info.numChannel; channel ++)
+        {
+            *datafloat++ = is_floatingpoint ? sample : sample * INT16_MAX;
         }
     }
 
