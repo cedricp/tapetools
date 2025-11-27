@@ -36,6 +36,7 @@ class AudioToolWindow : public Widget
     float m_signalgen_latency_s = 0.01f;
     int m_recorder_latency_ms = 100;
     int m_signalgen_volume_db = 0.f;
+    int m_input_gain_db = 0;
     
     int m_audio_out_idx = -1;
     int m_audio_in_idx = -1;
@@ -215,6 +216,7 @@ public:
     void draw_audio_fft_widget(int channelcount, int current_sample_rate, int plotheight);
     void draw_channels_phase_widget(int plotheight);
     void draw_tone_generator_widget();
+    void draw_input_control_widget();
 
     void draw_tools_windows();
     void draw_log_window();

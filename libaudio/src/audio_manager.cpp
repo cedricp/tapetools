@@ -2,6 +2,10 @@
 
 #ifdef WIN32
 #include "pa_win_wasapi.h"
+#include <audioclient.h>
+#include <Mmdeviceapi.h>
+#include <endpointvolume.h>
+#include <windows.h>
 #endif
 
 void log_message(const char* format, ...);
@@ -116,6 +120,7 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
     info.numChannel = inputParameters.channelCount;
     info.sampleRate = samplerate;
     info.format = inputParameters.sampleFormat;
+    info.deviceIndex = device_idx;
 
     PaStream* stream;
     err = Pa_OpenStream(
@@ -194,6 +199,7 @@ PaStream*PAaudioManager::get_output_stream(int samplerate, int device_idx, float
     info.numChannel = outputParameters.channelCount ;
     info.sampleRate = samplerate;
     info.format = outputParameters.sampleFormat;
+    info.deviceIndex = device_idx;
 
     PaStream* stream;
     err = Pa_OpenStream(
@@ -437,4 +443,47 @@ void PAaudioManager::close_open_stream()
         Pa_CloseStream(stream);
     }
     m_open_streams.clear();
+}
+
+bool PAaudioManager::set_IMM_volume(PaDeviceIndex idx, float volume)
+{
+    IMMDevice* pDevice = NULL;
+    PaWasapi_GetIMMDevice(idx, (void**)&pDevice);
+    if (pDevice == NULL) return false;
+
+    IAudioEndpointVolume* pVolume;
+    pDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, NULL, (void**)&pVolume);
+    if (pVolume == NULL) return false;
+
+    pVolume->SetMasterVolumeLevelScalar(volume, NULL);
+    pVolume->Release();
+    return true;
+}
+
+bool PAaudioManager::set_mixer_volume(PaStream* stream, float volume, bool output)
+{
+#ifdef WIN32
+    if (stream == nullptr) return false;
+
+    IAudioClient* audioClient = nullptr;
+    PaWasapi_GetAudioClient(stream, (void**)&audioClient, output ? TRUE : FALSE);
+
+    if (audioClient == nullptr) return false;
+
+    IAudioEndpointVolume* endpointVolume = nullptr;
+    HRESULT hr = audioClient->GetService(__uuidof(IAudioEndpointVolume), (void**)&endpointVolume);
+    if (FAILED(hr) || endpointVolume == nullptr)
+    {
+        return false;
+    }
+
+    hr = endpointVolume->SetMasterVolumeLevelScalar(volume, NULL);
+    if (FAILED(hr)) {
+        endpointVolume->Release();
+        return false;
+    }
+    endpointVolume->Release();
+    return true;
+#endif
+    return false;
 }

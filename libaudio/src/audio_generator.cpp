@@ -143,5 +143,10 @@ void PAaudioWaveformGenerator::set_pitch(double pitch, double duration)
 void PAaudioWaveformGenerator::set_volume(int db, double duration)
 {
     m_volume = pow(10, (double)db/20);   
+    if (m_manager.set_IMM_volume(m_outstreaminfo.deviceIndex, m_volume))
+    {
+        m_sinewave.sine_wave_amplitude_transition(1.0, duration); 
+        return;
+    }
     m_sinewave.sine_wave_amplitude_transition(m_volume, duration); 
 }

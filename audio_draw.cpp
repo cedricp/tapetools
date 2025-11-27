@@ -765,6 +765,21 @@ void AudioToolWindow::draw_channels_phase_widget(int plotheight)
     }
 }
 
+void AudioToolWindow::draw_input_control_widget()
+{
+    ImGui::BeginChild("InputControl", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+    TextCenter("Input control");
+
+    ImGui::BeginChild("ScopesChildTonGenSwitch", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
+    ImGui::SetNextItemWidth(200);
+    if(ImGui::SliderInt("Input gain (dB)", &m_input_gain_db, -60, 0))
+    {
+        m_audiorecorder.set_input_gain(pow(10, m_input_gain_db / 20.0));
+    }
+    ImGui::EndChild();
+    ImGui::EndChild();
+}
+
 void AudioToolWindow::draw_tone_generator_widget()
 {
     
@@ -775,7 +790,7 @@ void AudioToolWindow::draw_tone_generator_widget()
 
     if (!m_sweep_started || m_async_sweep)
     {
-        ImGui::BeginChild("ScopesChildToneGen", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_None);
+        ImGui::BeginChild("ScopesChildToneGen", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         TextCenter("Signal generator");
 
         ImGui::BeginChild("ScopesChildTonGenSwitch", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
@@ -824,6 +839,8 @@ void AudioToolWindow::draw_rt_analysis_tab()
     float padh = 3.0f * ImGui::GetStyle().FramePadding.y + ImGui::GetStyle().ItemSpacing.y;
 
     draw_tone_generator_widget();
+    ImGui::SameLine();
+    draw_input_control_widget();
 
     ImGui::BeginChild("ScopesChildMain", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
     float plotheight = height() / 2.0f - 5.f;
@@ -938,13 +955,13 @@ void AudioToolWindow::draw_rt_analysis_tab()
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildComputeInfo", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::AlignTextToFramePadding();
-        ImGui::Text("Audio process time: %luns", m_total_compute_time);
+        ImGui::Text("Audio process time: %05luns", m_total_compute_time);
         ImGui::EndChild();
 
         ImGui::SameLine();
         ImGui::BeginChild("ScopesChildComputeInfoUI", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::AlignTextToFramePadding();
-        ImGui::Text("UI draw time : %luns", m_ui_time);
+        ImGui::Text("UI draw time : %05luns", m_ui_time);
         ImGui::EndChild();
 
         ImGui::SameLine();

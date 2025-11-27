@@ -165,3 +165,8 @@ float PAaudioRecorder::get_ringbuffer_occupation()
     if (m_ring_buffer == nullptr) return 0;
     return ((float)m_ring_buffer->getReadAvailable() / (float)m_ring_buffer->getBufferSize()) * 100.;
 }
+
+void PAaudioRecorder::set_input_gain(float gain)
+{
+    m_manager.set_IMM_volume(m_instreaminfo.deviceIndex, gain);
+}

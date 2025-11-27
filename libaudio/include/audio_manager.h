@@ -15,6 +15,7 @@ struct StreamInfo
     int numChannel;
     int sampleRate;
     PaSampleFormat format; 
+    PaDeviceIndex deviceIndex;
 };
 
 class PAaudioManager
@@ -46,6 +47,7 @@ class PAaudioManager
         if (in >= m_output_map.size()) return paNoDevice;
         return m_output_map[in];
     }
+
 
 public:
     PAaudioManager();
@@ -84,6 +86,9 @@ public:
 
     int get_default_input_samplerate_idx(int dev);
     int get_default_output_samplerate_idx(int dev);
+
+    bool set_mixer_volume(PaStream* stream, float volume, bool output = true);
+    bool set_IMM_volume(PaDeviceIndex idx, float volume);
 
     bool valid(){return m_pa_ok;}
 

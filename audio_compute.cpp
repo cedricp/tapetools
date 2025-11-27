@@ -583,6 +583,7 @@ void AudioToolWindow::reinit_recorder()
 
     m_audiorecorder.pause(!m_compute_on);
     m_audioloopback.pause(!m_compute_on | !m_audio_loopback_on);
+    m_audiorecorder.set_input_gain(pow(10, m_input_gain_db / 20.0));
 }
 
 void AudioToolWindow::reset_signal_generator()
