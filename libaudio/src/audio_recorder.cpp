@@ -54,8 +54,8 @@ bool PAaudioRecorder::init(float latency, int device_idx, int samplerate)
 
     int bytes_per_sample = Pa_GetSampleSize(m_instreaminfo.format);
     int capacity = get_buffer_size(latency);
-    if (fp) m_ring_buffer = new ringBuffer<float>(capacity*2);
-    else m_ring_buffer = new ringBuffer<int16_t>(capacity*2);
+    if (fp) m_ring_buffer = new ringBuffer<float>(capacity*4);
+    else m_ring_buffer = new ringBuffer<int16_t>(capacity*4);
 
     return true;
 }
@@ -168,5 +168,5 @@ float PAaudioRecorder::get_ringbuffer_occupation()
 
 void PAaudioRecorder::set_input_gain(float gain)
 {
-    m_manager.set_IMM_volume(m_instreaminfo.deviceIndex, gain);
+    m_manager.set_device_mixer_volume(m_instreaminfo.deviceIndex, gain);
 }

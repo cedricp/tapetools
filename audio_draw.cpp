@@ -772,9 +772,9 @@ void AudioToolWindow::draw_input_control_widget()
 
     ImGui::BeginChild("ScopesChildTonGenSwitch", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
     ImGui::SetNextItemWidth(200);
-    if(ImGui::SliderInt("Input gain (dB)", &m_input_gain_db, -60, 0))
+    if(ImGui::SliderInt("Input gain", &m_input_gain, 0, 100))
     {
-        m_audiorecorder.set_input_gain(pow(10, m_input_gain_db / 20.0));
+        m_audiorecorder.set_input_gain((float)m_input_gain / 100.f);
     }
     ImGui::EndChild();
     ImGui::EndChild();

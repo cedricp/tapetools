@@ -189,3 +189,13 @@ static inline double complex_argument(double i, double r)
 {
 	return atan2(i, r);
 }
+
+static inline double db_to_linear(double db)
+{
+	return pow(10.0, db / 20.0);
+}
+
+static inline double linear_to_db(double lin)
+{
+	return 20.0 * log10(lin);
+}

@@ -128,7 +128,7 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
         &inputParameters,
         nullptr,  // no output
         samplerate,
-        0,//(unsigned long)round(latency * samplerate),
+        (unsigned long)round(latency * samplerate),
         paClipOff,  // no clipping
         callback,
         userData);
@@ -445,7 +445,7 @@ void PAaudioManager::close_open_stream()
     m_open_streams.clear();
 }
 
-bool PAaudioManager::set_IMM_volume(PaDeviceIndex idx, float volume)
+bool PAaudioManager::set_device_mixer_volume(PaDeviceIndex idx, float volume)
 {
     IMMDevice* pDevice = NULL;
     PaWasapi_GetIMMDevice(idx, (void**)&pDevice);
@@ -460,7 +460,7 @@ bool PAaudioManager::set_IMM_volume(PaDeviceIndex idx, float volume)
     return true;
 }
 
-bool PAaudioManager::set_mixer_volume(PaStream* stream, float volume, bool output)
+bool PAaudioManager::set_mixer_volume_tmp(PaStream* stream, float volume, bool output)
 {
 #ifdef WIN32
     if (stream == nullptr) return false;

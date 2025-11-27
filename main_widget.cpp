@@ -510,7 +510,7 @@ void AudioToolWindow::get_configuration_int(std::map<std::string, int> &cnf)
     cnf["inSampleRateIdx"] = m_in_sample_rate_idx;
     cnf["outSampleRateIdx"] = m_out_sample_rate_idx;
     cnf["use_floatingpoint"] = m_use_floatingpoint;
-    cnf["input_gain"] = m_input_gain_db;
+    cnf["input_gain"] = m_input_gain;
     cnf["output_gain"] = m_signalgen_volume_db;
 }
 
@@ -583,7 +583,7 @@ void AudioToolWindow::set_configuration_int(std::string s, int i)
         m_use_floatingpoint = i;
     } else if (s == "input_gain")
     {
-        m_input_gain_db = i;
+        m_input_gain = i;
     } else if (s == "output_gain")
     {
         m_signalgen_volume_db = i;

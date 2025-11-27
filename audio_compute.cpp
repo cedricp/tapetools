@@ -218,7 +218,7 @@ bool AudioToolWindow::compute()
         m_fftfreqs[i] = fft_step * (double)(i);
         double fftout = sqrt(m_fftoutl[i][0] * m_fftoutl[i][0] + m_fftoutl[i][1] * m_fftoutl[i][1]) * inv_fft_capture_size;
         fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
-        fftout = std::max(20.0 * log10(fftout), -200.0);
+        fftout = std::max(linear_to_db(fftout), -200.0);
         m_fftdrawl[i] = std::isnan(fftout) ? -200.f : fftout;
         if (m_fft_channel_left) sum += fftout;
 
@@ -226,7 +226,7 @@ bool AudioToolWindow::compute()
         {
             double fftout = sqrt(m_fftoutr[i][0] * m_fftoutr[i][0] + m_fftoutr[i][1] * m_fftoutr[i][1]) * inv_fft_capture_size;
             fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
-            fftout = std::max(20.0 * log10(fftout), -200.0);
+            fftout = std::max(linear_to_db(fftout), -200.0);
             m_fftdrawr[i] = std::isnan(fftout) ? -200.f : fftout;
             if (m_fft_channel_right) sum += fftout;
         }
@@ -462,7 +462,7 @@ void AudioToolWindow::compute_thdn()
 
     noise_rms = sqrt(noise_rms) * invsqrt2 * inv_capture_size;
 
-    double noise_db = 20. * log10(noise_rms);
+    double noise_db = linear_to_db(noise_rms);
 
     m_thdn = noise_rms / m_fft_rms;
     m_thddb = 20.0 * log10(m_thdn);
@@ -583,7 +583,7 @@ void AudioToolWindow::reinit_recorder()
 
     m_audiorecorder.pause(!m_compute_on);
     m_audioloopback.pause(!m_compute_on | !m_audio_loopback_on);
-    m_audiorecorder.set_input_gain(pow(10, m_input_gain_db / 20.0));
+    m_audiorecorder.set_input_gain((float)m_input_gain / 100.f);
 }
 
 void AudioToolWindow::reset_signal_generator()
@@ -602,6 +602,7 @@ void AudioToolWindow::reset_signal_generator()
     m_signal_generator.set_pitch(m_signal_generator_pitch);
     m_signal_generator.start();
     m_signal_generator.pause(!m_signal_generator_switch);
+    m_signal_generator.set_volume(m_signalgen_volume_db);
 }
 
 void AudioToolWindow::process_sweep()
