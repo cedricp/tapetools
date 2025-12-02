@@ -63,7 +63,7 @@ class AudioToolWindow : public Widget
     double *m_fftinr = nullptr;
     fftw_complex *m_fftoutr = nullptr;
     fftw_complex *m_wow_complex_out = nullptr;
-    double *m_rms_fft = nullptr;
+    double *m_fft_modules = nullptr;
     double *m_fftdrawl = nullptr;
     double *m_fftdrawr = nullptr;
     double *m_fftfreqs = nullptr;

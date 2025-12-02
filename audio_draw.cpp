@@ -776,13 +776,13 @@ void AudioToolWindow::draw_input_control_widget()
     {
         m_audiorecorder.set_input_gain((float)m_input_gain / 100.f);
     }
+    ImGui::SetItemTooltip("Set the input gain (may not be supported by all devices)");
     ImGui::EndChild();
     ImGui::EndChild();
 }
 
 void AudioToolWindow::draw_tone_generator_widget()
 {
-    
     const char* generator_presets[] = {"Sine","White noise", "Brown noise", "Pink noise"};
     static int fm_freq = 0;
     static float fm_vol = 1;

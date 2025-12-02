@@ -10,7 +10,6 @@ class PAaudioLoopback
     StreamInfo m_outstreaminfo;
     IringBuffer* m_ringbuffer = nullptr;
     bool m_playing = false;
-    int m_numchannels = 0;
 
     static int generator_callback(const void* input, void* output,
                     unsigned long frameCount,

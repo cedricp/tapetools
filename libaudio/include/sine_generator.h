@@ -47,7 +47,7 @@ public:
         phaseStep = 0;
     }
 
-    double sine_wave_sample() {
+    double sample() {
         double sample = amplitude * sin(phase);
         phase += phaseStep;
         if (transition.frequencyStep) {

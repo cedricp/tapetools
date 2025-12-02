@@ -148,6 +148,12 @@ bool AudioToolWindow::compute()
         return false;
     }
 
+    // Fill audio for audio loopback
+    if (m_audio_loopback_on)
+    {
+        m_audioloopback.add_data(m_raw_buffer.data(), m_capture_size * channelcount);
+    }
+    
     const int fft_capture_size = m_capture_size / 2;
     const double current_sample_rate = m_audiorecorder.get_current_samplerate();
     const double half_sample_rate = current_sample_rate / 2.0;
@@ -161,15 +167,6 @@ bool AudioToolWindow::compute()
     if (m_sound_data_x.size() != m_capture_size) m_sound_data_x.resize(m_capture_size);
 
     m_rms_left = m_rms_right = 0.0;
-
-    // Fill audio for audio loopback
-    if (m_audio_loopback_on)
-    {
-        std::vector<float> audio_data(m_capture_size * channelcount);
-
-        if (!m_audioloopback.add_data(m_raw_buffer.data(), m_capture_size * channelcount)){
-        }
-    }
 
     Chrono chrono;
     for (int i = 0; i < m_capture_size; i++)
@@ -207,6 +204,7 @@ bool AudioToolWindow::compute()
     }
     
     double* current_fft_draw = m_fft_channel_left  ? m_fftdrawl : m_fftdrawr;
+
     // Compute and fill audio FFT
     ::fftw_execute(m_fftplanl);
     if (channelcount > 1) ::fftw_execute(m_fftplanr);
@@ -216,7 +214,7 @@ bool AudioToolWindow::compute()
     for (int i = 0; i < fft_capture_size; ++i)
     {
         m_fftfreqs[i] = fft_step * (double)(i);
-        double fftout = sqrt(m_fftoutl[i][0] * m_fftoutl[i][0] + m_fftoutl[i][1] * m_fftoutl[i][1]) * inv_fft_capture_size;
+        double fftout = complex_module(m_fftoutl[i][0], m_fftoutl[i][1]) * inv_fft_capture_size;
         fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
         fftout = std::max(linear_to_db(fftout), -200.0);
         m_fftdrawl[i] = std::isnan(fftout) ? -200.f : fftout;
@@ -224,7 +222,7 @@ bool AudioToolWindow::compute()
 
         if (channelcount > 1)
         {
-            double fftout = sqrt(m_fftoutr[i][0] * m_fftoutr[i][0] + m_fftoutr[i][1] * m_fftoutr[i][1]) * inv_fft_capture_size;
+            double fftout = complex_module(m_fftoutr[i][0], m_fftoutr[i][1]) * inv_fft_capture_size;
             fftout *= m_window_amplitude_correction[m_fft_window_fn_index];
             fftout = std::max(linear_to_db(fftout), -200.0);
             m_fftdrawr[i] = std::isnan(fftout) ? -200.f : fftout;
@@ -321,8 +319,8 @@ void AudioToolWindow::compute_channels_phase()
     m_phase_diff_degrees = wrap_phase(right_phase - left_phase) * 180. / M_PI;
 
     // Compute amplitude difference (diff of complex modules)
-    double left_amplitude  = sqrt( ( (*left_comp)[0] * (*left_comp)[0] ) + ( (*left_comp)[1] * (*left_comp)[1]) ) / fft_capture_size;
-    double right_amplitude = sqrt( ( (*right_comp)[0] * (*right_comp)[0] ) + ( (*right_comp)[1] * (*right_comp)[1]) ) / fft_capture_size;
+    double left_amplitude  = complex_module((*left_comp)[0], (*left_comp)[1]) / fft_capture_size;
+    double right_amplitude = complex_module((*right_comp)[0], (*right_comp)[1]) / fft_capture_size;
 
     // Convert to dB
     m_left_right_db = 20. * log10(left_amplitude / right_amplitude);
@@ -375,18 +373,35 @@ void AudioToolWindow::compute_thd()
 
     // Compute Total Harmonic Distortion
     // Source http://www.r-type.org/addtext/add183.htm
+    // This method also works and give same results as the one below
+
+    // if (m_fft_found_peaks)
+    // {
+    //     m_thd = 0;
+    //     double fundamental_db = current_fft_draw[m_fft_harmonics_idx[0]];
+    //     double totdbc = 0;
+    //     for (int i = 1; i < m_fft_found_peaks; ++i)
+    //     {
+    //         double dBc = current_fft_draw[m_fft_harmonics_idx[i]] - fundamental_db;
+    //         totdbc += pow(10.0, dBc / 10.0);
+    //     }
+    //     m_thd = sqrt(totdbc) * 100.;
+    // }
+
     if (m_fft_found_peaks)
     {
         m_thd = 0;
-        double fundamental_db = current_fft_draw[m_fft_harmonics_idx[0]];
-        double totdbc = 0;
+        double fundamental_mod = to_rms(complex_module(m_fftoutl[m_fft_harmonics_idx[0]][0], m_fftoutl[m_fft_harmonics_idx[0]][1]));
+        fundamental_mod *= m_window_energy_correction[m_fft_window_fn_index];
+
+        double total = 0;
         for (int i = 1; i < m_fft_found_peaks; ++i)
         {
-            double dBc = current_fft_draw[m_fft_harmonics_idx[i]] - fundamental_db;
-            totdbc += pow(10.0, dBc / 10.0);
+            double mod = to_rms(complex_module(m_fftoutl[m_fft_harmonics_idx[i]][0], m_fftoutl[m_fft_harmonics_idx[i]][1]));
+            mod *= m_window_energy_correction[i];
+            total += mod*mod / (fundamental_mod*fundamental_mod);
         }
-
-        m_thd = sqrt(totdbc) * 100.;
+        m_thd = sqrt(total) * 100.;
     }
 }
 
@@ -405,11 +420,11 @@ void AudioToolWindow::compute_thdn()
     m_fft_rms = 0;
     for (int i = 1; i < fft_capture_size; ++i)
     {
-        double fft_module = sqrt(current_fft[i][0] * current_fft[i][0] + current_fft[i][1] * current_fft[i][1]);
+        double fft_module = complex_module(current_fft[i][0], current_fft[i][1]);
         fft_module *= m_window_energy_correction[m_fft_window_fn_index];
         fft_module *= fft_module;
-        m_fft_rms += fft_module;
-        m_rms_fft[i] = fft_module;
+        m_fft_rms  += fft_module;
+        m_fft_modules[i] = fft_module;
         
         if (fft_module > max_val)
         {
@@ -423,23 +438,23 @@ void AudioToolWindow::compute_thdn()
     double tmp = max_val;
     for (int i = max_val_index; i < fft_capture_size; ++i)
     {
-        if (m_rms_fft[i] > tmp)
+        if (m_fft_modules[i] > tmp)
         {
             m_fft_fund_idx_range_max = i;
             break;
         }
-        tmp = m_rms_fft[i];
+        tmp = m_fft_modules[i];
     }
     
     tmp = max_val;
     for (int i= max_val_index; i >= 0; --i)
     {
-        if (m_rms_fft[i] > tmp)
+        if (m_fft_modules[i] > tmp)
         {
             m_fft_fund_idx_range_min = i;
             break;
         }
-        tmp = m_rms_fft[i];
+        tmp = m_fft_modules[i];
     }
 
     if (m_fft_fund_idx_range_max - m_fft_fund_idx_range_min <=0)
@@ -452,20 +467,20 @@ void AudioToolWindow::compute_thdn()
     // Start at 1, we don't want DC value
     for (int i = 1; i < m_fft_fund_idx_range_min; ++i)
     {
-        noise_rms += m_rms_fft[i];
+        noise_rms += m_fft_modules[i];
     }
 
     for (int i = m_fft_fund_idx_range_max; i < fft_capture_size; ++i)
     {
-        noise_rms += m_rms_fft[i];
+        noise_rms += m_fft_modules[i];
     }
 
-    noise_rms = sqrt(noise_rms) * invsqrt2 * inv_capture_size;
+    noise_rms = to_rms(sqrt(noise_rms)) * inv_capture_size;
 
     double noise_db = linear_to_db(noise_rms);
 
     m_thdn = noise_rms / m_fft_rms;
-    m_thddb = 20.0 * log10(m_thdn);
+    m_thddb = linear_to_db(m_thdn);
     m_thdn *= 100.0;
 }
 
@@ -491,7 +506,7 @@ void AudioToolWindow::init_capture()
     m_fftdrawl  = new double[fft_capture_size];
     m_fftdrawr  = new double[fft_capture_size];
     m_fftfreqs  = new double[fft_capture_size];   
-    m_rms_fft   = new double[fft_capture_size];
+    m_fft_modules   = new double[fft_capture_size];
     m_current_window_cache  = new double[capture_size];
     m_wow_complex_out       = new fftw_complex[wow_capture_size];
 
@@ -537,7 +552,7 @@ void AudioToolWindow::destroy_capture()
     delete[] m_fftdrawr;
     delete[] m_fftfreqs;
     delete[] m_wow_complex_out;
-    delete[] m_rms_fft;
+    delete[] m_fft_modules;
     delete[] m_current_window_cache;
     m_sound_data_x.clear();
 
@@ -550,7 +565,7 @@ void AudioToolWindow::destroy_capture()
     m_fftfreqs  = nullptr;
     m_fftplanr  = nullptr;
     m_fftplanl  = nullptr;
-    m_rms_fft   = nullptr;
+    m_fft_modules   = nullptr;
     m_fftplanwow = nullptr;
     m_wow_complex_out = nullptr;
     m_current_window_cache = nullptr;

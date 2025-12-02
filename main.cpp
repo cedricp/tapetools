@@ -11,6 +11,9 @@ public:
         size_t font_data_size = _font_blob_end - _font_blob_start;
         load_font_from_memory((const char*)_font_blob_start, font_data_size, 14);
         m_audiotool = new AudioToolWindow(this);
+
+        // Laziness not enabled...
+        set_lazy_mode(false);
     }
 
     bool probe_event() override

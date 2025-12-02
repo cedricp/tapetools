@@ -41,7 +41,7 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
         double sample = 0;
         if (udata->m_mode == SINE)
         {
-            sample = udata->m_volume * udata->m_sinewave.sine_wave_sample();
+            sample = udata->m_volume * udata->m_sinewave.sample();
         }
         else if (udata->m_mode == WHITE_NOISE)
         {

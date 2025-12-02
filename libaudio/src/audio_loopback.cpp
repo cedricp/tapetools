@@ -11,15 +11,17 @@ int PAaudioLoopback::generator_callback(const void* input, void* output,
 
     PAaudioLoopback* al = (PAaudioLoopback*)userData;
     IringBuffer* rbuffer = al->m_ringbuffer;
-    int numChannel = al->m_outstreaminfo.numChannel;
+    if (rbuffer == nullptr) return paContinue;
+
+    int numChannels = al->m_outstreaminfo.numChannel;
     bool fp = al->m_outstreaminfo.format == paFloat32;
 
-    int numSamples = numChannel * frameCount;
+    int numSamples = numChannels * frameCount;
 
     if (rbuffer->getReadAvailable() >= numSamples){
         rbuffer->read(output, numSamples);
     } else {
-        memset(output, 0, fp ? sizeof(float) : sizeof(int16_t));
+        memset(output, 0, (fp ? sizeof(float) : sizeof(int16_t)) * numSamples);
     }
 
     return paContinue;
@@ -33,7 +35,6 @@ void PAaudioLoopback::destroy()
     m_ringbuffer = nullptr;
 
     m_playing = false;
-    m_numchannels = 0;
 }
 
 bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int channels)
@@ -42,13 +43,13 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
 
     m_outstream = m_manager.get_output_stream(samplerate, device_idx, latency, generator_callback, this, m_outstreaminfo, channels);
 
-    int ringbuffer_size = samplerate * latency * m_outstreaminfo.numChannel * 2;
+    int ringbuffer_size = samplerate * latency * m_outstreaminfo.numChannel * 4;
 
     if (!m_outstream){
         return false;
     }
 
-    bool fp = (m_outstreaminfo.format == paFloat32);
+    bool fp = m_manager.get_is_floatingpoint();
     
     if (fp) m_ringbuffer = new ringBuffer<float>(ringbuffer_size);
     else m_ringbuffer    = new ringBuffer<int16_t>(ringbuffer_size);
@@ -58,10 +59,9 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
 
 bool PAaudioLoopback::add_data(const float data[], int size)
 {
-    bool fp = m_outstreaminfo.format == paFloat32;
 
-    if (m_ringbuffer && m_ringbuffer->getWriteAvailable() >= size){
-        if (fp)
+    if (m_ringbuffer && (m_ringbuffer->getWriteAvailable() >= size)){
+        if (m_manager.get_is_floatingpoint())
         {
             m_ringbuffer->write(data, size);
             return true;
@@ -86,10 +86,10 @@ void PAaudioLoopback::pause(bool pause)
     if (pause)
     {
         Pa_StopStream(m_outstream);
-        m_ringbuffer->flush();
     }
     else
     {
+        m_ringbuffer->flush();
         Pa_StartStream(m_outstream);
     }
 }

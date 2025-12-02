@@ -143,7 +143,7 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
             &inputParameters,
             nullptr,  // no output
             samplerate,
-            0, //(unsigned long)round(latency * samplerate),
+            0,//(unsigned long)round(latency * samplerate) / 2,
             paClipOff,  // no clipping
             callback,
             userData);
@@ -207,7 +207,7 @@ PaStream*PAaudioManager::get_output_stream(int samplerate, int device_idx, float
         nullptr,  // no input
         &outputParameters,
         samplerate,
-        (unsigned long)round(latency * samplerate),
+        0,//(unsigned long)round(latency * samplerate) / 2,
         paClipOff,  // no clipping
         callback,
         userData

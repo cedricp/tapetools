@@ -199,3 +199,8 @@ static inline double linear_to_db(double lin)
 {
 	return 20.0 * log10(lin);
 }
+
+static inline double to_rms(double peak)
+{
+	return peak / sqrt(2.0);
+}
