@@ -445,8 +445,28 @@ void PAaudioManager::close_open_stream()
     m_open_streams.clear();
 }
 
-bool PAaudioManager::set_device_mixer_volume(PaDeviceIndex idx, float volume)
+bool PAaudioManager::set_device_mixer_volume_db(PaDeviceIndex idx, float volume)
 {
+#ifdef WIN32
+    IMMDevice* pDevice = NULL;
+    PaWasapi_GetIMMDevice(idx, (void**)&pDevice);
+    if (pDevice == NULL) return false;
+
+    IAudioEndpointVolume* pVolume;
+    pDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, NULL, (void**)&pVolume);
+    if (pVolume == NULL) return false;
+
+    pVolume->SetMasterVolumeLevel(volume, NULL);
+    pVolume->Release();
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool PAaudioManager::set_device_mixer_volume_scalar(PaDeviceIndex idx, float volume)
+{
+#ifdef WIN32
     IMMDevice* pDevice = NULL;
     PaWasapi_GetIMMDevice(idx, (void**)&pDevice);
     if (pDevice == NULL) return false;
@@ -458,32 +478,25 @@ bool PAaudioManager::set_device_mixer_volume(PaDeviceIndex idx, float volume)
     pVolume->SetMasterVolumeLevelScalar(volume, NULL);
     pVolume->Release();
     return true;
+#else
+    return false;
+#endif
 }
 
-bool PAaudioManager::set_mixer_volume_tmp(PaStream* stream, float volume, bool output)
+void PAaudioManager::get_volume_range_db(PaDeviceIndex idx, float &min_db, float &max_db)
 {
 #ifdef WIN32
-    if (stream == nullptr) return false;
+    IMMDevice* pDevice = NULL;
+    PaWasapi_GetIMMDevice(idx, (void**)&pDevice);
+    if (pDevice == NULL) return;
 
-    IAudioClient* audioClient = nullptr;
-    PaWasapi_GetAudioClient(stream, (void**)&audioClient, output ? TRUE : FALSE);
+    IAudioEndpointVolume* pVolume = nullptr;
 
-    if (audioClient == nullptr) return false;
+    pDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, NULL, (void**)&pVolume);
 
-    IAudioEndpointVolume* endpointVolume = nullptr;
-    HRESULT hr = audioClient->GetService(__uuidof(IAudioEndpointVolume), (void**)&endpointVolume);
-    if (FAILED(hr) || endpointVolume == nullptr)
-    {
-        return false;
-    }
+    if (pVolume == NULL) return;
 
-    hr = endpointVolume->SetMasterVolumeLevelScalar(volume, NULL);
-    if (FAILED(hr)) {
-        endpointVolume->Release();
-        return false;
-    }
-    endpointVolume->Release();
-    return true;
-#endif
-    return false;
+    pVolume->GetVolumeRange(&min_db, &max_db, NULL);
+    pVolume->Release();
+#endif 
 }

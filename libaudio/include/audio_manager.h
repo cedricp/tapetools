@@ -87,8 +87,10 @@ public:
     int get_default_input_samplerate_idx(int dev);
     int get_default_output_samplerate_idx(int dev);
 
-    bool set_mixer_volume_tmp(PaStream* stream, float volume, bool output = true);
-    bool set_device_mixer_volume(PaDeviceIndex idx, float volume);
+    bool set_device_mixer_volume_db(PaDeviceIndex idx, float volume);
+    bool set_device_mixer_volume_scalar(PaDeviceIndex idx, float volume);
+
+    void get_volume_range_db(PaDeviceIndex idx, float &min_db, float &max_db);
 
     bool valid(){return m_pa_ok;}
 

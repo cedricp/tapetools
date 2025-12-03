@@ -512,6 +512,7 @@ void AudioToolWindow::get_configuration_int(std::map<std::string, int> &cnf)
     cnf["use_floatingpoint"] = m_use_floatingpoint;
     cnf["input_gain"] = m_input_gain;
     cnf["output_gain"] = m_signalgen_volume_db;
+    cnf["hw_out_gain"] = m_output_hw_volume_db;
 }
 
 void AudioToolWindow::log_message(std::string msg)
@@ -587,6 +588,9 @@ void AudioToolWindow::set_configuration_int(std::string s, int i)
     } else if (s == "output_gain")
     {
         m_signalgen_volume_db = i;
+    } else if (s == "hw_out_gain")
+    {
+        m_output_hw_volume_db = i;
     }
 }
 

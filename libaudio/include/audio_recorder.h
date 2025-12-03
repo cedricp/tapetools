@@ -35,5 +35,11 @@ public:
     int get_buffer_size(float time, bool channels_mult = true);
     float get_ringbuffer_occupation();
 
-    void set_input_gain(float gain);
+    void set_input_gain_db(float gain);
+    void set_input_gain_linear(float gain);
+
+    void get_input_volume_range_db(float &min_db, float &max_db){
+        return m_manager.get_volume_range_db(m_instreaminfo.deviceIndex, min_db, max_db);
+    }
+
 };

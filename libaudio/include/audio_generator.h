@@ -47,6 +47,7 @@ public:
     int  get_samplerate();
 
     void set_pitch(double pitch, double duration = 0.1);
+    void set_hw_volume(float vol);
     void set_volume(int db, double duration = 0.1);
 
     void set_mode(int m){m_mode = m;}

@@ -598,7 +598,8 @@ void AudioToolWindow::reinit_recorder()
 
     m_audiorecorder.pause(!m_compute_on);
     m_audioloopback.pause(!m_compute_on | !m_audio_loopback_on);
-    m_audiorecorder.set_input_gain((float)m_input_gain / 100.f);
+    m_audiorecorder.get_input_volume_range_db(m_input_volume_min, m_input_volume_max); 
+    m_audiorecorder.set_input_gain_db(m_input_gain);
 }
 
 void AudioToolWindow::reset_signal_generator()
@@ -618,6 +619,7 @@ void AudioToolWindow::reset_signal_generator()
     m_signal_generator.start();
     m_signal_generator.pause(!m_signal_generator_switch);
     m_signal_generator.set_volume(m_signalgen_volume_db);
+    m_signal_generator.set_hw_volume(db_to_linear(m_output_hw_volume_db));
 }
 
 void AudioToolWindow::process_sweep()

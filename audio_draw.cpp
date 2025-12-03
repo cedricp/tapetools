@@ -772,9 +772,9 @@ void AudioToolWindow::draw_input_control_widget()
 
     ImGui::BeginChild("ScopesChildTonGenSwitch", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
     ImGui::SetNextItemWidth(200);
-    if(ImGui::SliderInt("Input gain", &m_input_gain, 0, 100))
+    if(ImGui::SliderInt("Input dB gain", &m_input_gain, (int)m_input_volume_min, (int)m_input_volume_max))
     {
-        m_audiorecorder.set_input_gain((float)m_input_gain / 100.f);
+        m_audiorecorder.set_input_gain_linear(db_to_linear(m_input_gain));
     }
     ImGui::SetItemTooltip("Set the input gain (may not be supported by all devices)");
     ImGui::EndChild();
@@ -823,6 +823,12 @@ void AudioToolWindow::draw_tone_generator_widget()
             m_signal_generator.set_volume(m_signalgen_volume_db);
         }
         ImGui::SetItemTooltip("Set the generator intensity");
+        ImGui::SameLine();
+        if(ImGui::SliderInt("HW volume", &m_output_hw_volume_db, -60, 0, "%d dB"))
+        {
+            m_signal_generator.set_hw_volume(db_to_linear(m_output_hw_volume_db));
+        }
+        ImGui::SetItemTooltip("Set the hardware output volume");
         ImGui::EndChild();
 
         ImGui::EndChild();

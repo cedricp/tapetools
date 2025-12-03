@@ -1,4 +1,5 @@
 #include "audio_recorder.h"
+#include <utils.h>
 
 int PAaudioRecorder::recordCallback(
     const void *inputBuffer,
@@ -166,7 +167,12 @@ float PAaudioRecorder::get_ringbuffer_occupation()
     return ((float)m_ring_buffer->getReadAvailable() / (float)m_ring_buffer->getBufferSize()) * 100.;
 }
 
-void PAaudioRecorder::set_input_gain(float gain)
+void PAaudioRecorder::set_input_gain_db(float gain)
 {
-    m_manager.set_device_mixer_volume(m_instreaminfo.deviceIndex, gain);
+    m_manager.set_device_mixer_volume_db(m_instreaminfo.deviceIndex, gain);
+}
+
+void PAaudioRecorder::set_input_gain_linear(float gain)
+{
+    m_manager.set_device_mixer_volume_scalar(m_instreaminfo.deviceIndex, gain);
 }

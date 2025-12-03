@@ -13,14 +13,6 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
 
     PAaudioWaveformGenerator* udata = (PAaudioWaveformGenerator*)userData;
 
-    if (statusFlags & paOutputUnderflow){
-        printf("Underflow\n");
-    }
-
-    if (statusFlags & paOutputOverflow){
-        printf("Overflowflow\n");
-    }
-
     const StreamInfo info = udata->get_info();
     bool is_floatingpoint = (info.format == paFloat32);
 
@@ -36,23 +28,23 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
     int16_t* dataint = (int16_t*)output;
     float* datafloat = (float*)output;
 
-
+    float volume = udata->m_volume;
     for (int i = 0; i < frameCount; ++i){
         double sample = 0;
         if (udata->m_mode == SINE)
         {
-            sample = udata->m_volume * udata->m_sinewave.sample();
+            sample = volume * udata->m_sinewave.sample();
         }
         else if (udata->m_mode == WHITE_NOISE)
         {
-            sample = udata->m_volume * udata->m_whitenoise.sample();
+            sample = volume * udata->m_whitenoise.sample();
         }
         else if (udata->m_mode == BROWN_NOISE)
         {
-            sample = udata->m_volume * udata->m_brownnoise.sample();
+            sample = volume * udata->m_brownnoise.sample();
         } else if (udata->m_mode == PINK_NOISE)
         {
-            sample = udata->m_volume *udata->m_pinknoise.sample();
+            sample = volume * udata->m_pinknoise.sample();
         }
 
         for (int channel = 0; channel < info.numChannel; channel ++)
@@ -144,11 +136,10 @@ void PAaudioWaveformGenerator::set_pitch(double pitch, double duration)
 void PAaudioWaveformGenerator::set_volume(int db, double duration)
 {
     m_volume = db_to_linear(db);   
-    if (m_manager.set_device_mixer_volume(m_outstreaminfo.deviceIndex, m_volume))
-    {
-        m_sinewave.sine_wave_amplitude_transition(1.0, duration); 
-        return;
-    }
-    log_message("Cannot set IMM volume, using software gain control\n");
-    m_sinewave.sine_wave_amplitude_transition(m_volume, duration); 
+    m_sinewave.sine_wave_amplitude_transition(1.0, duration); 
+}
+
+void PAaudioWaveformGenerator::set_hw_volume(float vol)
+{
+    m_manager.set_device_mixer_volume_scalar(m_outstreaminfo.deviceIndex, vol);
 }
