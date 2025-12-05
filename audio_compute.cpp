@@ -391,14 +391,14 @@ void AudioToolWindow::compute_thd()
     if (m_fft_found_peaks)
     {
         m_thd = 0;
-        double fundamental_mod = to_rms(complex_module(m_fftoutl[m_fft_harmonics_idx[0]][0], m_fftoutl[m_fft_harmonics_idx[0]][1]));
-        fundamental_mod *= m_window_energy_correction[m_fft_window_fn_index];
+        double fundamental_mod = complex_module(m_fftoutl[m_fft_harmonics_idx[0]][0], m_fftoutl[m_fft_harmonics_idx[0]][1]);
+        fundamental_mod *= m_window_amplitude_correction[m_fft_window_fn_index];
 
         double total = 0;
         for (int i = 1; i < m_fft_found_peaks; ++i)
         {
-            double mod = to_rms(complex_module(m_fftoutl[m_fft_harmonics_idx[i]][0], m_fftoutl[m_fft_harmonics_idx[i]][1]));
-            mod *= m_window_energy_correction[i];
+            double mod = complex_module(m_fftoutl[m_fft_harmonics_idx[i]][0], m_fftoutl[m_fft_harmonics_idx[i]][1]);
+            mod *= m_window_amplitude_correction[i];
             total += mod*mod / (fundamental_mod*fundamental_mod);
         }
         m_thd = sqrt(total) * 100.;
@@ -588,7 +588,6 @@ void AudioToolWindow::reinit_recorder()
 
     if (m_audiorecorder.init(float(m_recorder_latency_ms) / 1000.f, m_audio_in_idx, input_samplerate))
     {
-        m_audiorecorder.start();
         if (m_audio_loopback_out_idx >= 0 && !m_audioloopback.set(input_samplerate, float(m_recorder_latency_ms)/1000.f, m_audio_loopback_out_idx, m_audiorecorder.get_channel_count())){
             log_message("Cannot start loopback interface, maybe input samplerate is not compatible, try a different one");
         }
@@ -599,7 +598,7 @@ void AudioToolWindow::reinit_recorder()
     m_audiorecorder.pause(!m_compute_on);
     m_audioloopback.pause(!m_compute_on | !m_audio_loopback_on);
     m_audiorecorder.get_input_volume_range_db(m_input_volume_min, m_input_volume_max); 
-    m_audiorecorder.set_input_gain_db(m_input_gain);
+    m_audiorecorder.set_input_gain_linear(db_to_linear(m_input_gain));
 }
 
 void AudioToolWindow::reset_signal_generator()
@@ -613,6 +612,7 @@ void AudioToolWindow::reset_signal_generator()
     }
 
     int output_device_samplerate = m_audiomanager.get_output_sample_rates(m_audio_out_idx)[m_out_sample_rate_idx];
+
     m_signal_generator.destroy();
     m_signal_generator.init(m_audio_out_idx, output_device_samplerate, m_signalgen_latency_s);
     m_signal_generator.set_pitch(m_signal_generator_pitch);

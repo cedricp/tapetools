@@ -49,7 +49,8 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
 
         for (int channel = 0; channel < info.numChannel; channel ++)
         {
-            *datafloat++ = is_floatingpoint ? sample : sample * INT16_MAX;
+            if (is_floatingpoint) *datafloat++ = (float)sample;
+            else *dataint++ = (int16_t)(sample * INT16_MAX);
         }
     }
 

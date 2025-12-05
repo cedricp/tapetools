@@ -14,10 +14,13 @@ int PAaudioRecorder::recordCallback(
     PAaudioRecorder* ar = (PAaudioRecorder*)userData;
     IringBuffer* rbuffer = ar->m_ring_buffer;
 
-    if (inputBuffer == nullptr) return paContinue;
-
     int numSamplesToWrite = frameCount * ar->m_instreaminfo.numChannel;
-    if (rbuffer->getWriteAvailable() < numSamplesToWrite) return paContinue;
+
+
+    if (rbuffer->getWriteAvailable() < numSamplesToWrite)
+    {
+        return paContinue;
+    }
 
     rbuffer->write(in, numSamplesToWrite);
 
@@ -55,8 +58,8 @@ bool PAaudioRecorder::init(float latency, int device_idx, int samplerate)
 
     int bytes_per_sample = Pa_GetSampleSize(m_instreaminfo.format);
     int capacity = get_buffer_size(latency);
-    if (fp) m_ring_buffer = new ringBuffer<float>(capacity*4);
-    else m_ring_buffer = new ringBuffer<int16_t>(capacity*4);
+    if (fp) m_ring_buffer = new ringBuffer<float>(capacity*6);
+    else m_ring_buffer = new ringBuffer<int16_t>(capacity*6);
 
     return true;
 }
@@ -139,7 +142,7 @@ bool PAaudioRecorder::get_data(std::vector<float>& data, size_t size)
         return false;
     }
 
-    bool fp = m_instreaminfo.format == paFloat32;
+    bool fp = m_manager.get_is_floatingpoint();
 
     if (data.size() != size) data.resize(size, 0);
 

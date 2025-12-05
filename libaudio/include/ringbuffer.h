@@ -20,50 +20,50 @@ static uint32_t nextPowerOfTwoFP(uint32_t n) {
 
 class IringBuffer
 {
-    size_t  bufferSize; /**< Number of elements in FIFO. Power of 2. **/
-    size_t  bigMask;    /**< Used for wrapping indices with extra bit to distinguish full/empty. */
-    size_t  smallMask;  /**< Used for fitting indices to buffer. */
-    size_t  elementSizeBytes; /**< Number of bytes per element. */
-    char    *buffer;    /**< Pointer to the buffer containing the actual data. */
-    volatile size_t  writeIndex; /**< Index of next writable element. **/
-    volatile size_t  readIndex;  /**< Index of next readable element. **/
+    size_t  m_buffer_size; /**< Number of elements in FIFO. Power of 2. **/
+    size_t  m_big_mask;    /**< Used for wrapping indices with extra bit to distinguish full/empty. */
+    size_t  m_small_mask;  /**< Used for fitting indices to buffer. */
+    size_t  m_element_size_bytes; /**< Number of bytes per element. */
+    char    *m_buffer;    /**< Pointer to the buffer containing the actual data. */
+    volatile size_t  m_write_index; /**< Index of next writable element. **/
+    volatile size_t  m_read_index;  /**< Index of next readable element. **/
 public:
     IringBuffer(size_t elementSizeBytes, size_t elementCount)
     {
-        buffer = nullptr;
+        m_buffer = nullptr;
         elementCount = nextPowerOfTwoFP(elementCount);
-        bufferSize = elementCount;
-        buffer = (char *)malloc( elementSizeBytes * elementCount );
+        m_buffer_size = elementCount;
+        m_buffer = (char *)malloc( elementSizeBytes * elementCount );
         flush();
-        bigMask = (elementCount*2)-1;
-        smallMask = (elementCount)-1;
-        this->elementSizeBytes = elementSizeBytes;
+        m_big_mask = (elementCount*2)-1;
+        m_small_mask = (elementCount)-1;
+        m_element_size_bytes = elementSizeBytes;
     }
  
     virtual ~IringBuffer()
     {
-        free(buffer);
+        free(m_buffer);
     }
 
     size_t getBufferSize()
     {
-        return bufferSize;
+        return m_buffer_size;
     }
 
     void flush()
     {
-        writeIndex = 0;
-        readIndex = 0;
+        m_write_index = 0;
+        m_read_index = 0;
     }
 
     size_t getReadAvailable()
     {
-        return ( (writeIndex - readIndex) & bigMask );
+        return ( (m_write_index - m_read_index) & m_big_mask );
     }
 
     size_t getWriteAvailable()
     {
-        return ( bufferSize - getReadAvailable() );
+        return ( m_buffer_size - getReadAvailable() );
     }
 
     size_t write( const void *data, size_t elementCount )
@@ -74,13 +74,13 @@ public:
         if( size2 > 0 )
         {
 
-            memcpy( data1, data, size1*elementSizeBytes );
-            data = ((char *)data) + size1*elementSizeBytes;
-            memcpy( data2, data, size2*elementSizeBytes );
+            memcpy( data1, data, size1*m_element_size_bytes );
+            data = ((char *)data) + size1*m_element_size_bytes;
+            memcpy( data2, data, size2*m_element_size_bytes );
         }
         else
         {
-            memcpy( data1, data, size1*elementSizeBytes );
+            memcpy( data1, data, size1*m_element_size_bytes );
         }
         advanceWriteIndex( numWritten );
         return numWritten;
@@ -93,13 +93,13 @@ public:
         numRead = getReadRegions( elementCount, &data1, &size1, &data2, &size2 );
         if( size2 > 0 )
         {
-            memcpy( data, data1, size1*elementSizeBytes );
-            data = ((char *)data) + size1*elementSizeBytes;
-            memcpy( data, data2, size2*elementSizeBytes );
+            memcpy( data, data1, size1*m_element_size_bytes );
+            data = ((char *)data) + size1*m_element_size_bytes;
+            memcpy( data, data2, size2*m_element_size_bytes );
         }
         else
         {
-            memcpy( data, data1, size1*elementSizeBytes );
+            memcpy( data, data1, size1*m_element_size_bytes );
         }
         advanceReadIndex( numRead );
         return numRead;
@@ -114,19 +114,19 @@ private:
         size_t   available = getWriteAvailable();
         if( elementCount > available ) elementCount = available;
         /* Check to see if write is not contiguous. */
-        index = writeIndex & smallMask;
-        if( (index + elementCount) > bufferSize )
+        index = m_write_index & m_small_mask;
+        if( (index + elementCount) > m_buffer_size )
         {
             /* Write data in two blocks that wrap the buffer. */
-            size_t   firstHalf = bufferSize - index;
-            *dataPtr1 = &buffer[index*elementSizeBytes];
+            size_t   firstHalf = m_buffer_size - index;
+            *dataPtr1 = &m_buffer[index*m_element_size_bytes];
             *sizePtr1 = firstHalf;
-            *dataPtr2 = &buffer[0];
+            *dataPtr2 = &m_buffer[0];
             *sizePtr2 = elementCount - firstHalf;
         }
         else
         {
-            *dataPtr1 = &buffer[index*elementSizeBytes];
+            *dataPtr1 = &m_buffer[index*m_element_size_bytes];
             *sizePtr1 = elementCount;
             *dataPtr2 = NULL;
             *sizePtr2 = 0;
@@ -144,7 +144,7 @@ private:
         (write after write)
         */
         WriteMemoryBarrier();
-        return writeIndex = (writeIndex + elementCount) & bigMask;
+        return m_write_index = (m_write_index + elementCount) & m_big_mask;
     }
 
     size_t getReadRegions( size_t elementCount,
@@ -155,19 +155,19 @@ private:
         size_t   available = getReadAvailable(); /* doesn't use memory barrier */
         if( elementCount > available ) elementCount = available;
         /* Check to see if read is not contiguous. */
-        index = readIndex & smallMask;
-        if( (index + elementCount) > bufferSize )
+        index = m_read_index & m_small_mask;
+        if( (index + elementCount) > m_buffer_size )
         {
             /* Write data in two blocks that wrap the buffer. */
-            size_t firstHalf = bufferSize - index;
-            *dataPtr1 = &buffer[index*elementSizeBytes];
+            size_t firstHalf = m_buffer_size - index;
+            *dataPtr1 = &m_buffer[index*m_element_size_bytes];
             *sizePtr1 = firstHalf;
-            *dataPtr2 = &buffer[0];
+            *dataPtr2 = &m_buffer[0];
             *sizePtr2 = elementCount - firstHalf;
         }
         else
         {
-            *dataPtr1 = &buffer[index*elementSizeBytes];
+            *dataPtr1 = &m_buffer[index*m_element_size_bytes];
             *sizePtr1 = elementCount;
             *dataPtr2 = NULL;
             *sizePtr2 = 0;
@@ -185,7 +185,7 @@ private:
         (write-after-read) => full barrier
         */
         FullMemoryBarrier();
-        return readIndex = (readIndex + elementCount) & bigMask;
+        return m_read_index = (m_read_index + elementCount) & m_big_mask;
     }
 };
 

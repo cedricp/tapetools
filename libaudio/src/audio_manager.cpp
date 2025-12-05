@@ -98,21 +98,25 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
         log_message("Latency forced to min [%f]", latency);
     }
 
+    
     PaStreamParameters inputParameters;
     inputParameters.device = device_idx;
     inputParameters.channelCount = deviceInfo->maxInputChannels;
     inputParameters.sampleFormat = m_floatingpoint ? paFloat32 : paInt16;
     inputParameters.suggestedLatency = latency;
+
+    const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
+    bool excluvisve_mode = apiInfo->type == paWASAPI && m_use_exclusive_mode;
+    
 #ifdef WIN32
     PaWasapiStreamInfo wasapiInfo;
     memset(&wasapiInfo, 0, sizeof(wasapiInfo));
     wasapiInfo.size = sizeof(PaWasapiStreamInfo);
     wasapiInfo.hostApiType = paWASAPI;
     wasapiInfo.version = 1;
-    wasapiInfo.flags = (paWinWasapiExclusive|paWinWasapiThreadPriority);
+    wasapiInfo.flags = paWinWasapiExclusive|paWinWasapiThreadPriority;
     wasapiInfo.threadPriority = eThreadPriorityProAudio;
-    const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
-    inputParameters.hostApiSpecificStreamInfo = (apiInfo->type == paWASAPI && m_use_exclusive_mode) ? &wasapiInfo : nullptr;
+    inputParameters.hostApiSpecificStreamInfo = excluvisve_mode ? &wasapiInfo : nullptr;
 #else
     inputParameters.hostApiSpecificStreamInfo = nullptr;
 #endif
@@ -122,14 +126,17 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
     info.format = inputParameters.sampleFormat;
     info.deviceIndex = device_idx;
 
+    unsigned long framesPerBuffer = (unsigned long)round(latency * samplerate);
+    if (!excluvisve_mode) framesPerBuffer /= 8;
+
     PaStream* stream;
     err = Pa_OpenStream(
         &stream,
         &inputParameters,
         nullptr,  // no output
         samplerate,
-        (unsigned long)round(latency * samplerate),
-        paClipOff,  // no clipping
+        framesPerBuffer,
+        paClipOff | paDitherOff,  // no clipping
         callback,
         userData);
 
@@ -143,8 +150,8 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
             &inputParameters,
             nullptr,  // no output
             samplerate,
-            0,//(unsigned long)round(latency * samplerate) / 2,
-            paClipOff,  // no clipping
+            framesPerBuffer,
+            paClipOff | paDitherOff,  // no clipping
             callback,
             userData);
     }
@@ -207,7 +214,7 @@ PaStream*PAaudioManager::get_output_stream(int samplerate, int device_idx, float
         nullptr,  // no input
         &outputParameters,
         samplerate,
-        0,//(unsigned long)round(latency * samplerate) / 2,
+        (unsigned long)round(latency * samplerate) * 2,
         paClipOff,  // no clipping
         callback,
         userData
