@@ -1,7 +1,6 @@
 #include "audio_manager.h"
 
 #ifdef WIN32
-#include "pa_win_wasapi.h"
 #include <audioclient.h>
 #include <Mmdeviceapi.h>
 #include <endpointvolume.h>
@@ -10,8 +9,7 @@
 
 void log_message(const char* format, ...);
 
-static std::vector<double> test_rates = {8000, 11025, 16000, 22050, 32000,
-                      44100, 48000, 88200, 96000, 192000};
+static std::vector<double> test_rates = {8000.0, 11025.0, 16000.0, 22050.0, 32000.0, 37800.0, 40000.0, 44100.0, 47250.0, 48000.0, 50000.0, 88200.0, 96000.0, 176400.0, 192000.0};
 
 PAaudioManager::PAaudioManager()
 {
@@ -95,7 +93,12 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
 
     if (latency < deviceInfo->defaultLowInputLatency){
         latency = deviceInfo->defaultLowInputLatency;
-        log_message("Latency forced to min [%f]", latency);
+        log_message("Info : Input latency forced to min [%f]s", latency);;
+    }
+
+    if (latency > deviceInfo->defaultHighInputLatency){
+        latency = deviceInfo->defaultHighInputLatency;
+        log_message("Info : Input latency forced to max [%f]s", latency);
     }
 
     
@@ -106,17 +109,19 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
     inputParameters.suggestedLatency = latency;
 
     const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
-    bool excluvisve_mode = apiInfo->type == paWASAPI && m_use_exclusive_mode;
+    bool exclusive_mode = apiInfo->type == paWASAPI && m_use_exclusive_mode;
     
 #ifdef WIN32
-    PaWasapiStreamInfo wasapiInfo;
-    memset(&wasapiInfo, 0, sizeof(wasapiInfo));
-    wasapiInfo.size = sizeof(PaWasapiStreamInfo);
-    wasapiInfo.hostApiType = paWASAPI;
-    wasapiInfo.version = 1;
-    wasapiInfo.flags = paWinWasapiExclusive|paWinWasapiThreadPriority;
-    wasapiInfo.threadPriority = eThreadPriorityProAudio;
-    inputParameters.hostApiSpecificStreamInfo = excluvisve_mode ? &wasapiInfo : nullptr;
+    memset(&info.wasapiInfo, 0, sizeof(info.wasapiInfo));
+    info.wasapiInfo.size = sizeof(PaWasapiStreamInfo);
+    info.wasapiInfo.hostApiType = paWASAPI;
+    info.wasapiInfo.version = 1;
+    info.wasapiInfo.flags = paWinWasapiExclusive|paWinWasapiThreadPriority;
+    if (m_use_polling_mode){
+        info.wasapiInfo.flags |= paWinWasapiPolling;
+    }
+    info.wasapiInfo.threadPriority = eThreadPriorityProAudio;
+    inputParameters.hostApiSpecificStreamInfo = exclusive_mode ? &info.wasapiInfo : nullptr;
 #else
     inputParameters.hostApiSpecificStreamInfo = nullptr;
 #endif
@@ -126,8 +131,11 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
     info.format = inputParameters.sampleFormat;
     info.deviceIndex = device_idx;
 
-    unsigned long framesPerBuffer = (unsigned long)round(latency * samplerate);
-    if (!excluvisve_mode) framesPerBuffer /= 8;
+    unsigned long framesPerBuffer = (unsigned long)round(latency * samplerate) / 8;
+    if (exclusive_mode){
+         framesPerBuffer = paFramesPerBufferUnspecified;
+         inputParameters.suggestedLatency = 0;
+    }
 
     PaStream* stream;
     err = Pa_OpenStream(
@@ -180,10 +188,17 @@ PaStream*PAaudioManager::get_output_stream(int samplerate, int device_idx, float
 
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(device_idx);
 
-    if (latency < deviceInfo->defaultLowInputLatency){
-        latency = deviceInfo->defaultLowInputLatency;
-        log_message("Latency forced to min [%f]", latency);
+    if (latency < deviceInfo->defaultLowOutputLatency){
+        latency = deviceInfo->defaultLowOutputLatency;
+        log_message("Info : Output latency forced to min [%f]", latency);
     }
+
+    if (latency > deviceInfo->defaultHighOutputLatency){
+        latency = deviceInfo->defaultHighOutputLatency;
+        log_message("Info : Output latency forced to max [%f]s", latency);
+    }
+    const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
+    bool exclusive_mode = apiInfo->type == paWASAPI && m_use_exclusive_mode;
 
     PaStreamParameters outputParameters;
     outputParameters.device = device_idx;
@@ -191,15 +206,13 @@ PaStream*PAaudioManager::get_output_stream(int samplerate, int device_idx, float
     outputParameters.sampleFormat = m_floatingpoint ? paFloat32 : paInt16;
     outputParameters.suggestedLatency = latency;
 #ifdef WIN32
-    PaWasapiStreamInfo wasapiInfo;
-    memset(&wasapiInfo, 0, sizeof(wasapiInfo));
-    wasapiInfo.size = sizeof(PaWasapiStreamInfo);
-    wasapiInfo.hostApiType = paWASAPI;
-    wasapiInfo.version = 1;
-    wasapiInfo.flags = (paWinWasapiExclusive|paWinWasapiThreadPriority);
-    wasapiInfo.threadPriority = eThreadPriorityProAudio;
-    const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
-    outputParameters.hostApiSpecificStreamInfo = (apiInfo->type == paWASAPI && m_use_exclusive_mode) ? &wasapiInfo : nullptr;
+    memset(&info.wasapiInfo, 0, sizeof(PaWasapiStreamInfo));
+    info.wasapiInfo.size = sizeof(PaWasapiStreamInfo);
+    info.wasapiInfo.hostApiType = paWASAPI;
+    info.wasapiInfo.version = 1;
+    info.wasapiInfo.flags = (paWinWasapiExclusive|paWinWasapiThreadPriority);
+    info.wasapiInfo.threadPriority = eThreadPriorityProAudio;
+    outputParameters.hostApiSpecificStreamInfo = exclusive_mode ? &info.wasapiInfo : nullptr;
 #else
     outputParameters.hostApiSpecificStreamInfo = nullptr;
 #endif
@@ -208,14 +221,20 @@ PaStream*PAaudioManager::get_output_stream(int samplerate, int device_idx, float
     info.format = outputParameters.sampleFormat;
     info.deviceIndex = device_idx;
 
+    unsigned long framesPerBuffer = (unsigned long)round(latency * samplerate) / 8;
+    if (exclusive_mode){
+         framesPerBuffer = paFramesPerBufferUnspecified;
+         outputParameters.suggestedLatency = 0;
+    }
+
     PaStream* stream;
     err = Pa_OpenStream(
         &stream,
         nullptr,  // no input
         &outputParameters,
         samplerate,
-        (unsigned long)round(latency * samplerate) * 2,
-        paClipOff,  // no clipping
+        framesPerBuffer,
+        paClipOff | paDitherOff,  // no clipping
         callback,
         userData
     );

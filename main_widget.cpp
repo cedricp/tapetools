@@ -328,6 +328,7 @@ void AudioToolWindow::draw_tools_windows()
             {
                 // Disable exclusive mode
                 m_wasapi_exclusive = false;
+                m_wasapi_polling = true;
                 m_use_floatingpoint = true;
                 
                 // Release open streams
@@ -336,6 +337,7 @@ void AudioToolWindow::draw_tools_windows()
                 m_signal_generator.destroy();
 
                 m_audiomanager.set_exclusive_mode(m_wasapi_exclusive);
+                m_audiomanager.set_polling_mode(m_wasapi_polling);
                 m_audiomanager.set_floatingpoint(m_use_floatingpoint);
                 m_audiomanager.flush();
 
@@ -387,6 +389,18 @@ void AudioToolWindow::draw_tools_windows()
 
                 reset_signal_generator();
                 reinit_recorder();
+            }
+            if (m_wasapi_exclusive)
+            {
+                ImGui::SameLine();
+                if (ImGui::Checkbox("Use WASAPI polling mode", &m_wasapi_polling))
+                {
+                    m_audiomanager.set_polling_mode(m_wasapi_polling);
+                    m_audiomanager.flush();
+
+                    reset_signal_generator();
+                    reinit_recorder();
+                }
             }
 #endif
             ImVec2 winsize = ImGui::GetWindowSize();
@@ -457,6 +471,7 @@ void AudioToolWindow::get_configuration_string(std::map<std::string, std::string
 void AudioToolWindow::set_configuration_string(std::string s, std::string str)
 {
     m_audiomanager.set_exclusive_mode(m_wasapi_exclusive);
+    m_audiomanager.set_polling_mode(m_wasapi_polling);
     m_audiomanager.scan_devices();
 
     m_audiomanager.get_input_devices();
@@ -501,6 +516,7 @@ void AudioToolWindow::get_configuration_int(std::map<std::string, int> &cnf)
 {
 #ifdef WIN32
     cnf["use_exclusive_mode"] = m_wasapi_exclusive;
+    cnf["use_polling_mode"] = m_wasapi_polling;
 #endif
     cnf["logScaleFFT"] = m_logscale_frequency == true ? 1 : 0;
     cnf["FFTwindowType"] = m_fft_window_fn_index;
@@ -578,6 +594,10 @@ void AudioToolWindow::set_configuration_int(std::string s, int i)
     {
         m_wasapi_exclusive = i;
     }
+    else if (s == "use_polling_mode")
+    {
+        m_wasapi_polling = i;
+    }
 #endif
     else if (s == "use_floatingpoint")
     {
@@ -641,6 +661,7 @@ void AudioToolWindow::set_sound_config()
     if (m_output_device.empty()) m_audio_out_idx = m_audiomanager.get_default_output_device_id();
 
     m_audiomanager.set_exclusive_mode(m_wasapi_exclusive);
+    m_audiomanager.set_polling_mode(m_wasapi_polling);
     m_audiomanager.set_floatingpoint(m_use_floatingpoint);
 
     m_combo_in  = m_audio_in_idx;

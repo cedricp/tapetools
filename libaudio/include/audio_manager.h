@@ -10,12 +10,19 @@ extern "C"{
 #include <tuple>
 #include <algorithm>
 
+#ifdef WIN32
+#include "pa_win_wasapi.h"
+#endif
+
 struct StreamInfo
 {
     int numChannel;
     int sampleRate;
     PaSampleFormat format; 
     PaDeviceIndex deviceIndex;
+#ifdef WIN32
+    PaWasapiStreamInfo wasapiInfo;
+#endif
 };
 
 class PAaudioManager
@@ -30,6 +37,7 @@ class PAaudioManager
     std::vector<PaStream*> m_open_streams;
 
     bool m_use_exclusive_mode = false;
+    bool m_use_polling_mode = true;
     bool m_pa_ok = false;
     bool m_floatingpoint = true;
 
@@ -55,6 +63,12 @@ public:
 
     void set_exclusive_mode(bool mode);
     bool get_exclusive_mode(){return m_use_exclusive_mode;}
+
+    void set_polling_mode(bool mode){
+        m_use_polling_mode = mode;
+    }
+
+    bool get_polling_mode(){return m_use_polling_mode;}
 
     void set_floatingpoint(bool fp);
     bool get_is_floatingpoint(){return m_floatingpoint;}

@@ -58,8 +58,8 @@ bool PAaudioRecorder::init(float latency, int device_idx, int samplerate)
 
     int bytes_per_sample = Pa_GetSampleSize(m_instreaminfo.format);
     int capacity = get_buffer_size(latency);
-    if (fp) m_ring_buffer = new ringBuffer<float>(capacity*6);
-    else m_ring_buffer = new ringBuffer<int16_t>(capacity*6);
+    if (fp) m_ring_buffer = new ringBuffer<float>(capacity*3);
+    else m_ring_buffer = new ringBuffer<int16_t>(capacity*3);
 
     return true;
 }
