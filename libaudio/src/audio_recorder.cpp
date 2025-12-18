@@ -58,8 +58,8 @@ bool PAaudioRecorder::init(float latency, int device_idx, int samplerate)
 
     int bytes_per_sample = Pa_GetSampleSize(m_instreaminfo.format);
     int capacity = get_buffer_size(latency);
-    if (fp) m_ring_buffer = new ringBuffer<float>(capacity*3);
-    else m_ring_buffer = new ringBuffer<int16_t>(capacity*3);
+    if (fp) m_ring_buffer = new ringBuffer<float>(capacity*2);
+    else m_ring_buffer = new ringBuffer<int16_t>(capacity*2);
 
     return true;
 }
@@ -85,15 +85,6 @@ int PAaudioRecorder::get_current_samplerate()
     }
     const PaStreamInfo* info = Pa_GetStreamInfo(m_instream);
     return info->sampleRate;
-}
-
-int PAaudioRecorder::get_available_bytes()
-{
-    if (!m_ring_buffer || m_instream == nullptr){
-        return 0;
-    }
-    int bytes_per_sample = Pa_GetSampleSize(m_instreaminfo.format);
-    return m_ring_buffer->getReadAvailable() * bytes_per_sample;
 }
 
 int PAaudioRecorder::get_available_samples()

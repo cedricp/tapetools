@@ -118,6 +118,7 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
     info.wasapiInfo.version = 1;
     info.wasapiInfo.flags = paWinWasapiExclusive|paWinWasapiThreadPriority;
     if (m_use_polling_mode){
+        // This helps avoid dropped samples
         info.wasapiInfo.flags |= paWinWasapiPolling;
     }
     info.wasapiInfo.threadPriority = eThreadPriorityProAudio;
@@ -133,6 +134,7 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
 
     unsigned long framesPerBuffer = (unsigned long)round(latency * samplerate) / 8;
     if (exclusive_mode){
+        // Let PA calculate this
          framesPerBuffer = paFramesPerBufferUnspecified;
          inputParameters.suggestedLatency = 0;
     }
@@ -149,8 +151,7 @@ PaStream* PAaudioManager::get_input_stream(int samplerate, int device_idx, float
         userData);
 
     if (err != paNoError){
-        //log_message("Cannot initialize input with default channel number, trying 1...");
-        // Try with one channel....
+        // Try with one channel.... (Yes some devices only have one !)
         inputParameters.channelCount = 1;
         info.numChannel = 1;
         err = Pa_OpenStream(

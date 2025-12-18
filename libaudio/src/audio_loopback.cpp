@@ -8,9 +8,10 @@ int PAaudioLoopback::generator_callback(const void* input, void* output,
 {
     // NumSamples = frameCount * numChannel
     if (output == nullptr) return paContinue;
-
+    
     PAaudioLoopback* al = (PAaudioLoopback*)userData;
     IringBuffer* rbuffer = al->m_ringbuffer;
+    
     if (rbuffer == nullptr) return paContinue;
 
     int numChannels = al->m_outstreaminfo.numChannel;

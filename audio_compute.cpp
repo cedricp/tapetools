@@ -54,8 +54,8 @@ void AudioToolWindow::set_window_fn(bool compute_cache)
 }
 
 void AudioToolWindow::detect_periods(){
-    double timestep = 1. / (double)m_audiorecorder.get_current_samplerate();
-    double *audio_data = m_sound_data1.data();
+    const double timestep = 1. / (double)m_audiorecorder.get_current_samplerate();
+    double const* audio_data = m_sound_data1.data();
     std::vector<double> frequencies;
 
     int previous_idx = 0;
@@ -107,7 +107,7 @@ void AudioToolWindow::detect_periods(){
 void AudioToolWindow::compute_fft_window_corrections(int num_samples)
 {
     int tmp = m_fft_window_fn_index;
-    double inv_num_samples = 1. / num_samples;
+    const double inv_num_samples = 1. / num_samples;
     for (int j = 0; j < 8; ++j)
     {
         m_fft_window_fn_index = j;
@@ -254,10 +254,10 @@ void AudioToolWindow::compute_wow_and_flutter()
     double samplerate = m_audiorecorder.get_current_samplerate();
 
     // Append captured audio data to get them
-    int audio_capture_length = WOW_FLUTTER_ANALYSIS_TIME * samplerate;
-    std::vector<double> &audio_channel = m_fft_channel_left ? m_sound_data1 : m_sound_data2;
+    const int audio_capture_length = WOW_FLUTTER_ANALYSIS_TIME * samplerate;
+    const std::vector<double> &audio_channel = m_fft_channel_left ? m_sound_data1 : m_sound_data2;
 
-    int sampled_audio_length = audio_channel.size();
+    const int sampled_audio_length = audio_channel.size();
 
     m_wow_data_mutex.lock();
     if (m_longterm_audio.empty())
@@ -342,7 +342,7 @@ void AudioToolWindow::compute_channels_phase()
 
 void AudioToolWindow::compute_thd()
 {
-    double* current_fft_draw = m_fft_channel_left ? m_fftdrawl : m_fftdrawr;
+    double const* current_fft_draw = m_fft_channel_left ? m_fftdrawl : m_fftdrawr;
     const int fft_capture_size = m_capture_size / 2;
     m_fft_found_peaks = 1;
 
@@ -407,8 +407,8 @@ void AudioToolWindow::compute_thd()
 
 void AudioToolWindow::compute_thdn()
 {
-    int fft_capture_size = m_capture_size/2;
-    fftw_complex * current_fft = m_fft_channel_left ? m_fftoutl : m_fftoutr;
+    const int fft_capture_size = m_capture_size/2;
+    fftw_complex const* current_fft = m_fft_channel_left ? m_fftoutl : m_fftoutr;
     const double invsqrt2 = 1.0 / sqrt(2.0);
     const double inv_capture_size = 1.0 / (double(fft_capture_size));
 
@@ -486,8 +486,8 @@ void AudioToolWindow::compute_thdn()
 
 void AudioToolWindow::init_capture()
 {
-    int capture_size = m_audiorecorder.get_buffer_size(float(m_recorder_latency_ms) / 1000.f, false);
-    int samplerate = m_audiorecorder.get_current_samplerate();
+    const int capture_size = m_audiorecorder.get_buffer_size(float(m_recorder_latency_ms) / 1000.f, false);
+    const int samplerate = m_audiorecorder.get_current_samplerate();
     if (capture_size == 0) return;
 
     destroy_capture();
@@ -624,9 +624,9 @@ void AudioToolWindow::reset_signal_generator()
 
 void AudioToolWindow::process_sweep()
 {
-    float current_sample_rate = m_audiorecorder.get_current_samplerate();
-    float fft_step = m_capture_size / current_sample_rate;
-    double *current_fft_draw = m_fft_channel_left ? m_fftdrawl : m_fftdrawr;
+    const float current_sample_rate = m_audiorecorder.get_current_samplerate();
+    const float fft_step = m_capture_size / current_sample_rate;
+    double const* current_fft_draw = m_fft_channel_left ? m_fftdrawl : m_fftdrawr;
 
     if (!m_async_sweep)
     {

@@ -23,7 +23,6 @@ public:
     void destroy();
 
     bool init(float latency, int device_idx, int samplerate);
-    int get_available_bytes();
     int get_available_samples();
     bool start();
     bool pause(bool);

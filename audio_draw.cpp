@@ -374,7 +374,7 @@ void AudioToolWindow::draw_wow_flutter_widget(int channelcount, int current_samp
 {
     const char* ref_freq_presets[] = {"3000","3150", "Custom"};
     const char* filter_presets[] = {"Disabled", "Wow (6Hz)","Flutter low (20Hz)", "Flutter high (100Hz)"};
-    float ref_frequency;
+    float ref_frequency = 3150;
     static bool iq_view = false;
     static float iq_separation = 0.f;
     
@@ -757,11 +757,14 @@ void AudioToolWindow::draw_channels_phase_widget(int plotheight)
             if (amplitude_limit_mult > 10) amplitude_limit_mult = 10;
         }
 
-        ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
-        ImPlot::PlotLine("L/R phase", &m_phase_time[0], &m_phase_history[0], m_phase_time.size());
-        ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
-        ImPlot::PlotLine("Amplitude diff", &m_phase_time[0], &m_lrdiff_history[0], m_phase_time.size());
-        ImPlot::EndPlot();
+        if (m_phase_time.size())
+        {
+            ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
+            ImPlot::PlotLine("L/R phase", &m_phase_time[0], &m_phase_history[0], m_phase_time.size());
+            ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
+            ImPlot::PlotLine("Amplitude diff", &m_phase_time[0], &m_lrdiff_history[0], m_phase_time.size());
+            ImPlot::EndPlot();
+        }
     }
 }
 
@@ -823,12 +826,15 @@ void AudioToolWindow::draw_tone_generator_widget()
             m_signal_generator.set_volume(m_signalgen_volume_db);
         }
         ImGui::SetItemTooltip("Set the generator intensity");
-        ImGui::SameLine();
-        if(ImGui::SliderInt("Mixer gain", &m_output_hw_volume_db, -60, 0, "%d dB"))
+        if (m_audiomanager.get_exclusive_mode())
         {
-            m_signal_generator.set_hw_volume(db_to_linear(m_output_hw_volume_db));
+            ImGui::SameLine();
+            if(ImGui::SliderInt("Mixer gain", &m_output_hw_volume_db, -60, 0, "%d dB"))
+            {
+                m_signal_generator.set_hw_volume(db_to_linear(m_output_hw_volume_db));
+            }
+            ImGui::SetItemTooltip("Set the hardware output volume (may not be supported by all devices)");
         }
-        ImGui::SetItemTooltip("Set the hardware output volume (may not be supported by all devices)");
         ImGui::EndChild();
 
         ImGui::EndChild();
@@ -845,8 +851,12 @@ void AudioToolWindow::draw_rt_analysis_tab()
     float padh = 3.0f * ImGui::GetStyle().FramePadding.y + ImGui::GetStyle().ItemSpacing.y;
 
     draw_tone_generator_widget();
-    ImGui::SameLine();
-    draw_input_control_widget();
+
+    if (m_audiomanager.get_exclusive_mode())
+    {
+        ImGui::SameLine();
+        draw_input_control_widget();
+    }
 
     ImGui::BeginChild("ScopesChildMain", ImVec2(0, height()), ImGuiChildFlags_Border, ImGuiWindowFlags_None);
     float plotheight = height() / 2.0f - 5.f;
