@@ -4,6 +4,7 @@
 
 
 class SineWave {
+    bool m_square = false;
     struct Transition {
     double
         amplitude,
@@ -47,6 +48,10 @@ public:
         phaseStep = 0;
     }
 
+    void set_square(bool s){
+        m_square = s;
+    }
+
     double sample() {
         double sample = amplitude * sin(phase);
         phase += phaseStep;
@@ -64,6 +69,10 @@ public:
                 transition.amplitudeStep = 0;
                 amplitude = transition.amplitude;
             }
+        }
+        if (m_square)
+        {
+            return sample > 0 ? amplitude : -amplitude;
         }
         return sample;
     }

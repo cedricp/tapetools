@@ -786,7 +786,7 @@ void AudioToolWindow::draw_input_control_widget()
 
 void AudioToolWindow::draw_tone_generator_widget()
 {
-    const char* generator_presets[] = {"Sine","White noise", "Brown noise", "Pink noise"};
+    const char* generator_presets[] = {"Sine","Square", "White noise", "Brown noise", "Pink noise"};
     static int fm_freq = 0;
     static float fm_vol = 1;
     static bool fm_enable = false;
@@ -798,7 +798,7 @@ void AudioToolWindow::draw_tone_generator_widget()
 
         ImGui::BeginChild("ScopesChildTonGenSwitch", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AutoResizeX, ImGuiWindowFlags_None);
         ImGui::SetNextItemWidth(170);
-        if (ImGui::Combo("Generator type", &m_signal_generator.mode(), generator_presets, 4))
+        if (ImGui::Combo("Generator type", &m_signal_generator.mode(), generator_presets, 5))
         {
             m_signal_generator.set_mode(m_signal_generator.mode());
         }
@@ -809,7 +809,7 @@ void AudioToolWindow::draw_tone_generator_widget()
         }
         ImGui::SetItemTooltip("Waveform generator ON/OFF");
 
-        if (m_signal_generator.mode() == PAaudioWaveformGenerator::SINE)
+        if (m_signal_generator.mode_tunable())
         {
             ImGui::SameLine();
             if (ImGui::SliderInt("Pitch", &m_signal_generator_pitch, 20, 20000) || manage_slider_mousewheel_int(m_signal_generator_pitch, 20, 20000))

@@ -6,6 +6,7 @@ class PAaudioWaveformGenerator{
 public:
     enum generatorMode{
         SINE,
+        SQUARE,
         WHITE_NOISE,
         BROWN_NOISE,
         PINK_NOISE
@@ -50,6 +51,9 @@ public:
     void set_hw_volume(float vol);
     void set_volume(int db, double duration = 0.1);
 
-    void set_mode(int m){m_mode = m;}
+    void set_mode(int m);
     int& mode(){return m_mode;};
+    bool mode_tunable(){
+        return m_mode == SINE || m_mode == SQUARE;
+    }
 };
