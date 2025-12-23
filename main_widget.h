@@ -187,6 +187,8 @@ public:
     AudioToolWindow(Window_SDL* win);
     virtual ~AudioToolWindow();
 
+    bool is_compute_on(){return m_compute_on;}
+
     void destroy_capture();
     void init_capture();
     void reinit_recorder();

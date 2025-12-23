@@ -45,16 +45,13 @@ bool PAaudioLoopback::set(int samplerate, float latency, int device_idx, int cha
     m_outstream = m_manager.get_output_stream(samplerate, device_idx, latency, generator_callback, this, m_outstreaminfo, channels);
 
     int ringbuffer_size = samplerate * latency * m_outstreaminfo.numChannel * 4;
+    bool fp = m_manager.get_is_floatingpoint();
 
     if (!m_outstream){
         return false;
     }
 
-    bool fp = m_manager.get_is_floatingpoint();
-    
-    if (fp) m_ringbuffer = new ringBuffer<float>(ringbuffer_size);
-    else m_ringbuffer    = new ringBuffer<int16_t>(ringbuffer_size);
-
+    m_ringbuffer = fp ? (IringBuffer *)(new ringBuffer<float>(ringbuffer_size)) : (IringBuffer *)(new ringBuffer<int16_t>(ringbuffer_size));
     return true;
 }
 

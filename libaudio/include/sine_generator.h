@@ -4,7 +4,7 @@
 
 
 class SineWave {
-    bool m_square = false;
+    int m_function = 0;
     struct Transition {
     double
         amplitude,
@@ -20,6 +20,11 @@ class SineWave {
         phase,          // current phase
         phaseStep;      // phase step
 public:
+    enum WaveformFunction {
+        SINE_WAVE,
+        SQUARE_WAVE,
+        TRIANGLE_WAVE,
+    };
 
     const double radians = (M_PI * 2);
     bool double_equals(double a, double b)
@@ -48,12 +53,30 @@ public:
         phaseStep = 0;
     }
 
-    void set_square(bool s){
-        m_square = s;
+    void set_function(WaveformFunction s){
+        m_function = s;
     }
 
     double sample() {
-        double sample = amplitude * sin(phase);
+        double sample = 0;
+        if (m_function == SQUARE_WAVE)
+        {
+            sample = fmod(phase, M_PI * 2) < M_PI ? amplitude : -amplitude;
+        }
+        else if (m_function == TRIANGLE_WAVE)
+        {
+            double value = fmod(phase, M_PI * 2) / (M_PI * 2);
+            if (value < 0.25)
+                sample = (value * 4);
+            else if (value < 0.75)
+                sample = (2.0 - (value * 4));
+            else
+                sample =  ((value * 4) - 4.0);
+        }
+        else if (m_function == SINE_WAVE)
+        {
+            sample = sin(phase);
+        }
         phase += phaseStep;
         if (transition.frequencyStep) {
             frequency += transition.frequencyStep;
@@ -70,11 +93,7 @@ public:
                 amplitude = transition.amplitude;
             }
         }
-        if (m_square)
-        {
-            return sample > 0 ? amplitude : -amplitude;
-        }
-        return sample;
+        return sample * amplitude;
     }
 
     void sine_wave_frequency_transition(double freq, double duration) {

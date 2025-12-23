@@ -2,6 +2,7 @@
 #include "main_widget.h"
 #include "wow_flutter_thread.h"
 #include <complex>
+#include <algorithm>
 
 void wait_wow_thread()
 {
@@ -667,36 +668,48 @@ void AudioToolWindow::process_sweep()
     }
     else
     {
-        double fft_max_val = m_sweep_threshold_level;
-        double frequency = -1;
+        double found_fundamental = m_sweep_threshold_level;
+        double found_frequency = -1;
         for (int i = 1; i < m_capture_size / 2; ++i)
         {
-            if (current_fft_draw[i] > fft_max_val)
+            if (current_fft_draw[i] > found_fundamental)
             {
-                fft_max_val = current_fft_draw[i];
-                frequency = double(i) / fft_step;
+                found_fundamental = current_fft_draw[i];
+                found_frequency = double(i) / fft_step;
             }
         }
-        if (frequency > 0)
+        if (found_frequency > 0)
         {
             bool found_bin = false;
             int sweep_values_index = 0;
-            for (auto freq : m_sweep_freqs)
+            for (auto current_frequency : m_sweep_freqs)
             {
-                double freq_low = freq - (freq * 0.1);
-                double freq_hi = freq + (freq * 0.1);
-                if (frequency > freq_low && frequency < freq_hi)
+                double freq_low = current_frequency - (current_frequency * 0.1);
+                double freq_hi = current_frequency + (current_frequency * 0.1);
+                if (found_frequency > freq_low && found_frequency < freq_hi)
                 {
-                    if (m_sweep_values[sweep_values_index] < fft_max_val){
-                        m_sweep_values[sweep_values_index] = fft_max_val;
+                    if (m_sweep_values[sweep_values_index] < found_fundamental){
+                        m_sweep_values[sweep_values_index] = found_fundamental;
                         found_bin = true;
                         break;
                     }
                 }
-                if (freq > frequency && sweep_values_index >= 0)
+
+                bool freq_already_in_list = std::find(m_sweep_freqs.begin(), m_sweep_freqs.end(), found_frequency) != m_sweep_freqs.end();
+                if (freq_already_in_list){
+                    // Found the same frequency again
+                    if (m_sweep_values[sweep_values_index] < found_fundamental)
+                    {
+                        // Found a higher value for the same frequency, update it
+                        m_sweep_values[sweep_values_index] = found_fundamental;
+                    }
+                    found_bin = true;
+                    break;
+                }
+                if (current_frequency > found_frequency && sweep_values_index >= 0)
                 {
-                    m_sweep_values.insert(m_sweep_values.begin() + sweep_values_index, fft_max_val);
-                    m_sweep_freqs.insert(m_sweep_freqs.begin() + sweep_values_index, frequency);
+                    m_sweep_values.insert(m_sweep_values.begin() + sweep_values_index, found_fundamental);
+                    m_sweep_freqs.insert(m_sweep_freqs.begin() + sweep_values_index, found_frequency);
                     found_bin = true;
                     break;
                 }
@@ -704,10 +717,10 @@ void AudioToolWindow::process_sweep()
             }
             if (!found_bin)
             {
-                m_sweep_values.push_back(fft_max_val);
-                m_sweep_freqs.push_back(frequency);
+                m_sweep_values.push_back(found_fundamental);
+                m_sweep_freqs.push_back(found_frequency);
             }
-            m_sweep_last_measure_freq = frequency > m_sweep_last_measure_freq ? frequency : m_sweep_last_measure_freq;
+            m_sweep_last_measure_freq = found_frequency > m_sweep_last_measure_freq ? found_frequency : m_sweep_last_measure_freq;
         }
     }
     m_sweep_timer_chrono.reset();

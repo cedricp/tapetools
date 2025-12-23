@@ -31,7 +31,7 @@ int PAaudioWaveformGenerator::generator_callback(const void* input, void* output
     float volume = udata->m_volume;
     for (int i = 0; i < frameCount; ++i){
         double sample = 0;
-        if (udata->m_mode == SINE || udata->m_mode == SQUARE)
+        if (udata->m_mode <= TRIANGLE)
         {
             sample = volume * udata->m_sinewave.sample();
         }
@@ -112,14 +112,7 @@ bool PAaudioWaveformGenerator::start()
 void PAaudioWaveformGenerator::set_mode(int m)
 {
     m_mode = m;
-    if (m == SINE)
-    {
-        m_sinewave.set_square(false);
-    }
-    if (m == SQUARE)
-    {
-        m_sinewave.set_square(true);
-    }
+    m_sinewave.set_function((SineWave::WaveformFunction)m);
 }
 
 bool PAaudioWaveformGenerator::pause(bool pause)

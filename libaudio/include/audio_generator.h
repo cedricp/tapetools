@@ -7,6 +7,7 @@ public:
     enum generatorMode{
         SINE,
         SQUARE,
+        TRIANGLE,
         WHITE_NOISE,
         BROWN_NOISE,
         PINK_NOISE
@@ -54,6 +55,6 @@ public:
     void set_mode(int m);
     int& mode(){return m_mode;};
     bool mode_tunable(){
-        return m_mode == SINE || m_mode == SQUARE;
+        return m_mode <= TRIANGLE;
     }
 };

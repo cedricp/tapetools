@@ -28,6 +28,7 @@ public:
 
     void draw(bool c) override
     {
+        set_lazy_mode(!m_audiotool->is_compute_on());
         Window_SDL::draw(c);
     }
 
